@@ -8,7 +8,9 @@
 // Number of double precision elements in used AVX vector
 #define AVX_VECTOR_SIZE 4
 
-void LinearBasis::CPU::FUNCNAME(
+#define FUNCNAME(mode) LinearBasis_CPU_##mode##_InterpolateValue 
+
+void FUNCNAME(MODE)(
 	const int dim, const int nno,
 	const int Dof_choice, const double* x,
 	const int* index, const double* surplus_t, double* value_)
