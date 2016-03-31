@@ -5,7 +5,7 @@
 #include "LinearBasis.h"
 #endif
 
-void FUNCNAME(
+void LinearBasis::CPU::FUNCNAME(
 	const int dim, const int nno,
 	const int Dof_choice, const double* x,
 	const int* index, const double* surplus_t, double* value_)
