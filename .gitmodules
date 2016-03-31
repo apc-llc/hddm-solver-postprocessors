@@ -1,0 +1,3 @@
+[submodule "gcc-5.1.1-knc"]
+	path = gcc-5.1.1-knc
+	url = https://github.com/apc-llc/gcc-5.1.1-knc.git
