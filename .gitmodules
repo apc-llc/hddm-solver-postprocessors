@@ -4,3 +4,6 @@
 [submodule "liboffloadmic"]
 	path = liboffloadmic
 	url = https://github.com/apc-llc/liboffloadmic
+[submodule "tbb"]
+	path = tbb
+	url = https://github.com/apc-llc/tbb.git
