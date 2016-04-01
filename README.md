@@ -24,6 +24,7 @@ $ git submodule update
 ### Build interpolators for Intel Xeon Phi (k1om) target on Ubuntu Linux
 
 ```
+$ cd hddm-solver-interpolators
 $ cd LinearBasis/MIC
 $ make target=native
 ```
@@ -32,6 +33,7 @@ $ make target=native
 
 ```
 $ qsub -q qmic -I -A DD-16-7
+$ cd hddm-solver-interpolators
 $ cd LinearBasis/MIC
 $ make target=native
 ```
