@@ -43,8 +43,7 @@ HOST_LIB_PATH := $(INSTALL_PREFIX)/host/lib/$(shell $(MIC_CC) -print-multi-os-di
 HOST_CFLAGS := -I$(shell pwd)/$(LOCATION)/libgomp/runtime -I$(shell pwd)/$(LOCATION)/libgomp/include/coi -I$(shell pwd)/$(LOCATION)/liboffloadmic/build_mic/plugin/ -g -O3 -gdwarf-3 -D_GNU_SOURCE -DLINUX -DGET_DEVICE_SYMBOL_ADDRESS_SUPPORT
 HOST_CXXFLAGS := $(HOST_CFLAGS)
 
-ifneq (,$(shell which $(MIC_CC)))
-TARGET_LIB_PATH := $(INSTALL_PREFIX)/mic/lib/$(shell $(MIC_CC) -print-multi-os-directory)
+TARGET_LIB_PATH := $(INSTALL_PREFIX)/mic/lib/`$(MIC_CC) -print-multi-os-directory`
 ifeq (native,$(target))
 MIC_LIB := $(TARGET_LIB_PATH) -lintrinsics
 MIC_CFLAGS := $(HOST_CFLAGS) -I$(INSTALL_PREFIX)/mic/lib/gcc/k1om-intelmic-linux-gnu/5.3.0/include -L$(MIC_LIB) -D__MIC__
@@ -53,7 +52,6 @@ else
 MIC_LIB := $(TARGET_LIB_PATH)
 MIC_CFLAGS := $(HOST_CFLAGS) -L$(MIC_LIB)
 MIC_CXXFLAGS := $(MIC_CFLAGS)
-endif
 endif
 
 # Check we are on Anselm. Otherwise, locally installed Xeon Phi is expected.
@@ -68,11 +66,9 @@ LOAD_FLEX_MODULE := module load flex
 LOAD_ICC_MODULE := module load intel
 endif
 
-ifneq (,$(shell which $(MIC_CC)))
 DEPENDS_ON_INTRINSICS_OR_NOT :=
 ifeq (native,$(target))
 DEPENDS_ON_INTRINSICS_OR_NOT := $(TARGET_LIB_PATH)/libintrinsics.a
-endif
 endif
 
 LIBOFFLOADMIC_HOST := $(HOST_LIB_PATH)/liboffloadmic_host.so
