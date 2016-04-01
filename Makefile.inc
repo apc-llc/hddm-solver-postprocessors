@@ -39,7 +39,7 @@ MIC_CC := $(HOST_CC)
 MIC_CXX := $(HOST_CXX)
 endif
 
-HOST_LIB_PATH := $(INSTALL_PREFIX)/host/lib/$(shell $(MIC_CC) -print-multi-os-directory)
+HOST_LIB_PATH := $(INSTALL_PREFIX)/host/lib/$(shell $(HOST_CC) -print-multi-os-directory)
 HOST_CFLAGS := -I$(shell pwd)/$(LOCATION)/libgomp/runtime -I$(shell pwd)/$(LOCATION)/libgomp/include/coi -I$(shell pwd)/$(LOCATION)/liboffloadmic/build_mic/plugin/ -g -O3 -gdwarf-3 -D_GNU_SOURCE -DLINUX -DGET_DEVICE_SYMBOL_ADDRESS_SUPPORT
 HOST_CXXFLAGS := $(HOST_CFLAGS)
 
