@@ -47,20 +47,21 @@ $(INSTALL_PREFIX)/host/bin/k1om-mpss-linux-gcc: mpss/$(MPSS_VER)/sysroots/k1om-m
 	mkdir -p build/ && \
 	cd build/ && \
 	export PATH=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/x86_64-mpsssdk-linux/usr/bin/k1om-mpss-linux/:$(PATH) && \
-	../configure --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=k1om-mpss-linux --prefix=$(shell pwd)/install/host --disable-silent-rules --disable-dependency-tracking --with-ld=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/x86_64-mpsssdk-linux/usr/bin/k1om-mpss-linux/k1om-mpss-linux-ld --with-as=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/x86_64-mpsssdk-linux/usr/bin/k1om-mpss-linux/k1om-mpss-linux-as --enable-shared --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-c99 --enable-long-long --enable-symvers=gnu --enable-libstdcxx-pch --program-prefix=k1om-mpss-linux- --enable-target-optspace --enable-lto --disable-bootstrap --with-system-zlib --with-linker-hash-style=gnu --enable-cheaders=c_global --with-local-prefix=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/k1om-mpss-linux/usr --with-sysroot=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/k1om-mpss-linux/ --disable-libunwind-exceptions --disable-libssp --disable-libgomp --disable-libmudflap --enable-nls --enable-__cxa_atexit --disable-libitm $(GCC_EXTRA_CONFIG) && \
+	../configure --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=k1om-mpss-linux --prefix=$(shell pwd)/$(LOCATION)/install/host --disable-silent-rules --disable-dependency-tracking --with-ld=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/x86_64-mpsssdk-linux/usr/bin/k1om-mpss-linux/k1om-mpss-linux-ld --with-as=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/x86_64-mpsssdk-linux/usr/bin/k1om-mpss-linux/k1om-mpss-linux-as --enable-shared --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-c99 --enable-long-long --enable-symvers=gnu --enable-libstdcxx-pch --program-prefix=k1om-mpss-linux- --enable-target-optspace --enable-lto --disable-bootstrap --with-system-zlib --with-linker-hash-style=gnu --enable-cheaders=c_global --with-local-prefix=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/k1om-mpss-linux/usr --with-sysroot=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/k1om-mpss-linux/ --disable-libunwind-exceptions --disable-libssp --disable-libgomp --disable-libmudflap --enable-nls --enable-__cxa_atexit --disable-libitm $(GCC_EXTRA_CONFIG) && \
 	make -j64 && \
 	make -j64 install
 
 $(INSTALL_PREFIX)/host/lib/libmicrt.so: $(INSTALL_PREFIX)/host/bin/k1om-mpss-linux-gcc
-	export PATH=$(shell pwd)/install/host/bin:$(PATH) && \
+	export PATH=$(shell pwd)/$(LOCATION)install/host/bin:$(PATH) && \
 	cd $(LOCATION)/liboffloadmic/ && \
 	$(LOAD_ICC_MODULE) && \
-	make target=native INSTALL_PREFIX=$(shell pwd)/install MIC_PREFIX=k1om-mpss-linux-
+	make clean && \
+	make target=native INSTALL_PREFIX=$(shell pwd)/$(LOCATION)/install MIC_PREFIX=k1om-mpss-linux-
 
 test_InterpolateValue: test_InterpolateValue.o InterpolateValueCPU.o InterpolateValue_embed.o
 	$(LOAD_GCC_MODULE) && $(HOST_CC) $(HOST_CFLAGS) $^ -o $@ -L$(INSTALL_PREFIX)/host/lib/$(TOOLEXECLIBDIR) -lmicrt -Wl,-rpath=$(INSTALL_PREFIX)/host/lib/$(TOOLEXECLIBDIR)
 
-test_InterpolateValue.o: test_InterpolateValue.c $(INSTALL_PREFIX)/host/include/mic_runtime.h
+test_InterpolateValue.o: test_InterpolateValue.c $(INSTALL_PREFIX)/host/lib/libmicrt.so
 	$(LOAD_GCC_MODULE) && $(HOST_CC) $(HOST_CFLAGS) -std=c99 -I$(INSTALL_PREFIX)/host/include -c $< -o $@
 
 InterpolateValueCPU.o: ../CPU/InterpolateValue.c
