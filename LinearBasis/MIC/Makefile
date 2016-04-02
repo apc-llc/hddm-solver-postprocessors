@@ -5,7 +5,7 @@
 
 LOCATION = ../../
 
-INSTALL_PREFIX = ../../install
+INSTALL_PREFIX = $(shell pwd)/$(LOCATION)/install
 
 MIC_PREFIX = k1om-mpss-linux-
 
@@ -48,16 +48,16 @@ $(INSTALL_PREFIX)/host/bin/k1om-mpss-linux-gcc: mpss/$(MPSS_VER)/sysroots/k1om-m
 	rm -rf build/ && \
 	mkdir build/ && \
 	cd build/ && \
-	../configure --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=k1om-mpss-linux --prefix=$(shell pwd)/$(LOCATION)/install/host --disable-silent-rules --disable-dependency-tracking --with-ld=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/x86_64-mpsssdk-linux/usr/bin/k1om-mpss-linux/k1om-mpss-linux-ld --with-as=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/x86_64-mpsssdk-linux/usr/bin/k1om-mpss-linux/k1om-mpss-linux-as --enable-shared --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-c99 --enable-long-long --enable-symvers=gnu --enable-libstdcxx-pch --program-prefix=k1om-mpss-linux- --enable-target-optspace --enable-lto --disable-bootstrap --with-system-zlib --with-linker-hash-style=gnu --enable-cheaders=c_global --with-local-prefix=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/k1om-mpss-linux/usr --with-sysroot=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/k1om-mpss-linux/ --disable-libunwind-exceptions --disable-libssp --disable-libgomp --disable-libmudflap --enable-nls --enable-__cxa_atexit --disable-libitm $(GCC_EXTRA_CONFIG) && \
-	make -j64 && \
-	make -j64 install
+	../configure --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=k1om-mpss-linux --prefix=$(INSTALL_PREFIX)/host --disable-silent-rules --disable-dependency-tracking --with-ld=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/x86_64-mpsssdk-linux/usr/bin/k1om-mpss-linux/k1om-mpss-linux-ld --with-as=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/x86_64-mpsssdk-linux/usr/bin/k1om-mpss-linux/k1om-mpss-linux-as --enable-shared --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-c99 --enable-long-long --enable-symvers=gnu --enable-libstdcxx-pch --program-prefix=k1om-mpss-linux- --enable-target-optspace --enable-lto --disable-bootstrap --with-system-zlib --with-linker-hash-style=gnu --enable-cheaders=c_global --with-local-prefix=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/k1om-mpss-linux/usr --with-sysroot=$(shell pwd)/mpss/$(MPSS_VER)/sysroots/k1om-mpss-linux/ --disable-libunwind-exceptions --disable-libssp --disable-libgomp --disable-libmudflap --enable-nls --enable-__cxa_atexit --disable-libitm $(GCC_EXTRA_CONFIG) && \
+	$(MAKE) -j64 && \
+	$(MAKE) -j64 install
 
 $(HOST_LIB_PATH)/libmicrt.so: $(INSTALL_PREFIX)/host/bin/k1om-mpss-linux-gcc
-	export PATH=$(shell pwd)/$(LOCATION)install/host/bin:$(PATH) && \
+	export PATH=$(INSTALL_PREFIX)/host/bin:$(PATH) && \
 	$(LOAD_GCC_MODULE) && $(LOAD_ICC_MODULE) && \
 	cd $(LOCATION)/liboffloadmic/ && \
-	make clean && \
-	make target=native INSTALL_PREFIX=$(shell pwd)/$(LOCATION)/install MIC_PREFIX=k1om-mpss-linux-
+	$(MAKE) clean && \
+	$(MAKE) INSTALL_PREFIX=$(INSTALL_PREFIX) MIC_PREFIX=k1om-mpss-linux-
 
 test_InterpolateValue: test_InterpolateValue.o InterpolateValueCPU.o InterpolateValue_embed.o
 	$(LOAD_GCC_MODULE) && $(HOST_CC) $(HOST_CFLAGS) $^ -o $@ -L$(INSTALL_PREFIX)/host/lib/$(TOOLEXECLIBDIR) -lmicrt -Wl,-rpath=$(INSTALL_PREFIX)/host/lib/$(TOOLEXECLIBDIR)
@@ -66,7 +66,7 @@ test_InterpolateValue.o: test_InterpolateValue.c $(HOST_LIB_PATH)/libmicrt.so
 	$(LOAD_GCC_MODULE) && $(HOST_CC) $(HOST_CFLAGS) -std=c99 -I$(INSTALL_PREFIX)/host/include -c $< -o $@
 
 InterpolateValueCPU.o: ../CPU/InterpolateValue.c
-	$(HOST_CC) $(HOST_CFLAGS) -I.. -mavx -std=c99 -DMODE=Generic -DDIM=8 -DDEFERRED -DHAVE_AVX -c $< -o $@
+	$(LOAD_GCC_MODULE) && $(HOST_CC) $(HOST_CFLAGS) -I.. -mavx -std=c99 -DMODE=Generic -DDIM=8 -DDEFERRED -DHAVE_AVX -c $< -o $@
 
 InterpolateValue_embed.o: InterpolateValue_embed.c InterpolateValue_embed.h
 	$(LOAD_GCC_MODULE) && $(HOST_CC) $(HOST_CFLAGS) -I. -I$(INSTALL_PREFIX)/host/include -c $< -o $@
@@ -75,8 +75,16 @@ InterpolateValue_embed.h: libInterpolateValueMIC.so
 	xxd -include $< >$@
 
 libInterpolateValueMIC.so: InterpolateValue.cpp $(INSTALL_PREFIX)/host/bin/k1om-mpss-linux-gcc $(HOST_LIB_PATH)/libmicrt.so $(LOCATION)/tbb/build/linux_release/libtbb.so
-	export PATH=$(shell pwd)/$(LOCATION)install/host/bin:$(PATH) && \
-	$(LOAD_GCC_MODULE) && $(MIC_CXX) $(MIC_CXXFLAGS) -I.. -mavx512f -DMODE=Generic -DDIM=8 -DDEFERRED -DHAVE_MIC -fPIC -shared $< -o $@ -I$(LOCATION)/tbb/include/
+	export PATH=$(INSTALL_PREFIX)/host/bin:$(PATH) && \
+	$(LOAD_GCC_MODULE) && $(MIC_CXX) $(MIC_CXXFLAGS) -I.. -mavx512f -DMODE=Generic -DDIM=8 -DDEFERRED -DHAVE_MIC -fPIC -shared $< -o $@ -I$(LOCATION)/tbb/include/ -L../../tbb/build/linux_release -ltbb -ltbbmalloc
+
+ifeq (native,$(target))
+run: test_InterpolateValue
+	SINK_LD_LIBRARY_PATH=$(SINK_LD_LIBRARY_PATH):$(INSTALL_PREFIX)/mic/lib/$(TOOLEXECLIBDIR):$(INSTALL_PREFIX)/host/k1om-mpss-linux/lib64:$(INSTALL_PREFIX)/../tbb/build/linux_release ./$<
+else
+run: test_InterpolateValue
+	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):$(INSTALL_PREFIX)/mic/lib/$(TOOLEXECLIBDIR):$(INSTALL_PREFIX)/../tbb/build/linux_release ./$<
+endif
 
 clean:
 	rm -rf test_InterpolateValue libInterpolateValueMIC.so InterpolateValue_embed.h *.o
