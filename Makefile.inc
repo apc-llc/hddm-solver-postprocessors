@@ -61,9 +61,9 @@ LOAD_GCC_MODULE := true
 LOAD_FLEX_MODULE := true
 LOAD_ICC_MODULE := true
 ifneq (,$(ANSELM))
-LOAD_GCC_MODULE := module unload gcc && module load gcc/4.9.0 && module load binutils
+LOAD_GCC_MODULE := module unload intel && module unload gcc && module load gcc/4.9.0 && module load binutils
 LOAD_FLEX_MODULE := module load flex
-LOAD_ICC_MODULE := module load intel
+LOAD_ICC_MODULE := module unload gcc && module load intel
 endif
 
 DEPENDS_ON_INTRINSICS_OR_NOT :=
