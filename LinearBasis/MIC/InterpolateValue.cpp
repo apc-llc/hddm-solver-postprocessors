@@ -2,6 +2,10 @@
 #include <assert.h>
 #include <stdint.h>
 #include <immintrin.h>
+unsigned long long _rdtsc(void);
+void _mm_delay_32(unsigned int val);
+#include "tbb/parallel_reduce.h"
+#include "tbb/blocked_range.h"
 #else
 #include "LinearBasis.h"
 #endif
@@ -33,6 +37,101 @@ static inline __m512d _mm512_abs_pd(const __m512d x)
     return _mm512_castsi512_pd(_mm512_castpd_si512(x) & sign_mask);
 }
 
+using namespace tbb;
+
+struct Interpolate
+{
+	const int dim, vdim, nno, Dof_choice;
+	const double *x, *index, *surplus_t;
+
+	volatile __m512d x8;
+	double value;
+
+	Interpolate(const int dim_, const int vdim_, const int nno_,
+		const int Dof_choice_, const double* x_,
+		const double* index_, const double* surplus_t_) : 
+		dim(dim_), vdim(vdim_), nno(nno_), Dof_choice(Dof_choice_),
+		x(x_), index(index_), surplus_t(surplus_t_), value(0)
+	{
+#if defined(DEFERRED)
+		if (DIM <= AVX_VECTOR_SIZE)
+		{
+			x8 = _mm512_load_pd(x);
+		}
+#endif
+	}
+
+	Interpolate(Interpolate& interp, split) :
+		dim(interp.dim), vdim(interp.vdim), nno(interp.nno), Dof_choice(interp.Dof_choice),
+		x(interp.x), index(interp.index), surplus_t(interp.surplus_t)
+	{
+		value = 0;
+#if defined(DEFERRED)
+		if (DIM <= AVX_VECTOR_SIZE)
+		{
+			x8 = _mm512_load_pd(x);
+		}
+#endif
+	}
+
+	void operator()(const blocked_range<int>& r)
+	{
+		for (int i = r.begin(); i != r.end(); i++)
+		{
+			int zero = 0;
+			volatile __m512d temp = double8_1_1_1_1_1_1_1_1;
+			for (int j = 0; j < DIM; j += AVX_VECTOR_SIZE)
+			{
+#if defined(DEFERRED)
+				if (DIM > AVX_VECTOR_SIZE)
+#endif
+				{
+					__m512d x8 = _mm512_load_pd(x + j);
+				}
+
+				// Read integer indexes, which are already converted to double,
+				// because k1om can't load __m256i and convert anyway.
+				volatile __m512d i8 = _mm512_load_pd((void*)&index[i * 2 * vdim + j]);
+				volatile __m512d j8 = _mm512_load_pd((void*)&index[i * 2 * vdim + j + vdim]);
+
+				volatile const __m512d xp = _mm512_sub_pd(double8_1_1_1_1_1_1_1_1,
+					_mm512_abs_pd(_mm512_fmsub_pd (x8, i8, j8)));
+				volatile __mmask8 d = _mm512_cmp_pd_mask(xp, double8_0_0_0_0_0_0_0_0, _MM_CMPINT_GT);
+				if (d != 0xff)
+				{
+					zero = 1;
+					break;
+				}
+				temp = _mm512_mul_pd(temp, xp);
+			}
+			if (zero) continue;
+
+			// TODO GCC generates an unsupported vector instruction here.
+			//value += _mm512_reduce_mul_pd(temp) * surplus_t[Dof_choice * nno + i];
+			double reduction = _mm512_reduce_mul_pd(temp);
+			__asm__ (
+				  "fldl %[temp]\n\t"
+				  "fmull %[surplus]\n\t"
+				  "faddl %[value]\n\t"
+				  "fstpl %[value]\n\t"
+				: [value] "+m"(value)
+				: [temp] "m"(reduction), [surplus] "m"(surplus_t[Dof_choice * nno + i]));
+		}
+	}
+
+	void join(Interpolate& rhs)
+	{
+		// TODO GCC generates an unsupported vector instruction here.
+		// value += rhs.value;
+		__asm__ (
+			  "fldl %[rhs_value]\n\t"
+			  "faddl %[value]\n\t"
+			  "fstpl %[value]\n\t"
+			: [value] "+m"(value)
+			: [rhs_value] "m"(rhs.value));
+	}
+};
+
 #endif
 
 static void interpolate(
@@ -53,57 +152,9 @@ static void interpolate(
 	vdim *= AVX_VECTOR_SIZE;
 
 #ifdef HAVE_MIC
-	volatile __m512d x8;
-#if defined(DEFERRED)
-	if (DIM <= AVX_VECTOR_SIZE)
-	{
-		x8 = _mm512_load_pd(x);
-		//x8 = _mm512_extloadunpacklo_pd(x8, x, _MM_UPCONV_PD_NONE, _MM_HINT_NONE);
-		//x8 = _mm512_extloadunpackhi_pd(x8, (uint8_t*)x + 64, _MM_UPCONV_PD_NONE, _MM_HINT_NONE);
-	}
-#endif
-	for (int i = 0; i < nno; i++)
-	{
-		int zero = 0;
-		volatile __m512d temp = double8_1_1_1_1_1_1_1_1;
-		for (int j = 0; j < DIM; j += AVX_VECTOR_SIZE)
-		{
-#if defined(DEFERRED)
-			if (DIM > AVX_VECTOR_SIZE)
-#endif
-			{
-				__m512d x8 = _mm512_load_pd(x + j);
-				//x8 = _mm512_extloadunpacklo_pd(x8, x + j, _MM_UPCONV_PD_NONE, _MM_HINT_NONE);
-				//x8 = _mm512_extloadunpackhi_pd(x8, (uint8_t*)(x + j) + 64, _MM_UPCONV_PD_NONE, _MM_HINT_NONE);
-			}
-
-			// Read integer indexes, which are already converted to double,
-			// because k1om can't load __m256i and convert anyway.
-			volatile __m512d i8 = _mm512_load_pd((void*)&index[i * 2 * vdim + j]);
-			volatile __m512d j8 = _mm512_load_pd((void*)&index[i * 2 * vdim + j + vdim]);
-
-			volatile const __m512d xp = _mm512_sub_pd(double8_1_1_1_1_1_1_1_1,
-				_mm512_abs_pd(_mm512_fmsub_pd (x8, i8, j8)));
-			volatile __mmask8 d = _mm512_cmp_pd_mask(xp, double8_0_0_0_0_0_0_0_0, _MM_CMPINT_GT);
-			if (d != 0xff)
-			{
-				zero = 1;
-				break;
-			}
-			temp = _mm512_mul_pd(temp, xp);
-		}
-		if (zero) continue;
-
-		//value += _mm512_reduce_mul_pd(temp) * surplus_t[Dof_choice * nno + i];
-		double reduction = _mm512_reduce_mul_pd(temp);
-		__asm__ (
-			  "fldl %[temp]\n\t"
-			  "fmull %[surplus]\n\t"
-			  "faddl %[value]\n\t"
-			  "fstpl %[value]\n\t"
-			: [value] "+m"(value)
-			: [temp] "m"(reduction), [surplus] "m"(surplus_t[Dof_choice * nno + i]));
-	}
+	Interpolate interp(dim, vdim, nno, Dof_choice, x, index, surplus_t);
+	parallel_reduce(blocked_range<int>(0, nno), interp);
+	value = interp.value;
 #else
 	for (int i = 0; i < nno; i++)
 	{
