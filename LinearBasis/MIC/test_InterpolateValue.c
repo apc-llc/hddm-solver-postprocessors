@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
 	double dinvrandmax = 1.0 / (double)RAND_MAX;
 
 	int dim = 8;
-	int nno = 5;
+	int nno = 100;
 	int Dof_choice = 2;
 
 	double* host_x;
@@ -108,10 +108,10 @@ int main(int argc, char* argv[])
 	else
 		printf("Result is correct\n");
 
-	MIC_ERROR_CHECK(micFreeAligned(device_x));
-	MIC_ERROR_CHECK(micFreeAligned(device_index));
-	MIC_ERROR_CHECK(micFreeAligned(device_surplus_t));
-	MIC_ERROR_CHECK(micFreeAligned(device_value));
+	MIC_ERROR_CHECK(micFree(device_x));
+	MIC_ERROR_CHECK(micFree(device_index));
+	MIC_ERROR_CHECK(micFree(device_surplus_t));
+	MIC_ERROR_CHECK(micFree(device_value));
 
 	free(host_x);
 	free(host_index);
