@@ -3,7 +3,7 @@
 # Anselm cluster http://www.it4i.cz/
 #
 
-LOCATION = ../../
+LOCATION = ../..
 
 INSTALL_PREFIX = $(shell pwd)/$(LOCATION)/install
 
@@ -24,6 +24,11 @@ ANSELM_LIBS := -Wl,-rpath=$(GMP_PATH)/lib -Wl,-rpath=$(MPFR_PATH)/lib -Wl,-rpath
 GCC_CFLAGS := CFLAGS="-g -O2 $(ANSELM_LIBS)"
 GCC_CXXFLAGS := CXXFLAGS="-g -O2 $(ANSELM_LIBS)"
 GCC_EXTRA_CONFIG := --disable-libatomic --with-gmp=$(GMP_PATH) --with-mpfr=$(MPFR_PATH) --with-mpc=$(MPC_PATH) $(GCC_CFLAGS) $(GCC_CXXFLAGS)
+endif
+
+ifneq (,$(DEBUG))
+HOST_CFLAGS := -g -O0 -gdwarf-3
+HOST_CXXFLAGS := -g -O0 -gdwarf-3
 endif
 
 all: test_InterpolateValue
@@ -66,7 +71,7 @@ test_InterpolateValue.o: test_InterpolateValue.c $(HOST_LIB_PATH)/libmicrt.so
 	$(LOAD_GCC_MODULE) && $(HOST_CC) $(HOST_CFLAGS) -std=c99 -I$(INSTALL_PREFIX)/host/include -c $< -o $@
 
 InterpolateValueCPU.o: ../CPU/InterpolateValue.c
-	$(LOAD_GCC_MODULE) && $(HOST_CC) $(HOST_CFLAGS) -I.. -mavx -std=c99 -DMODE=Generic -DDIM=8 -DDEFERRED -DHAVE_AVX -c $< -o $@
+	$(LOAD_GCC_MODULE) && $(HOST_CC) $(HOST_CFLAGS) -I.. -mavx -std=c99 -DFUNCNAME=LinearBasis_CPU_Generic_InterpolateValue -DDIM=8 -DDEFERRED -DHAVE_AVX -c $< -o $@
 
 InterpolateValue_embed.o: InterpolateValue_embed.c InterpolateValue_embed.h
 	$(LOAD_GCC_MODULE) && $(HOST_CC) $(HOST_CFLAGS) -I. -I$(INSTALL_PREFIX)/host/include -c $< -o $@
@@ -76,7 +81,7 @@ InterpolateValue_embed.h: libInterpolateValueMIC.so
 
 libInterpolateValueMIC.so: InterpolateValue.cpp $(INSTALL_PREFIX)/host/bin/k1om-mpss-linux-gcc $(HOST_LIB_PATH)/libmicrt.so $(LOCATION)/tbb/build/linux_release/libtbb.so
 	export PATH=$(INSTALL_PREFIX)/host/bin:$(PATH) && \
-	$(LOAD_GCC_MODULE) && $(MIC_CXX) $(MIC_CXXFLAGS) -I.. -mavx512f -DMODE=Generic -DDIM=8 -DDEFERRED -DHAVE_MIC -fPIC -shared $< -o $@ -I$(LOCATION)/tbb/include/ -L../../tbb/build/linux_release -ltbb -ltbbmalloc
+	$(LOAD_GCC_MODULE) && $(MIC_CXX) $(MIC_CXXFLAGS) -I.. -mavx512f -DFUNCNAME=LinearBasis_MIC_Generic_InterpolateValue -DDIM=8 -DDEFERRED -DHAVE_MIC -fPIC -shared $< -o $@ -I$(LOCATION)/tbb/include/ -L../../tbb/build/linux_release -ltbb -ltbbmalloc
 
 ifeq (native,$(target))
 run: test_InterpolateValue
@@ -84,6 +89,13 @@ run: test_InterpolateValue
 else
 run: test_InterpolateValue
 	LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):$(INSTALL_PREFIX)/mic/lib/$(TOOLEXECLIBDIR):$(INSTALL_PREFIX)/../tbb/build/linux_release ./$<
+endif
+
+ifeq (native,$(target))
+setup_host: test_InterpolateValue
+	SINK_LD_LIBRARY_PATH=$(SINK_LD_LIBRARY_PATH):$(INSTALL_PREFIX)/mic/lib/$(TOOLEXECLIBDIR):$(INSTALL_PREFIX)/host/k1om-mpss-linux/lib64:$(INSTALL_PREFIX)/../tbb/build/linux_release $(LOCATION)/liboffloadmic/gdb/setup_host ./$<
+setup_device: test_InterpolateValue
+	SINK_LD_LIBRARY_PATH=$(SINK_LD_LIBRARY_PATH):$(INSTALL_PREFIX)/mic/lib/$(TOOLEXECLIBDIR):$(INSTALL_PREFIX)/host/k1om-mpss-linux/lib64:$(INSTALL_PREFIX)/../tbb/build/linux_release $(LOCATION)/liboffloadmic/gdb/setup_device
 endif
 
 clean:

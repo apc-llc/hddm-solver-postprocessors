@@ -1,4 +1,5 @@
 #ifdef HAVE_MIC
+#include <assert.h>
 #include <stdint.h>
 #include <immintrin.h>
 #else
@@ -34,13 +35,15 @@ static inline __m512d _mm512_abs_pd(const __m512d x)
 
 #endif
 
-#define FUNCNAME(mode) LinearBasis_MIC_##mode##_InterpolateValue 
-
-void FUNCNAME(MODE)(
+static void interpolate(
 	const int dim, const int nno,
 	const int Dof_choice, const double* x,
-	const int* index, const double* surplus_t, double* value_)
+	const double* index, const double* surplus_t, double* value_)
 {
+	assert(((size_t)x % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "x vector must be sufficiently memory-aligned");
+	assert(((size_t)index % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "index vector must be sufficiently memory-aligned");
+	assert(((size_t)surplus_t % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "surplus_t vector must be sufficiently memory-aligned");
+
 	double value = 0.0;
 
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
@@ -122,5 +125,20 @@ void FUNCNAME(MODE)(
 	}
 #endif
 	*value_ = value;
+}
+
+extern "C" void FUNCNAME(void* arg)
+{
+	typedef struct
+	{
+		int dim, nno, Dof_choice;
+		double *x, *surplus_t, *value, *index;
+	}
+	Args;
+	
+	Args* args = (Args*)arg;
+
+	interpolate(args->dim, args->nno, args->Dof_choice, args->x,
+		args->index, args->surplus_t, args->value);
 }
 

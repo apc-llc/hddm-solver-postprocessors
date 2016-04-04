@@ -1,4 +1,5 @@
 #ifdef HAVE_AVX
+#include <assert.h>
 #include <stdint.h>
 #include <x86intrin.h>
 #else
@@ -8,13 +9,15 @@
 // Number of double precision elements in used AVX vector
 #define AVX_VECTOR_SIZE 4
 
-#define FUNCNAME(mode) LinearBasis_CPU_##mode##_InterpolateValue 
-
-void FUNCNAME(MODE)(
+void FUNCNAME(
 	const int dim, const int nno,
 	const int Dof_choice, const double* x,
 	const int* index, const double* surplus_t, double* value_)
 {
+	assert(((size_t)x % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "x vector must be sufficiently memory-aligned");
+	assert(((size_t)index % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "index vector must be sufficiently memory-aligned");
+	assert(((size_t)surplus_t % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "surplus_t vector must be sufficiently memory-aligned");
+
 	double value = 0.0;
 
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
