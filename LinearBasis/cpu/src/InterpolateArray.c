@@ -12,7 +12,7 @@ void FUNCNAME(
 	const int* index, const double* surplus_t, double* value)
 {
 	assert(((size_t)x % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "x vector must be sufficiently memory-aligned");
-	assert(((size_t)index % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "index vector must be sufficiently memory-aligned");
+	assert(((size_t)index % (AVX_VECTOR_SIZE * sizeof(int)) == 0) && "index vector must be sufficiently memory-aligned");
 	assert(((size_t)surplus_t % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "surplus_t vector must be sufficiently memory-aligned");
 
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
