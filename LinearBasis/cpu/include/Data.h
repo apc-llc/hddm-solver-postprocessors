@@ -78,6 +78,8 @@ class Data
 	friend class Interpolator;
 
 public :
+	int getNno() const;
+
 	void load(const char* filename);
 
 	Data();
