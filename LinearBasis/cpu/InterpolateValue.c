@@ -6,9 +6,6 @@
 #include "LinearBasis.h"
 #endif
 
-// Number of double precision elements in used AVX vector
-#define AVX_VECTOR_SIZE 4
-
 void FUNCNAME(
 	const int dim, const int nno,
 	const int Dof_choice, const double* x,
@@ -73,7 +70,7 @@ void FUNCNAME(
 		for (int j = 0; j < DIM; j++)
 		{
 			double xp = LinearBasis(x[j], index[i * 2 * vdim + j],
-				index[i * 2 * vdim + j + vdim * AVX_VECTOR_SIZE]);
+				index[i * 2 * vdim + j + vdim]);
 			if (xp <= 0.0)
 			{
 				zero = 1;

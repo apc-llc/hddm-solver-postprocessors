@@ -1,8 +1,8 @@
-.PHONY: MIC
+.PHONY: cpu gpu mic
 
-all: MIC
-	cd MIC && $(MAKE) target=native
+all: mic
+	cd mic && $(MAKE) target=native
 
 clean:
-	cd MIC && $(MAKE) clean
+	cd mic && $(MAKE) clean
 
