@@ -3,17 +3,78 @@
 
 #include <algorithm>
 #include <assert.h>
+#include <cstddef>
+#include <cstdlib>
 #include <vector>
+
+// Custom allocator, using code by Sergei Danielian
+// https://github.com/gahcep/Allocators
+template <class T>
+class AlignedAllocator
+{
+public:
+	using value_type = T;
+	using pointer = T*;
+	using const_pointer = const T*;
+	using reference = T&;
+	using const_reference = const T&;
+	using size_type = std::size_t;
+	using difference_type = std::ptrdiff_t;
+
+	// Rebind
+	template <class U>
+	struct rebind { using other = AlignedAllocator<U>; }
+
+	AlignedAllocator() { }
+	AlignedAllocator(const AlignedAllocator&) { }
+	template <class U>
+	AlignedAllocator(const AlignedAllocator<U>&) { }
+
+	// Allocators are not required to be assignable
+	AlignedAllocator& operator=(const AlignedAllocator& other) = delete;
+	~AlignedAllocator() { }
+
+	// Obtains the address of an object
+	pointer address(reference r) const { return &r; }
+	const_pointer address(const_reference r) const { return &r; }
+
+	// Returns the largest supported allocation size
+	size_type max_size() const
+	{
+		return (static_cast<size_t>(0) - static_cast<size_t>(1)) / sizeof(T);
+	}
+
+	// Equality of allocators does not imply that they must have exactly
+	// the same internal state,  only that they must both be able to
+	// deallocate memory that was allocated with either allocator
+	bool operator!=(const AlignedAllocator& other) { return !(*this == other); }
+	bool operator==(const AlignedAllocator&) { return true; }
+
+	// allocation
+	pointer allocate(size_type n, std::allocator<void>::const_pointer = 0) const
+		throw(std::bad_alloc, std::length_error)
+	{
+		void* ptr;
+		posix_memalign(&ptr, AVX_VECTOR_SIZE * sizeof(T), n * sizeof(T));
+
+		return static_cast<pointer>(ptr);
+	}
+
+	void deallocate(pointer ptr, size_type n)
+	{
+		free(ptr);
+	}
+};
 
 template<typename T>
 class Vector
 {
-	std::vector<T> data;
+	std::vector<T, AlignedAllocator<T> > data;
 
 public :
-	Vector() { }
+	Vector() : data(AlignedAllocator<T>()) { }
 
-	Vector(int dim) { data.resize(dim); }
+	Vector(int dim) : data(AlignedAllocator<T>()) { data.resize(dim); }
 
 	T* getData() { return &data[0]; }
 
@@ -31,13 +92,13 @@ public :
 template<typename T>
 class Matrix
 {
-	std::vector<T> data;
+	std::vector<T, AlignedAllocator<T> > data;
 	int dimX, dimY;
 
 public :
-	Matrix() : dimX(0), dimY(0) { }
+	Matrix() : data(AlignedAllocator<T>()), dimX(0), dimY(0) { }
 
-	Matrix(int dimX_, int dimY_) : dimX(dimX_), dimY(dimY_)
+	Matrix(int dimX_, int dimY_) : data(AlignedAllocator<T>()), dimX(dimX_), dimY(dimY_)
 	{
 		data.resize(dimX_ * dimY_);
 	}
