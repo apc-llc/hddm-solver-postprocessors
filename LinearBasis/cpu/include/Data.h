@@ -23,7 +23,7 @@ public:
 
 	// Rebind
 	template <class U>
-	struct rebind { using other = AlignedAllocator<U>; }
+	struct rebind { using other = AlignedAllocator<U>; };
 
 	AlignedAllocator() { }
 	AlignedAllocator(const AlignedAllocator&) { }
