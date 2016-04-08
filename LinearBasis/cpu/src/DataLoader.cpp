@@ -30,6 +30,8 @@ public :
 
 extern "C" int MPI_Process_get(MPI_Process**);
 
+int Data::getNno() const { return nno; }
+
 void Data::load(const char* filename)
 {
 	MPI_Process* process;
