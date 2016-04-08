@@ -30,7 +30,7 @@ void FUNCNAME(
 	__m256d x4;
 #if defined(DEFERRED)
 	if (DIM <= AVX_VECTOR_SIZE)
-		x4 = _mm256_loadu_pd(x);
+		x4 = _mm256_load_pd(x);
 #endif
 	for (int i = 0; i < nno; i++)
 	{
@@ -42,7 +42,7 @@ void FUNCNAME(
 			if (DIM > AVX_VECTOR_SIZE)
 #endif
 			{
-				x4 = _mm256_loadu_pd(x + j);
+				x4 = _mm256_load_pd(x + j);
 			}
 
 			__m128i i4 = _mm_load_si128((const __m128i*)&index[i * 2 * vdim + j]);
