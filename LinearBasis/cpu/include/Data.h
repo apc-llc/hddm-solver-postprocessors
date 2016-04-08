@@ -107,7 +107,7 @@ public :
 	
 	T& operator()(int x, int y)
 	{
-		int index = x + dimX * y;
+		int index = y + dimY * x;
 		assert(index < data.size());
 		return data[index];
 	}
