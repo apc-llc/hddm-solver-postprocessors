@@ -11,9 +11,11 @@ void FUNCNAME(
 	const int Dof_choice, const double* x,
 	const int* index, const double* surplus_t, double* value_)
 {
+#ifdef HAVE_AVX
 	assert(((size_t)x % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "x vector must be sufficiently memory-aligned");
 	assert(((size_t)index % (AVX_VECTOR_SIZE * sizeof(int)) == 0) && "index vector must be sufficiently memory-aligned");
 	assert(((size_t)surplus_t % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "surplus_t vector must be sufficiently memory-aligned");
+#endif
 
 	double value = 0.0;
 
