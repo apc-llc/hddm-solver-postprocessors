@@ -39,7 +39,7 @@ $(BUILD)/DataLoader.o: src/DataLoader.cpp include/Data.h
 	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/JIT.o: src/JIT.cpp include/InterpolateKernel.h
-	$(CDIR) && $(MPICXX) -DINTERPOLATE_ARRAY_GPU_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArrayGPU.sh\" -DINTERPOLATE_ARRAY_MANY_GPU_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArrayManyGPU.sh\" -DINTERPOLATE_VALUE_GPU_SH=\"$(shell pwd)/$(BUILD)/libInterpolateValueGPU.sh\" -DINTERPOLATE_ARRAY_CPU_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArrayCPU.sh\" -DINTERPOLATE_ARRAY_MANY_CPU_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArrayManyCPU.sh\" -DINTERPOLATE_VALUE_CPU_SH=\"$(shell pwd)/$(BUILD)/libInterpolateValueCPU.sh\" $(CINC) $(COPT) -c $< -o $@
+	$(CDIR) && $(MPICXX) -DINTERPOLATE_ARRAY_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArray.sh\" -DINTERPOLATE_ARRAY_MANY_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArrayMany.sh\" -DINTERPOLATE_VALUE_SH=\"$(shell pwd)/$(BUILD)/libInterpolateValue.sh\" $(CINC) $(COPT) -c $< -o $@
 
 clean:
 	rm -rf $(BUILD) $(INSTALL)/bin/interpolators/cpu/libinterpolator.so

@@ -17,11 +17,11 @@
 using namespace std;
 
 template<>
-const string InterpolateArrayKernel::sh = INTERPOLATE_ARRAY_CPU_SH;
+const string InterpolateArrayKernel::sh = INTERPOLATE_ARRAY_SH;
 template<>
-const string InterpolateArrayManyKernel::sh = INTERPOLATE_ARRAY_MANY_CPU_SH;
+const string InterpolateArrayManyKernel::sh = INTERPOLATE_ARRAY_MANY_SH;
 template<>
-const string InterpolateValueKernel::sh = INTERPOLATE_VALUE_CPU_SH;
+const string InterpolateValueKernel::sh = INTERPOLATE_VALUE_SH;
 
 template<typename K, typename F>
 K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbackFunc)
@@ -150,6 +150,22 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 			std::ifstream t(kernel.sh.c_str());
 			std::string sh((std::istreambuf_iterator<char>(t)),
 				std::istreambuf_iterator<char>());
+			if (!t.is_open())
+			{
+				cerr << "Error opening file: " << kernel.sh << endl;
+				cerr << "Deferred CPU kernel compilation failed!" << endl;
+
+				kernel.compilationFailed = true;
+				kernel.dim = dim;
+				kernel.fileowner = false;
+				kernel.func = fallbackFunc;
+
+				__sync_synchronize();
+
+				kernels_tls->operator[](dim) = kernel;
+				PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
+				return kernel;
+			}
 			stringstream snewline;
 			snewline << endl;
 			string newline = snewline.str();

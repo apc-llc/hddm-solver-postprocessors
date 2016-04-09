@@ -18,7 +18,6 @@ class InterpolateKernel
 	std::string filename;
 	bool fileowner;
 	std::string funcname;
-	bool gpu;
 	
 	pthread_mutex_t mutex;
 
@@ -35,7 +34,6 @@ public :
 			if (!func)
 			{
 				string type = "CPU";
-				if (gpu) type = "GPU";
 			
 				// Open compiled library and load interpolation function entry point.
 #ifndef RTLD_DEEPBIND
@@ -71,7 +69,7 @@ public :
 	}
 
 	InterpolateKernel() :
-		dim(-1), compilationFailed(false), func(NULL), filename(""), fileowner(false), gpu(false)
+		dim(-1), compilationFailed(false), func(NULL), filename(""), fileowner(false)
 	{
 		pthread_mutex_init(&mutex, NULL); 
 	}
@@ -83,7 +81,6 @@ public :
 		func = other.func;
 		filename = other.filename;
 		fileowner = false;
-		gpu = other.gpu;
 		pthread_mutex_init(&mutex, NULL);
 	}
 
