@@ -58,8 +58,8 @@ void FUNCNAME(
 				__m128i j4 = _mm_load_si128((const __m128i*)&index[i * 2 * vdim + j + vdim]);
 				const __m256d xp = _mm256_sub_pd(double4_1_1_1_1, _mm256_andnot_pd(sign_mask,
 					_mm256_sub_pd(_mm256_mul_pd(x4, _mm256_cvtepi32_pd(i4)), _mm256_cvtepi32_pd(j4))));
-				const __m256d d = (__m256d)_mm256_cmp_ps((__m256)xp, (__m256)double4_0_0_0_0, _CMP_GT_OS);
-				if (_mm256_movemask_pd(d) != 0xf)
+				const __m256d d = _mm256_cmp_pd(xp, double4_0_0_0_0, _CMP_GT_OQ);
+				if (_mm256_movemask_pd(d) != (int)0xf)
 				{
 					zero = 1;
 					break;

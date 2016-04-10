@@ -52,7 +52,7 @@ void FUNCNAME(
 			const __m256d xp = _mm256_sub_pd(double4_1_1_1_1, _mm256_andnot_pd(sign_mask,
 				_mm256_sub_pd(_mm256_mul_pd(x4, _mm256_cvtepi32_pd(i4)), _mm256_cvtepi32_pd(j4))));
 			const __m256d d = _mm256_cmp_pd(xp, double4_0_0_0_0, _CMP_GT_OQ);
-			if (_mm256_movemask_pd(d) != 0xf)
+			if (_mm256_movemask_pd(d) != (int)0xf)
 			{
 				zero = 1;
 				break;
