@@ -52,7 +52,6 @@ public:
 
 	// allocation
 	pointer allocate(size_type n, std::allocator<void>::const_pointer = 0) const
-		throw(std::bad_alloc, std::length_error)
 	{
 		void* ptr;
 		posix_memalign(&ptr, AVX_VECTOR_SIZE * sizeof(T), n * sizeof(T));
