@@ -11,7 +11,7 @@ all: $(INSTALL)/bin/interpolators/cpu/libinterpolator.so
 $(INSTALL)/bin/interpolators/cpu/libinterpolator.so: \
 	$(BUILD)/InterpolateValue.o $(BUILD)/InterpolateArray.o $(BUILD)/InterpolateArrayMany.o \
 	$(BUILD)/libInterpolateValue.sh $(BUILD)/libInterpolateArray.sh $(BUILD)/libInterpolateArrayMany.sh \
-	$(BUILD)/Interpolator.o $(BUILD)/DataLoader.o $(BUILD)/JIT.o
+	$(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o
 	mkdir -p $(INSTALL)/bin/interpolators/cpu && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@
 
 $(BUILD)/InterpolateValue.o: src/InterpolateValue.c
@@ -35,7 +35,7 @@ $(BUILD)/libInterpolateArrayMany.sh: src/InterpolateArrayMany.c
 $(BUILD)/Interpolator.o: src/Interpolator.cpp include/JIT.h include/Data.h
 	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
 
-$(BUILD)/DataLoader.o: src/DataLoader.cpp include/Data.h
+$(BUILD)/Data.o: src/Data.cpp include/Data.h
 	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/JIT.o: src/JIT.cpp include/InterpolateKernel.h

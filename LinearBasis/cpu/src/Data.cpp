@@ -73,43 +73,43 @@ void Data::load(const char* filename)
 	// For better caching we use transposed surplus.
 	surplus_t.resize(TotalDof, nno);
 	surplus_t.fill(0.0);
-	int i = 0;
+	int j = 0;
 	while (infile)
 	{
-		if (i == nno) break;
+		if (j == nno) break;
 
-		for (int j = 0;j < dim; )
+		for (int i = 0; i < dim; )
 		{
 			int value_simd[AVX_VECTOR_SIZE];
-			for (int v = 0; (v < AVX_VECTOR_SIZE) && (j < dim); v++, j++)
+			for (int v = 0; (v < AVX_VECTOR_SIZE) && (i < dim); v++, i++)
 			{
 				int value; infile >> value;
 				value = 2 << (value - 2);
-				index(i, j) = value;
+				index(j, i) = value;
 				value_simd[v] = value;
 			}
 		}
-		for (int j = 0; j < dim; )
+		for (int i = 0; i < dim; )
 		{
 			int value_simd[AVX_VECTOR_SIZE];
-			for (int v = 0; (v < AVX_VECTOR_SIZE) && (j < dim); v++, j++)
+			for (int v = 0; (v < AVX_VECTOR_SIZE) && (i < dim); v++, i++)
 			{
 				int value; infile >> value;
 				value--;
 				// Percompute "j" to merge two cases into one:
 				// (((i) == 0) ? (1) : (1 - fabs((x) * (i) - (j)))).
-				if (!index(i, j)) value = 0;
-				index(i, j + vdim * AVX_VECTOR_SIZE) = value;
+				if (!index(j, i)) value = 0;
+				index(j, i + vdim * AVX_VECTOR_SIZE) = value;
 				value_simd[v] = value;
 			}
 		}
-		for (int j = 0; j < TotalDof; j++)
+		for (int i = 0; i < TotalDof; i++)
 		{
 			double value; infile >> value;
-			surplus(i, j) = value;
-			surplus_t(j, i) = value;
+			surplus(j, i) = value;
+			surplus_t(i, j) = value;
 		}
-		i++;
+		j++;
 	}
 	infile.close();
 }
@@ -118,7 +118,7 @@ Data::Data() { }
 
 static unique_ptr<Data> data = NULL;
 
-extern "C" Data* getDataLoader()
+extern "C" Data* getData()
 {
 	if (!data.get())
 		data.reset(new Data());
