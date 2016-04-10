@@ -118,7 +118,7 @@ Data::Data() { }
 
 static unique_ptr<Data> data = NULL;
 
-extern "C" Data* getDataLoader()
+extern "C" Data* getData()
 {
 	if (!data.get())
 		data.reset(new Data());
