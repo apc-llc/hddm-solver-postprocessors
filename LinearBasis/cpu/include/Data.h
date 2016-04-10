@@ -99,33 +99,33 @@ template<typename T>
 class Matrix
 {
 	std::vector<T, AlignedAllocator<T> > data;
-	int dimX, dimY;
+	int dimY, dimX;
 
 public :
-	Matrix() : data(AlignedAllocator<T>()), dimX(0), dimY(0) { }
+	Matrix() : data(AlignedAllocator<T>()), dimY(0), dimX(0) { }
 
-	Matrix(int dimX_, int dimY_) : data(AlignedAllocator<T>()), dimX(dimX_), dimY(dimY_)
+	Matrix(int dimY_, int dimX_) : data(AlignedAllocator<T>()), dimY(dimY_), dimX(dimX_)
 	{
-		data.resize(dimX_ * dimY_);
+		data.resize(dimY_ * dimX_);
 	}
 
 	T* getData() { return &data[0]; }
 	
-	T& operator()(int x, int y)
+	T& operator()(int y, int x)
 	{
-		int index = y + dimY * x;
+		int index = x + dimX * y;
 		assert(index < data.size());
 		return data[index];
 	}
 
-	int dimx() { return dimX; }
-	
 	int dimy() { return dimY; }
-	
-	void resize(int dimX_, int dimY_)
+
+	int dimx() { return dimX; }
+		
+	void resize(int dimY_, int dimX_)
 	{
-		dimX = dimX_; dimY = dimY_;
-		data.resize(dimX_ * dimY_);
+		dimY = dimY_; dimX = dimX_;
+		data.resize(dimY_ * dimX_);
 	}
 	
 	void fill(T value)
