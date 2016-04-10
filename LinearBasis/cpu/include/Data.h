@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <cstddef>
 #include <cstdlib>
+#include <string.h>
 #include <vector>
 
 // Custom allocator, using code by Sergei Danielian
@@ -54,8 +55,13 @@ public:
 	pointer allocate(size_type n, std::allocator<void>::const_pointer = 0) const
 		throw(std::bad_alloc, std::length_error)
 	{
+		// Align & pad to vector size and zero.
 		void* ptr;
-		posix_memalign(&ptr, AVX_VECTOR_SIZE * sizeof(T), n * sizeof(T));
+		size_t size = n * sizeof(T);
+		if (size % (AVX_VECTOR_SIZE * sizeof(T)))
+			size += AVX_VECTOR_SIZE * sizeof(T) - size % (AVX_VECTOR_SIZE * sizeof(T)); 
+		posix_memalign(&ptr, AVX_VECTOR_SIZE * sizeof(T), size);
+		memset(ptr, 0, size);
 
 		return static_cast<pointer>(ptr);
 	}
