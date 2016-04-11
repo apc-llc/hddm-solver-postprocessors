@@ -80,18 +80,15 @@ void Data::load(const char* filename)
 
 		for (int i = 0; i < dim; )
 		{
-			int value_simd[AVX_VECTOR_SIZE];
 			for (int v = 0; (v < AVX_VECTOR_SIZE) && (i < dim); v++, i++)
 			{
 				int value; infile >> value;
 				value = 2 << (value - 2);
-				index(j, i) = value;
-				value_simd[v] = value;
+				index(j, i) = (real)value;
 			}
 		}
 		for (int i = 0; i < dim; )
 		{
-			int value_simd[AVX_VECTOR_SIZE];
 			for (int v = 0; (v < AVX_VECTOR_SIZE) && (i < dim); v++, i++)
 			{
 				int value; infile >> value;
@@ -99,8 +96,7 @@ void Data::load(const char* filename)
 				// Percompute "j" to merge two cases into one:
 				// (((i) == 0) ? (1) : (1 - fabs((x) * (i) - (j)))).
 				if (!index(j, i)) value = 0;
-				index(j, i + vdim * AVX_VECTOR_SIZE) = value;
-				value_simd[v] = value;
+				index(j, i + vdim * AVX_VECTOR_SIZE) = (real)value;
 			}
 		}
 		for (int i = 0; i < TotalDof; i++)

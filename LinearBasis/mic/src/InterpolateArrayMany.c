@@ -1,23 +1,49 @@
 #ifdef HAVE_AVX
 #include <assert.h>
 #include <stdint.h>
-#include <x86intrin.h>
+#include <immintrin.h>
 #else
 #include "LinearBasis.h"
 #endif
 
-void FUNCNAME(
+#ifdef HAVE_AVX
+
+static __m512i sign_mask;
+static __m512d double8_0_0_0_0_0_0_0_0;
+static __m512d double8_1_1_1_1_1_1_1_1;
+
+__attribute__((constructor)) void init_consts()
+{
+	sign_mask = _mm512_set_epi64(
+		0x7FFFFFFFFFFFFFFF, 0x7FFFFFFFFFFFFFFF, 0x7FFFFFFFFFFFFFFF, 0x7FFFFFFFFFFFFFFF,
+		0x7FFFFFFFFFFFFFFF, 0x7FFFFFFFFFFFFFFF, 0x7FFFFFFFFFFFFFFF, 0x7FFFFFFFFFFFFFFF);
+
+	double8_0_0_0_0_0_0_0_0 = _mm512_setzero_pd();
+
+	double8_1_1_1_1_1_1_1_1 = _mm512_set_pd(
+		1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0);
+}
+
+#endif // HAVE_AVX
+
+// Adopted from C++ vector class library by Agner Fog
+static inline __m512d _mm512_abs_pd(const __m512d x)
+{
+    return _mm512_castsi512_pd(_mm512_and_epi64(_mm512_castpd_si512(x), sign_mask));
+}
+
+static void interpolate(
 	const int dim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* x_,
-	const int* index, const double* surplus_t, double* value)
+	const int Dof_choice_start, const int Dof_choice_end, const int count, double* x,
+	const double* index, const double* surplus_t, double* value)
 {
 #ifdef HAVE_AVX
-	assert(((size_t)x_ % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "x vector must be sufficiently memory-aligned");
-	assert(((size_t)index % (AVX_VECTOR_SIZE * sizeof(int)) == 0) && "index vector must be sufficiently memory-aligned");
+	assert(((size_t)x % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "x vector must be sufficiently memory-aligned");
+	assert(((size_t)index % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "index vector must be sufficiently memory-aligned");
 	assert(((size_t)surplus_t % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "surplus_t vector must be sufficiently memory-aligned");
 #endif
 
-	double* x = (double*)x_;
+	__m512d x8;
 
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
 	// boundary to keep up the required alignment.
@@ -32,47 +58,43 @@ void FUNCNAME(
 		for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
 			value[Dof_choice - b] = 0;
 #ifdef HAVE_AVX
-		const __m256d double4_0_0_0_0 = _mm256_setzero_pd();
-		const __m256d double4_1_1_1_1 = _mm256_set1_pd(1.0);
-		const __m256d sign_mask = _mm256_set1_pd(-0.);
-
-		__m256d x4;
-#if defined(DEFERRED)
-		if (DIM <= AVX_VECTOR_SIZE)
-			x4 = _mm256_load_pd(x);
-#endif
+		#pragma omp parallel for
 		for (int i = 0; i < nno; i++)
 		{
 			int zero = 0;
-			__m256d temp = double4_1_1_1_1;
-			for (int j = 0; j < DIM; j += 4)
+			volatile __m512d temp = double8_1_1_1_1_1_1_1_1;
+			for (int j = 0; j < DIM; j += AVX_VECTOR_SIZE)
 			{
 #if defined(DEFERRED)
 				if (DIM > AVX_VECTOR_SIZE)
 #endif
 				{
-					x4 = _mm256_load_pd(x + j);
+					__m512d x8 = _mm512_load_pd(x + j);
 				}
 
-				__m128i i4 = _mm_load_si128((const __m128i*)&index[i * 2 * vdim + j]);
-				__m128i j4 = _mm_load_si128((const __m128i*)&index[i * 2 * vdim + j + vdim]);
-				const __m256d xp = _mm256_sub_pd(double4_1_1_1_1, _mm256_andnot_pd(sign_mask,
-					_mm256_sub_pd(_mm256_mul_pd(x4, _mm256_cvtepi32_pd(i4)), _mm256_cvtepi32_pd(j4))));
-				const __m256d d = _mm256_cmp_pd(xp, double4_0_0_0_0, _CMP_GT_OQ);
-				if (_mm256_movemask_pd(d) != (int)0xf)
+				// Read integer indexes, which are already converted to double,
+				// because k1om can't load __m256i and convert anyway.
+				volatile __m512d i8 = _mm512_load_pd((void*)&index[i * 2 * vdim + j]);
+				volatile __m512d j8 = _mm512_load_pd((void*)&index[i * 2 * vdim + j + vdim]);
+
+				volatile const __m512d xp = _mm512_sub_pd(double8_1_1_1_1_1_1_1_1,
+					_mm512_abs_pd(_mm512_fmsub_pd (x8, i8, j8)));
+				volatile __mmask8 d = _mm512_cmp_pd_mask(xp, double8_0_0_0_0_0_0_0_0, _MM_CMPINT_GT);
+				if (d != 0xff)
 				{
 					zero = 1;
 					break;
 				}
-				temp = _mm256_mul_pd(temp, xp);
+				temp = _mm512_mul_pd(temp, xp);
 			}
 			if (zero) continue;
-			const __m128d pairwise_sum = _mm_mul_pd(_mm256_castpd256_pd128(temp), _mm256_extractf128_pd(temp, 1));
-			const double temps = _mm_cvtsd_f64(_mm_mul_pd(pairwise_sum,
-				(__m128d)_mm_movehl_ps((__m128)pairwise_sum, (__m128)pairwise_sum)));
-			for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
-				value[Dof_choice - b] += temps * surplus_t[Dof_choice * nno + i];
-		}		
+			double temps = _mm512_reduce_mul_pd(temp);
+			#pragma omp critical
+			{
+				for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
+					value[Dof_choice - b] += temps * surplus_t[Dof_choice * nno + i];
+			}
+		}
 #else
 		for (int i = 0; i < nno; i++)
 		{
@@ -97,5 +119,20 @@ void FUNCNAME(
 		value += TotalDof;
 		x += dim;
 	}
+}
+
+void FUNCNAME(void* arg)
+{
+	typedef struct
+	{
+		int dim, nno, Dof_choice_start, Dof_choice_end, count;
+		double *x, *surplus_t, *value, *index;
+	}
+	Args;
+	
+	Args* args = (Args*)arg;
+
+	interpolate(args->dim, args->nno, args->Dof_choice_start, args->Dof_choice_end, args->count, args->x,
+		args->index, args->surplus_t, args->value);
 }
 

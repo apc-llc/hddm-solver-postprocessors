@@ -3,87 +3,57 @@
 
 #include <algorithm>
 #include <assert.h>
-#include <cstddef>
-#include <cstdlib>
-#include <string.h>
+#include <mic_runtime.h>
 #include <vector>
 
-// Custom allocator, using code by Sergei Danielian
-// https://github.com/gahcep/Allocators
-template <class T>
-class AlignedAllocator
-{
-public:
-	using value_type = T;
-	using pointer = T*;
-	using const_pointer = const T*;
-	using reference = T&;
-	using const_reference = const T&;
-	using size_type = std::size_t;
-	using difference_type = std::ptrdiff_t;
-
-	// Rebind
-	template <class U>
-	struct rebind { using other = AlignedAllocator<U>; };
-
-	AlignedAllocator() { }
-	AlignedAllocator(const AlignedAllocator&) { }
-	template <class U>
-	AlignedAllocator(const AlignedAllocator<U>&) { }
-
-	// Allocators are not required to be assignable
-	AlignedAllocator& operator=(const AlignedAllocator& other) = delete;
-	~AlignedAllocator() { }
-
-	// Obtains the address of an object
-	pointer address(reference r) const { return &r; }
-	const_pointer address(const_reference r) const { return &r; }
-
-	// Returns the largest supported allocation size
-	size_type max_size() const
-	{
-		return (static_cast<size_t>(0) - static_cast<size_t>(1)) / sizeof(T);
-	}
-
-	// Equality of allocators does not imply that they must have exactly
-	// the same internal state,  only that they must both be able to
-	// deallocate memory that was allocated with either allocator
-	bool operator!=(const AlignedAllocator& other) { return !(*this == other); }
-	bool operator==(const AlignedAllocator&) { return true; }
-
-	// allocation
-	pointer allocate(size_type n, std::allocator<void>::const_pointer = 0) const
-	{
-		// Align & pad to vector size and zero.
-		void* ptr;
-		size_t size = n * sizeof(T);
-		if (size % (AVX_VECTOR_SIZE * sizeof(T)))
-			size += AVX_VECTOR_SIZE * sizeof(T) - size % (AVX_VECTOR_SIZE * sizeof(T)); 
-		posix_memalign(&ptr, AVX_VECTOR_SIZE * sizeof(T), size);
-		memset(ptr, 0, size);
-
-		return static_cast<pointer>(ptr);
-	}
-
-	void deallocate(pointer ptr, size_type n)
-	{
-		free(ptr);
-	}
-};
+#define MIC_ERROR_CHECK(x) do { micError_t err = x; if (( err ) != micSuccess ) { \
+	printf ("Error %d at %s :%d \n" , err, __FILE__ , __LINE__ ) ; exit(-1);\
+}} while (0)
 
 template<typename T>
 class Vector
 {
-	std::vector<T, AlignedAllocator<T> > data;
+	std::vector<T> data;
+	T* device_data;
+
+	// Denotes that host array items have been possibly changed,
+	// and we need to reload new data into device memory.
+	bool dirty;
 
 public :
-	Vector() : data(AlignedAllocator<T>()) { }
+	Vector() : dirty(false), device_data(NULL) { }
 
-	Vector(int dim) : data(AlignedAllocator<T>()) { data.resize(dim); }
+	~Vector()
+	{
+		if (device_data)
+			MIC_ERROR_CHECK(micFree(device_data));
+	}
 
-	T* getData() { return &data[0]; }
+	Vector(int dim) : dirty(false), device_data(NULL)
+	{
+		data.resize(dim);
+		MIC_ERROR_CHECK(micMallocAligned((void**)&device_data,
+			AVX_VECTOR_SIZE * sizeof(T), dim * sizeof(T)));
+	}
+
+	T* getData()
+	{
+		if (dirty)
+		{
+			MIC_ERROR_CHECK(micMemcpy(device_data, &data[0], data.size() * sizeof(T), micMemcpyHostToDevice));
+			dirty = false;
+		}
+		return device_data;
+	}
 
 	T& operator()(int x)
+	{
+		assert(x < data.size());
+		dirty = true;
+		return data[x];
+	}
+
+	const T& operator()(int x) const
 	{
 		assert(x < data.size());
 		return data[x];
@@ -91,45 +61,91 @@ public :
 	
 	int length() { return data.size(); }
 	
-	void resize(int length) { data.resize(length); }
+	void resize(int length)
+	{
+		if (length >= data.size())
+		{
+			MIC_ERROR_CHECK(micFree(device_data));
+			MIC_ERROR_CHECK(micMallocAligned((void**)&device_data,
+				AVX_VECTOR_SIZE * sizeof(T), length * sizeof(T)));
+		}
+		data.resize(length);
+	}
 };
 
 template<typename T>
 class Matrix
 {
-	std::vector<T, AlignedAllocator<T> > data;
+	std::vector<T> data;
+	T* device_data;
 	int dimY, dimX;
+	
+	// Denotes that host array items have been possibly changed,
+	// and we need to reload new data into device memory.
+	bool dirty;
 
 public :
-	Matrix() : data(AlignedAllocator<T>()), dimY(0), dimX(0) { }
-
-	Matrix(int dimY_, int dimX_) : data(AlignedAllocator<T>()), dimY(dimY_), dimX(dimX_)
+	Matrix() : dimY(0), dimX(0), dirty(false), device_data(NULL) { }
+	
+	~Matrix()
 	{
-		data.resize(dimY_ * dimX_);
+		if (device_data)
+			MIC_ERROR_CHECK(micFree(device_data));
 	}
 
-	T* getData() { return &data[0]; }
+	Matrix(int dimY_, int dimX_) : dimY(dimY_), dimX(dimX_), dirty(false), device_data(NULL)
+	{
+		data.resize(dimY_ * dimX_);
+		MIC_ERROR_CHECK(micMallocAligned((void**)&device_data,
+			AVX_VECTOR_SIZE * sizeof(T), dimY_ * dimX_ * sizeof(T)));
+	}
+
+	T* getData()
+	{
+		if (dirty)
+		{
+			MIC_ERROR_CHECK(micMemcpy(device_data, &data[0], data.size() * sizeof(T), micMemcpyHostToDevice));
+			dirty = false;
+		}
+		return device_data;
+	}
 	
 	T& operator()(int y, int x)
 	{
 		int index = x + dimX * y;
 		assert(index < data.size());
+		dirty = true;
 		return data[index];
 	}
 
+	const T& operator()(int x, int y) const
+	{
+		int index = x + dimX * y;
+		assert(index < data.size());
+		return data[index];
+	}
+	
 	int dimy() { return dimY; }
 
 	int dimx() { return dimX; }
-		
+	
 	void resize(int dimY_, int dimX_)
 	{
 		dimY = dimY_; dimX = dimX_;
+
+		if (dimY_ * dimX_ >= data.size())
+		{
+			MIC_ERROR_CHECK(micFree(device_data));
+			MIC_ERROR_CHECK(micMallocAligned((void**)&device_data,
+				dimY_ * dimX_ * sizeof(T), AVX_VECTOR_SIZE * sizeof(T)));
+		}
 		data.resize(dimY_ * dimX_);
 	}
 	
 	void fill(T value)
 	{
 		std::fill(data.begin(), data.end(), value);
+		dirty = true;
 	}
 };
 
@@ -138,7 +154,7 @@ class Interpolator;
 class Data
 {
 	int dim, vdim, nno, TotalDof, Level;
-	Matrix<int> index;
+	Matrix<real> index;
 	Matrix<real> surplus, surplus_t;
 
 	friend class Interpolator;
