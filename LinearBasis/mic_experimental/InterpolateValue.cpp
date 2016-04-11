@@ -44,7 +44,7 @@ struct Interpolate
 	const int dim, vdim, nno, Dof_choice;
 	const double *x, *index, *surplus_t;
 
-	volatile __m512d x8;
+	__m512d x8;
 	double value;
 
 	Interpolate(const int dim_, const int vdim_, const int nno_,
