@@ -3,12 +3,9 @@
 
 #include <algorithm>
 #include <assert.h>
+#include <check.h>
 #include <mic_runtime.h>
 #include <vector>
-
-#define MIC_ERROR_CHECK(x) do { micError_t err = x; if (( err ) != micSuccess ) { \
-	printf ("Error %d at %s :%d \n" , err, __FILE__ , __LINE__ ) ; exit(-1);\
-}} while (0)
 
 template<typename T>
 class Vector
