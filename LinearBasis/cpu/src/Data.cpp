@@ -32,11 +32,17 @@ extern "C" int MPI_Process_get(MPI_Process**);
 
 int Data::getNno() const { return nno; }
 
-void Data::load(const char* filename)
+void Data::load(const char* filename, int istate)
 {
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
 	const Parameters* params = const_cast<Parameters*>(&process->getSimulation()->getParameters());
+
+	if (loadedStates[istate])
+	{
+		cerr << "State " << istate << " data is already loaded" << endl;
+		process->abort();
+	}
 
 	ifstream infile;
 	if (params->get_binaryio())
@@ -47,7 +53,7 @@ void Data::load(const char* filename)
 	if (!infile.is_open())
 	{
 		cerr << "Error opening file: " << filename << endl;
-		exit(1);
+		process->abort();
 	}
 
 	infile >> dim;
@@ -65,14 +71,14 @@ void Data::load(const char* filename)
 	vdim = dim / AVX_VECTOR_SIZE;
 	if (dim % AVX_VECTOR_SIZE) vdim++;
 	int nsd = 2 * vdim * AVX_VECTOR_SIZE;
-	index.resize(nno, nsd);
-	index.fill(0);
-	surplus.resize(nno, TotalDof);
-	surplus.fill(0.0);
+	index[istate].resize(nno, nsd);
+	index[istate].fill(0);
+	surplus[istate].resize(nno, TotalDof);
+	surplus[istate].fill(0.0);
 
 	// For better caching we use transposed surplus.
-	surplus_t.resize(TotalDof, nno);
-	surplus_t.fill(0.0);
+	surplus_t[istate].resize(TotalDof, nno);
+	surplus_t[istate].fill(0.0);
 	int j = 0;
 	while (infile)
 	{
@@ -84,7 +90,7 @@ void Data::load(const char* filename)
 			{
 				int value; infile >> value;
 				value = 2 << (value - 2);
-				index(j, i) = value;
+				index[istate](j, i) = value;
 			}
 		}
 		for (int i = 0; i < dim; )
@@ -95,29 +101,43 @@ void Data::load(const char* filename)
 				value--;
 				// Percompute "j" to merge two cases into one:
 				// (((i) == 0) ? (1) : (1 - fabs((x) * (i) - (j)))).
-				if (!index(j, i)) value = 0;
-				index(j, i + vdim * AVX_VECTOR_SIZE) = value;
+				if (!index[istate](j, i)) value = 0;
+				index[istate](j, i + vdim * AVX_VECTOR_SIZE) = value;
 			}
 		}
 		for (int i = 0; i < TotalDof; i++)
 		{
 			double value; infile >> value;
-			surplus(j, i) = value;
-			surplus_t(i, j) = value;
+			surplus[istate](j, i) = value;
+			surplus_t[istate](i, j) = value;
 		}
 		j++;
 	}
 	infile.close();
+	
+	loadedStates[istate] = true;
 }
 
-Data::Data() { }
+void Data::clear()
+{
+	fill(loadedStates.begin(), loadedStates.end(), false);
+}
+
+Data::Data(int nstates_) : nstates(nstates_)
+{
+	index.resize(nstates);
+	surplus.resize(nstates);
+	surplus_t.resize(nstates);
+	loadedStates.resize(nstates);
+	fill(loadedStates.begin(), loadedStates.end(), false);
+}
 
 static unique_ptr<Data> data = NULL;
 
-extern "C" Data* getData()
+extern "C" Data* getData(int nstates)
 {
 	if (!data.get())
-		data.reset(new Data());
+		data.reset(new Data(nstates));
 	
 	return data.get();
 }

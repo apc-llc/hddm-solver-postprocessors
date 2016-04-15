@@ -137,18 +137,21 @@ class Interpolator;
 
 class Data
 {
-	int dim, vdim, nno, TotalDof, Level;
-	Matrix<int> index;
-	Matrix<real> surplus, surplus_t;
+	int nstates, dim, vdim, nno, TotalDof, Level;
+	std::vector<Matrix<int> > index;
+	std::vector<Matrix<real> > surplus, surplus_t;
+	std::vector<bool> loadedStates;
 
 	friend class Interpolator;
 
 public :
 	int getNno() const;
 
-	void load(const char* filename);
+	void load(const char* filename, int istate);
+	
+	void clear();
 
-	Data();
+	Data(int nstates);
 };
 
 #endif // DATA_H

@@ -17,14 +17,16 @@
 using namespace std;
 
 template<>
+const string InterpolateValueKernel::sh = INTERPOLATE_VALUE_SH;
+template<>
 const string InterpolateArrayKernel::sh = INTERPOLATE_ARRAY_SH;
 template<>
-const string InterpolateArrayManyKernel::sh = INTERPOLATE_ARRAY_MANY_SH;
+const string InterpolateArrayManyStatelessKernel::sh = INTERPOLATE_ARRAY_MANY_STATELESS_SH;
 template<>
-const string InterpolateValueKernel::sh = INTERPOLATE_VALUE_SH;
+const string InterpolateArrayManyMultistateKernel::sh = INTERPOLATE_ARRAY_MANY_MULTISTATE_SH;
 
 template<typename K, typename F>
-K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbackFunc)
+K& JIT::jitCompile(int dim, const string& funcnameTemplate, F fallbackFunc)
 {
 	map<int, K>* kernels_tls = NULL;
 
@@ -276,19 +278,32 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 	return kernel;
 }
 
-InterpolateArrayKernel& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, InterpolateArrayFunc fallbackFunc)
+InterpolateValueKernel& JIT::jitCompile(
+	int dim, const string& funcnameTemplate, InterpolateValueFunc fallbackFunc)
 {
-	return JIT::jitCompile<InterpolateArrayKernel, InterpolateArrayFunc>(dim, count, funcnameTemplate, fallbackFunc);
+	return JIT::jitCompile<InterpolateValueKernel, InterpolateValueFunc>(
+		dim, funcnameTemplate, fallbackFunc);
 }
 
-InterpolateArrayManyKernel& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, InterpolateArrayManyFunc fallbackFunc)
+InterpolateArrayKernel& JIT::jitCompile(
+	int dim, const string& funcnameTemplate, InterpolateArrayFunc fallbackFunc)
 {
-	return JIT::jitCompile<InterpolateArrayManyKernel, InterpolateArrayManyFunc>(dim, count, funcnameTemplate, fallbackFunc);
+	return JIT::jitCompile<InterpolateArrayKernel, InterpolateArrayFunc>(
+		dim, funcnameTemplate, fallbackFunc);
 }
 
-InterpolateValueKernel& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, InterpolateValueFunc fallbackFunc)
+InterpolateArrayManyStatelessKernel& JIT::jitCompile(
+	int dim, const string& funcnameTemplate, InterpolateArrayManyStatelessFunc fallbackFunc)
 {
-	return JIT::jitCompile<InterpolateValueKernel, InterpolateValueFunc>(dim, count, funcnameTemplate, fallbackFunc);
+	return JIT::jitCompile<InterpolateArrayManyStatelessKernel, InterpolateArrayManyStatelessFunc>(
+		dim, funcnameTemplate, fallbackFunc);
+}
+
+InterpolateArrayManyMultistateKernel& JIT::jitCompile(
+	int dim, const string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc)
+{
+	return JIT::jitCompile<InterpolateArrayManyMultistateKernel, InterpolateArrayManyMultistateFunc>(
+		dim, funcnameTemplate, fallbackFunc);
 }
 
 #endif // HAVE_RUNTIME_OPTIMIZATION
