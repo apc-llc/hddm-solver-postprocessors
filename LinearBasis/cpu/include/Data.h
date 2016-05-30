@@ -5,8 +5,12 @@
 #include <assert.h>
 #include <cstddef>
 #include <cstdlib>
+#include <iostream>
 #include <string.h>
 #include <vector>
+
+#include "check.h"
+#include "process.h"
 
 // Custom allocator, using code by Sergei Danielian
 // https://github.com/gahcep/Allocators
@@ -59,7 +63,18 @@ public:
 		size_t size = n * sizeof(T);
 		if (size % (AVX_VECTOR_SIZE * sizeof(T)))
 			size += AVX_VECTOR_SIZE * sizeof(T) - size % (AVX_VECTOR_SIZE * sizeof(T)); 
-		posix_memalign(&ptr, AVX_VECTOR_SIZE * sizeof(T), size);
+		int err = posix_memalign(&ptr, AVX_VECTOR_SIZE * sizeof(T), size);
+		if (err != 0)
+		{
+			using namespace std;
+			cerr << "posix_memalign returned error " << err;
+			if (err == EINVAL) cerr << " (EINVAL)";
+			else if (err == ENOMEM) cerr << " (ENOMEM)";
+			cerr << endl;
+			MPI_Process* process;
+			MPI_ERR_CHECK(MPI_Process_get(&process));
+			process->abort();
+		}
 		memset(ptr, 0, size);
 
 		return static_cast<pointer>(ptr);
@@ -80,6 +95,8 @@ public :
 	Vector() : data(AlignedAllocator<T>()) { }
 
 	Vector(int dim) : data(AlignedAllocator<T>()) { data.resize(dim); }
+
+	Vector(int dim, T value) : data(dim, value, AlignedAllocator<T>()) { }
 
 	T* getData() { return &data[0]; }
 

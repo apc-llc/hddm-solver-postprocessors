@@ -2,7 +2,7 @@ LOCATION = ../../..
 
 include $(LOCATION)/Makefile.inc
 
-CINC += -I.
+CINC += -I. -I../include -I../../include
 COPT += -DAVX_VECTOR_SIZE=4
 CDIR = mkdir -p $(shell dirname $@)
 

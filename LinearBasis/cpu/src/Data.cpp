@@ -1,5 +1,6 @@
 #include "check.h"
 #include "Data.h"
+#include "interpolator.h"
 
 #include <fstream>
 #include <iostream>
@@ -8,35 +9,13 @@
 
 using namespace std;
 
-class Parameters
-{
-public :
-	bool get_binaryio() const;
-	int get_nagents() const;
-};
-
-class Simulation
-{
-public :
-	const Parameters& getParameters() const;
-};
-
-class MPI_Process
-{
-public :
-	Simulation* getSimulation();
-	void abort();
-};
-
-extern "C" int MPI_Process_get(MPI_Process**);
-
 int Data::getNno() const { return nno; }
 
 void Data::load(const char* filename, int istate)
 {
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
-	const Parameters* params = const_cast<Parameters*>(&process->getSimulation()->getParameters());
+	const Parameters& params = Interpolator::getInstance()->getParameters();
 
 	if (loadedStates[istate])
 	{
@@ -45,7 +24,7 @@ void Data::load(const char* filename, int istate)
 	}
 
 	ifstream infile;
-	if (params->get_binaryio())
+	if (params.binaryio)
 		infile.open(filename, ios::in | ios::binary);
 	else
 		infile.open(filename, ios::in);
@@ -57,10 +36,10 @@ void Data::load(const char* filename, int istate)
 	}
 
 	infile >> dim;
-	if (dim != params->get_nagents())
+	if (dim != params.nagents)
 	{
 		cerr << "File \"" << filename << "\" # of dimensions (" << dim << 
-			") mismatches config (" << params->get_nagents() << ")" << endl;
+			") mismatches config (" << params.nagents << ")" << endl;
 		process->abort();
 	}
 	infile >> nno; 

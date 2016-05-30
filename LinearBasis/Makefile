@@ -1,15 +1,29 @@
 LOCATION = ../..
 
-include Makefile.inc
+include $(LOCATION)/Makefile.inc
 
-.PHONY: cpu gpu mic
+CINC += -I../include -I../../include
+CDIR = mkdir -p $(shell dirname $@)
 
-all: cpu mic
+TARGETS = cpu gpu mic
 
-cpu:
+.PHONY: $(TARGETS)
+
+all: $(TARGETS)
+
+$(INSTALL)/lib/liblinearbasis.a: $(BUILD)/parameters.o
+	$(CDIR) && ar rcs $@ $^
+
+$(BUILD)/parameters.o: src/parameters.cpp $(LOCATION)/include/check.h include/parameters.h include/parameters.c
+	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
+
+cpu: $(INSTALL)/lib/liblinearbasis.a
 	cd $@ && $(MAKE) -j$(NJOBS)
 
-mic:
+gpu: $(INSTALL)/lib/liblinearbasis.a
+	cd $@ && $(MAKE) -j$(NJOBS)
+
+mic: $(INSTALL)/lib/liblinearbasis.a
 	cd $@ && $(MAKE) -j$(NJOBS) target=native
 
 clean:
