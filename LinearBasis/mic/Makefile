@@ -6,13 +6,13 @@ CINC += -I. -I.. -I$(INSTALL)/include -I$(BUILD)
 COPT += -DAVX_VECTOR_SIZE=8
 CDIR = mkdir -p $(shell dirname $@)
 
-all: $(INSTALL)/bin/interpolators/LinearBasis/mic/libinterpolator.so
+all: $(INSTALL)/bin/postprocessors/LinearBasis/mic/libpostprocessor.so
 
-$(INSTALL)/bin/interpolators/LinearBasis/mic/libinterpolator.so: \
+$(INSTALL)/bin/postprocessors/LinearBasis/mic/libpostprocessor.so: \
 	$(BUILD)/InterpolateValue_embed.o $(BUILD)/InterpolateArray_embed.o $(BUILD)/InterpolateArrayMany_embed.o \
 	$(BUILD)/libInterpolateValue.sh $(BUILD)/libInterpolateArray.sh $(BUILD)/libInterpolateArrayMany.sh \
 	$(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o
-	mkdir -p $(INSTALL)/bin/interpolators/mic && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib -lmicrt
+	mkdir -p $(INSTALL)/bin/postprocessors/mic && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib -lmicrt
 
 $(INSTALL)/libmicrt.so:
 	cd liboffloadmic/ && $(MAKE) clean && $(MAKE) INSTALL_PREFIX=$(INSTALL)/.. MIC_PREFIX=/usr/linux-k1om-4.7/bin/x86-k1om-linux-
@@ -63,5 +63,5 @@ $(BUILD)/JIT.o: src/JIT.cpp include/InterpolateKernel.h
 	$(CDIR) && $(MPICXX) -DINTERPOLATE_ARRAY_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArray.sh\" -DINTERPOLATE_ARRAY_MANY_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArrayMany.sh\" -DINTERPOLATE_VALUE_SH=\"$(shell pwd)/$(BUILD)/libInterpolateValue.sh\" $(CINC) $(COPT) -c $< -o $@
 
 clean:
-	rm -rf $(BUILD) $(INSTALL)/bin/interpolators/LinearBasis/mic/libinterpolator.so
+	rm -rf $(BUILD) $(INSTALL)/bin/postprocessors/LinearBasis/mic/libpostprocessor.so
 
