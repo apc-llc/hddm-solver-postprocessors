@@ -6,15 +6,15 @@ CINC += -I. -I../include -I../../include
 COPT += -DAVX_VECTOR_SIZE=4
 CDIR = mkdir -p $(shell dirname $@)
 
-all: $(INSTALL)/bin/postprocessors/cpu/libpostprocessor.so
+all: $(INSTALL)/bin/postprocessors/LinearBasis/cpu/libpostprocessor.so
 
-$(INSTALL)/bin/postprocessors/cpu/libpostprocessor.so: \
+$(INSTALL)/bin/postprocessors/LinearBasis/cpu/libpostprocessor.so: \
 	$(BUILD)/InterpolateValue.o $(BUILD)/InterpolateArray.o \
 	$(BUILD)/InterpolateArrayManyStateless.o $(BUILD)/InterpolateArrayManyMultistate.o \
 	$(BUILD)/libInterpolateValue.sh $(BUILD)/libInterpolateArray.sh \
 	$(BUILD)/libInterpolateArrayManyStateless.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
 	$(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o
-	mkdir -p $(INSTALL)/bin/postprocessors/cpu && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@
+	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/cpu && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@
 
 $(BUILD)/InterpolateValue.o: src/InterpolateValue.c
 	$(CDIR) && $(MPICC) -std=c99 -DFUNCNAME=LinearBasis_CPU_Generic_InterpolateValue -DDIM=dim $(CINC) $(COPT) -c $< -o $@
