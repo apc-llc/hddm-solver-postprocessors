@@ -12,7 +12,7 @@ struct Parameters
 	#undef REFERENCES
 	#undef ALIGN_BOOL_4
 
-	Parameters(const std::string& configFile = "hddm-solver.cfg");
+	Parameters(const std::string& targetSuffix, const std::string& configFile = "hddm-solver.cfg");
 };
 
 #endif // HDDM_PARAMETERS_H

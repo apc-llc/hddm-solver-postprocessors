@@ -12,7 +12,7 @@ $(INSTALL)/bin/postprocessors/LinearBasis/mic/libpostprocessor.so: \
 	$(BUILD)/InterpolateValue_embed.o $(BUILD)/InterpolateArray_embed.o $(BUILD)/InterpolateArrayMany_embed.o \
 	$(BUILD)/libInterpolateValue.sh $(BUILD)/libInterpolateArray.sh $(BUILD)/libInterpolateArrayMany.sh \
 	$(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o
-	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/mic && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib -lmicrt
+	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/mic && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib -lmicrt -llinearbasis
 
 $(INSTALL)/libmicrt.so:
 	cd liboffloadmic/ && $(MAKE) clean && $(MAKE) INSTALL_PREFIX=$(INSTALL)/.. MIC_PREFIX=/usr/linux-k1om-4.7/bin/x86-k1om-linux-

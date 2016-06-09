@@ -2,42 +2,26 @@
 #include <memory>
 #include <vector>
 
-#include "Data.h"
+#include "interpolator.h"
 #include "JIT.h"
 
 using namespace std;
 
-class Interpolator
+const Parameters& Interpolator::getParameters() const { return params; }
+
+Interpolator::Interpolator(const std::string& targetSuffix, const std::string& configFile) : 
+
+params(targetSuffix, configFile)
+
 {
-	bool jit;
-
-public :
-	Interpolator(bool jit_);
-
-	// Interpolate a single value.
-	void interpolate(Data* data,
-		const int istate, const real* x, const int Dof_choice, real& value);
-
-	// Interpolate array of values.
-	void interpolate(Data* data,
-		const int istate, const real* x, const int Dof_choice_start, const int Dof_choice_end, real* value);
-
-	// Interpolate multiple arrays of values in continuous vector, with single surplus state.
-	void interpolate(Data* data,
-		const int istate, const real* x, const int Dof_choice_start, const int Dof_choice_end, const int count, real* value);
-
-	// Interpolate multiple arrays of values in continuous vector, with multiple surplus states.
-	void interpolate(Data* data,
-		const real* x, const int Dof_choice_start, const int Dof_choice_end, real* value);
-};
-
-Interpolator::Interpolator(bool jit_) : jit(jit_) { }
+	jit = params.enableRuntimeOptimization;
+}
 
 extern "C" void LinearBasis_CPU_Generic_InterpolateValue(
 	const int dim, const int nno,
 	const int Dof_choice, const double* x,
 	const int* index, const double* surplus_t, double* value_);
-
+	
 // Interpolate a single value.
 void Interpolator::interpolate(Data* data,
 	const int istate, const real* x, const int Dof_choice, real& value)
@@ -146,12 +130,12 @@ void Interpolator::interpolate(Data* data,
 
 extern "C" void LinearBasis_CPU_Generic_InterpolateArrayManyMultistate(
 	const int dim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* x_,
-	int** index, double** surplus_t, double* value);
+	const int Dof_choice_start, const int Dof_choice_end, const int count, const double** x_,
+	int** index, double** surplus_t, double** value);
 
 // Interpolate multiple arrays of values in continuous vector, with multiple surplus states.
 void Interpolator::interpolate(Data* data,
-	const real* x, const int Dof_choice_start, const int Dof_choice_end, real* value)
+	const real** x, const int Dof_choice_start, const int Dof_choice_end, real** value)
 {
 	vector<int*> indexes; indexes.resize(data->nstates);
 	vector<real*> surpluses; surpluses.resize(data->nstates);
@@ -165,8 +149,8 @@ void Interpolator::interpolate(Data* data,
 	{
 		typedef void (*Func)(
 			const int dim, const int nno,
-			const int Dof_choice_start, const int Dof_choice_end, const int count, const double* x_,
-			int** index, double** surplus_t, double* value);
+			const int Dof_choice_start, const int Dof_choice_end, const int count, const double** x_,
+			int** index, double** surplus_t, double** value);
 
 		static Func LinearBasis_CPU_RuntimeOpt_InterpolateArrayManyMultistate;
 
@@ -189,13 +173,18 @@ void Interpolator::interpolate(Data* data,
 	}
 }
 
-static map<bool, unique_ptr<Interpolator> > interp;
-
-extern "C" Interpolator* getInterpolator(bool jit)
+Interpolator* Interpolator::getInstance()
 {
-	if (!interp[jit].get())
-		interp[jit].reset(new Interpolator(jit));
+	static unique_ptr<Interpolator> interp;
+
+	if (!interp.get())
+		interp.reset(new Interpolator("CPU"));
 	
-	return interp[jit].get();
+	return interp.get();
+}
+
+extern "C" Interpolator* getInterpolator()
+{
+	return Interpolator::getInstance();
 }
 

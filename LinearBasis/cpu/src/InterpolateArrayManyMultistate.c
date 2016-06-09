@@ -8,13 +8,9 @@
 
 void FUNCNAME(
 	const int dim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const int count, double* x,
-	const int** index_, const double** surplus_t_, double* value)
+	const int Dof_choice_start, const int Dof_choice_end, const int count, double** x_,
+	const int** index_, const double** surplus_t_, double** value_)
 {
-#ifdef HAVE_AVX
-	assert(((size_t)x % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "x vector must be sufficiently memory-aligned");
-#endif
-
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
 	// boundary to keep up the required alignment.
 	int vdim = dim / AVX_VECTOR_SIZE;
@@ -25,10 +21,13 @@ void FUNCNAME(
 
 	for (int many = 0; many < count; many++)
 	{
+		const double* x = x_[many];
 		const int* index = index_[many];
 		const double* surplus_t = surplus_t_[many];
+		double* value = value_[many];
 
 #ifdef HAVE_AVX
+		assert(((size_t)x % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "x vector must be sufficiently memory-aligned");
 		assert(((size_t)index % (AVX_VECTOR_SIZE * sizeof(int)) == 0) && "index vector must be sufficiently memory-aligned");
 		assert(((size_t)surplus_t % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "surplus_t vector must be sufficiently memory-aligned");
 #endif
@@ -98,10 +97,6 @@ void FUNCNAME(
 				value[Dof_choice - b] += temp * surplus_t[Dof_choice * nno + i];
 		}
 #endif
-
-		// TODO pad to AVX_VECTOR_SIZE!
-		value += TotalDof;
-		x += dim;
 	}
 }
 

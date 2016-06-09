@@ -28,9 +28,11 @@ extern "C"
 
 #define ASSIGN(name) name(::name)
 
-Parameters::Parameters(const string& configFile) :
+Parameters::Parameters(const string& targetSuffix, const string& configFile) :
 
+ASSIGN(priority),
 ASSIGN(nagents),
+ASSIGN(enableRuntimeOptimization),
 ASSIGN(binaryio)
 
 // XXX Add new parameters here
@@ -44,12 +46,14 @@ ASSIGN(binaryio)
 	if (process->isMaster())
 	{
 		cout << "------------------------------------" << endl;
-		cout << "LOADING SIMULATION CONFIG (" << configFile << ")" << endl;
+		cout << "LOADING \"" << targetSuffix << "\" POSTPROCESSOR CONFIG (" << configFile << ")" << endl;
 		cout << "------------------------------------" << endl;
 	}
 	
 	map<string, bool> undefParams;
+	undefParams["priority"] = true;
 	undefParams["nagents"] = true;
+	undefParams["enableRuntimeOptimization"] = true;
 	undefParams["binaryio"] = true;
 
 	// Read configuration file on master.
@@ -82,12 +86,43 @@ ASSIGN(binaryio)
 			process->abort();
 		}
 
-		if ((name == "n_agents") || (name == "nagents"))
+		if (name == "priority" + targetSuffix)
+		{
+			priority = atoi(value.c_str());
+			if (process->isMaster())
+				cout << "priority : " << priority << endl;
+			undefParams["priority"] = false;
+		}
+		else if ((name == "n_agents") || (name == "nagents"))
 		{
 			nagents = atoi(value.c_str());
 			if (process->isMaster())
 				cout << "nagents : " << nagents << endl;
 			undefParams["nagents"] = false;
+		}
+		else if ((name == "enable_runtime_optimization") || (name == "enableRuntimeOptimization"))
+		{
+			if (process->isMaster())
+				cout << "enableRuntimeOptimization : ";
+			if ((value == "yes") || (value == "y") || (value == "true"))
+			{
+				enableRuntimeOptimization = true;
+				if (process->isMaster())
+					cout << value << endl;
+			}
+			else if ((value == "no") || (value == "n") || (value == "false"))
+			{
+				enableRuntimeOptimization = false;
+				if (process->isMaster())
+					cout << value << endl;
+			}
+			else
+			{
+				if (process->isMaster())
+					cerr << "unknown" << endl;
+				process->abort();
+			}
+			undefParams["enableRuntimeOptimization"] = false;
 		}
 		else if (name == "binaryio")
 		{

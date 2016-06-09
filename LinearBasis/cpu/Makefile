@@ -13,8 +13,9 @@ $(INSTALL)/bin/postprocessors/LinearBasis/cpu/libpostprocessor.so: \
 	$(BUILD)/InterpolateArrayManyStateless.o $(BUILD)/InterpolateArrayManyMultistate.o \
 	$(BUILD)/libInterpolateValue.sh $(BUILD)/libInterpolateArray.sh \
 	$(BUILD)/libInterpolateArrayManyStateless.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
-	$(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o
-	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/cpu && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@
+	$(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o \
+	$(BUILD)/priority.o $(BUILD)/supported.o $(BUILD)/available.o
+	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/cpu && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -llinearbasis
 
 $(BUILD)/InterpolateValue.o: src/InterpolateValue.c
 	$(CDIR) && $(MPICC) -std=c99 -DFUNCNAME=LinearBasis_CPU_Generic_InterpolateValue -DDIM=dim $(CINC) $(COPT) -c $< -o $@
@@ -48,6 +49,15 @@ $(BUILD)/Data.o: src/Data.cpp include/Data.h
 
 $(BUILD)/JIT.o: src/JIT.cpp include/InterpolateKernel.h
 	$(CDIR) && $(MPICXX) -DINTERPOLATE_ARRAY_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArray.sh\" -DINTERPOLATE_ARRAY_MANY_STATELESS_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArrayManyStateless.sh\" -DINTERPOLATE_ARRAY_MANY_MULTISTATE_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArrayManyMultistate.sh\" -DINTERPOLATE_VALUE_SH=\"$(shell pwd)/$(BUILD)/libInterpolateValue.sh\" $(CINC) $(COPT) -c $< -o $@
+
+$(BUILD)/priority.o: src/priority.cpp
+	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
+
+$(BUILD)/supported.o: src/supported.cpp
+	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
+
+$(BUILD)/available.o: src/available.cpp
+	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
 
 clean:
 	rm -rf $(BUILD) $(INSTALL)/bin/postprocessors/cpu/libpostprocessor.so
