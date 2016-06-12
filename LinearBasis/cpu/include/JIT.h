@@ -21,8 +21,8 @@ typedef void (*InterpolateArrayManyStatelessFunc)(const int dim, const int nno,
 	real* value);
 
 typedef void (*InterpolateArrayManyMultistateFunc)(const int dim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const int count, const real** x,
-	int** index, real** surplus_t,
+	const int Dof_choice_start, const int Dof_choice_end, const int count, const real* const* x,
+	const int* const* index, const real* const* surplus_t,
 	real** value);
 
 typedef InterpolateKernel<InterpolateValueFunc> InterpolateValueKernel;

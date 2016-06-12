@@ -130,27 +130,19 @@ void Interpolator::interpolate(Data* data,
 
 extern "C" void LinearBasis_CPU_Generic_InterpolateArrayManyMultistate(
 	const int dim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const int count, const double** x_,
-	int** index, double** surplus_t, double** value);
+	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
+	const int* const* index, const double* const* surplus_t, double** value);
 
 // Interpolate multiple arrays of values in continuous vector, with multiple surplus states.
 void Interpolator::interpolate(Data* data,
 	const real** x, const int Dof_choice_start, const int Dof_choice_end, real** value)
 {
-	vector<int*> indexes; indexes.resize(data->nstates);
-	vector<real*> surpluses; surpluses.resize(data->nstates);
-	for (int i = 0; i < data->nstates; i++)
-	{
-		indexes[i] = data->index[i].getData();
-		surpluses[i] = data->surplus_t[i].getData();
-	}
-
 	if (jit)
 	{
 		typedef void (*Func)(
 			const int dim, const int nno,
-			const int Dof_choice_start, const int Dof_choice_end, const int count, const double** x_,
-			int** index, double** surplus_t, double** value);
+			const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
+			const int* const* index, const double* const* surplus_t, double** value);
 
 		static Func LinearBasis_CPU_RuntimeOpt_InterpolateArrayManyMultistate;
 
@@ -163,13 +155,13 @@ void Interpolator::interpolate(Data* data,
 
 		LinearBasis_CPU_RuntimeOpt_InterpolateArrayManyMultistate(
 			data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
-			&indexes[0], &surpluses[0], value);
+			data->getIndexes(), data->getSurpluses(), value);
 	}
 	else
 	{
 		LinearBasis_CPU_Generic_InterpolateArrayManyMultistate(
 			data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
-			&indexes[0], &surpluses[0], value);
+			data->getIndexes(), data->getSurpluses(), value);
 	}
 }
 

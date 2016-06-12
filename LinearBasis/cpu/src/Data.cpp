@@ -95,6 +95,9 @@ void Data::load(const char* filename, int istate)
 	infile.close();
 	
 	loadedStates[istate] = true;
+	
+	indexes[istate] = index[istate].getData();
+	surpluses[istate] = surplus[istate].getData();
 }
 
 void Data::clear()
@@ -109,7 +112,13 @@ Data::Data(int nstates_) : nstates(nstates_)
 	surplus_t.resize(nstates);
 	loadedStates.resize(nstates);
 	fill(loadedStates.begin(), loadedStates.end(), false);
+	indexes.resize(nstates);
+	surpluses.resize(nstates);
 }
+
+const int* const* Data::getIndexes() const { return &indexes[0]; }
+	
+const real* const* Data::getSurpluses() const { return &surpluses[0]; }
 
 static unique_ptr<Data> data = NULL;
 
