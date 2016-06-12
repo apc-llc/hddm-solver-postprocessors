@@ -27,5 +27,5 @@ mic: $(INSTALL)/lib/liblinearbasis.a
 	cd $@ && $(MAKE) -j$(NJOBS) target=native
 
 clean:
-	cd mic && $(MAKE) clean
+	rm -rf $(BUILD) $(INSTALL)/lib/liblinearbasis.a && cd mic && $(MAKE) clean
 
