@@ -1,6 +1,6 @@
 #include <math.h>
 
-__attribute__((always_inline)) static double IndextoCoordinate(int i, int j)
+inline __attribute__((always_inline)) static double IndextoCoordinate(int i, int j)
 {
 	double m = pow(2.0, (i - 1)) + 1;
 
@@ -17,7 +17,7 @@ __attribute__((always_inline)) static double IndextoCoordinate(int i, int j)
  * @param  j [Basis Function Index]
  * @return   [Value]
  */
-__attribute__((always_inline)) static double FlipUpBasis(double x, int i, int j)
+inline __attribute__((always_inline)) static double FlipUpBasis(double x, int i, int j)
 {
 	if (i == 1) return 1.0;
 	
@@ -51,33 +51,30 @@ __attribute__((always_inline)) static double FlipUpBasis(double x, int i, int j)
  * @param  j [Basis Function Index]
  * @return   [Value]
  */
-__attribute__((always_inline)) static double PolyBasis(double x, int i, int j)
+inline __attribute__((always_inline)) static double PolyBasis(double x, int i, int j)
 {
-	if (i < 3) {
-		return FlipUpBasis(x, i, j);
-	} else {
+	if (i < 3) return FlipUpBasis(x, i, j);
 
-		double m = pow(2.0, i);
-		double xp = IndextoCoordinate(i, j);
+	double m = pow(2.0, i);
+	double invm = 1.0 / m;
+	double xp = IndextoCoordinate(i, j);
 
-		// Wings
-		if ( x <= (1.0 / m) && xp == 1. / m)  {
-			return (-1.0 * m * x + 2.0);
-		} else if ( x >= (1.0 - 1.0 / m )  && xp == (1.0 - 1. / m) )  {
-			return (1.0 * m * x + (2.0 - m));
-		} else {
+	// Wings
+	if ((x <= invm) && (xp == invm))
+		return (-1.0 * m * x + 2.0);
+	else if ((x >= 1.0 - invm) && (xp == 1.0 - invm))
+		return (1.0 * m * x + (2.0 - m));
+	else
+	{
+		// Body
+		double x1 = xp - invm;
+		double x2 = xp + invm;
+		double temp = (x - x1) * (x - x2) / ((xp - x1) * (xp - x2));
 
-			// Body
-			double x1 = xp - 1.0 / m;
-			double x2 = xp + 1.0 / m;
-			double temp = (x - x1) * (x - x2) / ((xp - x1) * (xp - x2));
+		if (temp > 0)
+			return temp;
 
-			if (temp > 0) {
-				return temp;
-			} else {
-				return 0.0;
-			}
-		}
+		return 0.0;
 	}
 }
 
