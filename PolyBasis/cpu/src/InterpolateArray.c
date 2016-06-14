@@ -86,8 +86,16 @@ __attribute__((always_inline)) static double PolyBasis(double x, int i, int j)
 void FUNCNAME(
 	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const double* x,
-	const int* index, const double* surplus_t, double* value)
+	const int* index, const double* surplus, double* value)
 {
+	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
+	// boundary to keep up the required alignment.
+	int vdim = dim / AVX_VECTOR_SIZE;
+	if (dim % AVX_VECTOR_SIZE) vdim++;
+	vdim *= AVX_VECTOR_SIZE;
+
+	const int TotalDof = Dof_choice_end - Dof_choice_start + 1;
+
 	for (int i = 0; i < nno; i++)
 	{
 		int zero = 0;
