@@ -1,13 +1,85 @@
-#ifdef HAVE_AVX
-#include <assert.h>
-#include <stdint.h>
-#include <x86intrin.h>
-#else
-#include "LinearBasis.h"
-#endif
+#include <math.h>
 
-#include <stdio.h>
-#include <stdlib.h>
+__attribute__((always_inline)) static double IndextoCoordinate(int i, int j)
+{
+	double m = pow(2.0, (i - 1)) + 1;
+
+	if (i == 1) return 0.5;
+
+	m = pow(2.0, i) + 1;
+	return (j - 1) / (m - 1.0);
+}
+
+/**
+ * FlipUpBasis Basis Function
+ * @param  x [X val]
+ * @param  i [Level Depth]
+ * @param  j [Basis Function Index]
+ * @return   [Value]
+ */
+__attribute__((always_inline)) static double FlipUpBasis(double x, int i, int j)
+{
+	if (i == 1) return 1.0;
+	
+	double m = pow(2.0, i);
+	double invm = 1.0 / m;
+	double xp = IndextoCoordinate(i, j);
+
+	// Wing
+	if ((x <= invm) && (xp == invm))
+	{
+		return -1.0 * m * x + 2.0;
+	}
+	else if ((x >= 1.0 - invm) && (xp == (1.0 - invm)))
+	{
+		return (1.0 * m * x + (2.0 - m));
+	}
+	else
+	{
+		// Body
+		if (fabs(x - xp) >= invm)
+			return 0.0;
+		else
+			return (1 - m * fabs(x - xp));
+	}
+}
+
+/**
+ * Polynomial Basis Function
+ * @param  x [X val]
+ * @param  i [Level Depth]
+ * @param  j [Basis Function Index]
+ * @return   [Value]
+ */
+__attribute__((always_inline)) static double PolyBasis(double x, int i, int j)
+{
+	if (i < 3) {
+		return FlipUpBasis(x, i, j);
+	} else {
+
+		double m = pow(2.0, i);
+		double xp = IndextoCoordinate(i, j);
+
+		// Wings
+		if ( x <= (1.0 / m) && xp == 1. / m)  {
+			return (-1.0 * m * x + 2.0);
+		} else if ( x >= (1.0 - 1.0 / m )  && xp == (1.0 - 1. / m) )  {
+			return (1.0 * m * x + (2.0 - m));
+		} else {
+
+			// Body
+			double x1 = xp - 1.0 / m;
+			double x2 = xp + 1.0 / m;
+			double temp = (x - x1) * (x - x2) / ((xp - x1) * (xp - x2));
+
+			if (temp > 0) {
+				return temp;
+			} else {
+				return 0.0;
+			}
+		}
+	}
+}
 
 #define STR(funcname) #funcname
 
@@ -16,73 +88,13 @@ void FUNCNAME(
 	const int Dof_choice_start, const int Dof_choice_end, const double* x,
 	const int* index, const double* surplus_t, double* value)
 {
-	printf("%s is not implemented\n", STR(FUNCNAME));
-	abort();
-
-#ifdef HAVE_AVX
-	assert(((size_t)x % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "x vector must be sufficiently memory-aligned");
-	assert(((size_t)index % (AVX_VECTOR_SIZE * sizeof(int)) == 0) && "index vector must be sufficiently memory-aligned");
-	assert(((size_t)surplus_t % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "surplus_t vector must be sufficiently memory-aligned");
-#endif
-
-	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
-	// boundary to keep up the required alignment.
-	int vdim = dim / AVX_VECTOR_SIZE;
-	if (dim % AVX_VECTOR_SIZE) vdim++;
-	vdim *= AVX_VECTOR_SIZE;
-
-	for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
-		value[Dof_choice - b] = 0;
-#ifdef HAVE_AVX
-	const __m256d double4_0_0_0_0 = _mm256_setzero_pd();
-	const __m256d double4_1_1_1_1 = _mm256_set1_pd(1.0);
-	const __m256d sign_mask = _mm256_set1_pd(-0.);
-
-	__m256d x4;
-#if defined(DEFERRED)
-	if (DIM <= AVX_VECTOR_SIZE)
-		x4 = _mm256_load_pd(x);
-#endif
-	for (int i = 0; i < nno; i++)
-	{
-		int zero = 0;
-		__m256d temp = double4_1_1_1_1;
-		for (int j = 0; j < DIM; j += AVX_VECTOR_SIZE)
-		{
-#if defined(DEFERRED)
-			if (DIM > AVX_VECTOR_SIZE)
-#endif
-			{
-				x4 = _mm256_load_pd(x + j);
-			}
-
-			__m128i i4 = _mm_load_si128((const __m128i*)&index[i * 2 * vdim + j]);
-			__m128i j4 = _mm_load_si128((const __m128i*)&index[i * 2 * vdim + j + vdim]);
-			const __m256d xp = _mm256_sub_pd(double4_1_1_1_1, _mm256_andnot_pd(sign_mask,
-				_mm256_sub_pd(_mm256_mul_pd(x4, _mm256_cvtepi32_pd(i4)), _mm256_cvtepi32_pd(j4))));
-			const __m256d d = _mm256_cmp_pd(xp, double4_0_0_0_0, _CMP_GT_OQ);
-			if (_mm256_movemask_pd(d) != (int)0xf)
-			{
-				zero = 1;
-				break;
-			}
-			temp = _mm256_mul_pd(temp, xp);
-		}
-		if (zero) continue;
-		const __m128d pairwise_sum = _mm_mul_pd(_mm256_castpd256_pd128(temp), _mm256_extractf128_pd(temp, 1));
-		const double temps = _mm_cvtsd_f64(_mm_mul_pd(pairwise_sum,
-			(__m128d)_mm_movehl_ps((__m128)pairwise_sum, (__m128)pairwise_sum)));
-		for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
-			value[Dof_choice - b] += temps * surplus_t[Dof_choice * nno + i];
-	}
-#else
 	for (int i = 0; i < nno; i++)
 	{
 		int zero = 0;
 		double temp = 1.0;
 		for (int j = 0; j < DIM; j++)
 		{
-			double xp = LinearBasis(x[j], index[i * 2 * vdim + j],
+			double xp = PolyBasis(x[j], index[i * 2 * vdim + j],
 				index[i * 2 * vdim + j + vdim]);
 			if (xp <= 0.0)
 			{
@@ -93,8 +105,7 @@ void FUNCNAME(
 		}
 		if (zero) continue;
 		for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
-			value[Dof_choice - b] += temp * surplus_t[Dof_choice * nno + i];
+			value[Dof_choice - b] += temp * surplus[i * TotalDof + Dof_choice];
 	}
-#endif
 }
 
