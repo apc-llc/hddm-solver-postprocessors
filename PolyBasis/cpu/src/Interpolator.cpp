@@ -57,7 +57,7 @@ void Interpolator::interpolate(Data* data,
 extern "C" void PolyBasis_CPU_Generic_InterpolateArray(
 	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const double* x,
-	const int* index, const double* surplus_t, double* value);
+	const int* index, const double* surplus, double* value);
 
 // Interpolate array of values.
 void Interpolator::interpolate(Data* data,
@@ -68,7 +68,7 @@ void Interpolator::interpolate(Data* data,
 		typedef void (*Func)(
 			const int dim, const int nno,
 			const int Dof_choice_start, const int Dof_choice_end, const double* x,
-			const int* index, const double* surplus_t, double* value);
+			const int* index, const double* surplus, double* value);
 
 		static Func PolyBasis_CPU_RuntimeOpt_InterpolateArray;
 
@@ -81,13 +81,13 @@ void Interpolator::interpolate(Data* data,
 		
 		PolyBasis_CPU_RuntimeOpt_InterpolateArray(
 			data->dim, data->nno, Dof_choice_start, Dof_choice_end, x,
-			data->index[istate].getData(), data->surplus_t[istate].getData(), value);
+			data->index[istate].getData(), data->surplus[istate].getData(), value);
 	}
 	else
 	{
 		PolyBasis_CPU_Generic_InterpolateArray(
 			data->dim, data->nno, Dof_choice_start, Dof_choice_end, x,
-			data->index[istate].getData(), data->surplus_t[istate].getData(), value);
+			data->index[istate].getData(), data->surplus[istate].getData(), value);
 	}
 }
 
