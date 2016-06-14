@@ -13,7 +13,7 @@ Interpolator* Interpolator::getInstance()
 	return &optimizer;
 }
 
-static const Basis basis = LinearBasis;
+static const Basis basis = PolyBasis;
 
 extern "C" Basis getBasis() { return basis; }
 

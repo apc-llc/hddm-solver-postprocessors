@@ -27,5 +27,5 @@ mic: $(INSTALL)/lib/libpolybasis.a
 	cd $@ && $(MAKE) -j$(NJOBS) target=native
 
 clean:
-	rm -rf $(BUILD) $(INSTALL)/lib/libpolybasis.a && cd mic && $(MAKE) clean
+	rm -rf $(BUILD) $(INSTALL)/lib/libpolybasis.a && cd cpu && $(MAKE) clean
 
