@@ -6,28 +6,28 @@ CINC += -I. -I../include -I../../include
 COPT += -DAVX_VECTOR_SIZE=4
 CDIR = mkdir -p $(shell dirname $@)
 
-all: $(INSTALL)/bin/postprocessors/LinearBasis/cpu/libpostprocessor.so
+all: $(INSTALL)/bin/postprocessors/PolyBasis/cpu/libpostprocessor.so
 
-$(INSTALL)/bin/postprocessors/LinearBasis/cpu/libpostprocessor.so: \
+$(INSTALL)/bin/postprocessors/PolyBasis/cpu/libpostprocessor.so: \
 	$(BUILD)/InterpolateValue.o $(BUILD)/InterpolateArray.o \
 	$(BUILD)/InterpolateArrayManyStateless.o $(BUILD)/InterpolateArrayManyMultistate.o \
 	$(BUILD)/libInterpolateValue.sh $(BUILD)/libInterpolateArray.sh \
 	$(BUILD)/libInterpolateArrayManyStateless.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
 	$(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o \
 	$(BUILD)/priority.o $(BUILD)/supported.o $(BUILD)/available.o
-	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/cpu && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -llinearbasis
+	mkdir -p $(INSTALL)/bin/postprocessors/PolyBasis/cpu && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -lpolybasis
 
 $(BUILD)/InterpolateValue.o: src/InterpolateValue.c
-	$(CDIR) && $(MPICC) -std=c99 -DFUNCNAME=LinearBasis_CPU_Generic_InterpolateValue -DDIM=dim $(CINC) $(COPT) -c $< -o $@
+	$(CDIR) && $(MPICC) -std=c99 -DFUNCNAME=PolyBasis_CPU_Generic_InterpolateValue -DDIM=dim $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.c
-	$(CDIR) && $(MPICC) -std=c99 -DFUNCNAME=LinearBasis_CPU_Generic_InterpolateArray -DDIM=dim $(CINC) $(COPT) -c $< -o $@
+	$(CDIR) && $(MPICC) -std=c99 -DFUNCNAME=PolyBasis_CPU_Generic_InterpolateArray -DDIM=dim $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/InterpolateArrayManyStateless.o: src/InterpolateArrayManyStateless.c
-	$(CDIR) && $(MPICC) -std=c99 -DFUNCNAME=LinearBasis_CPU_Generic_InterpolateArrayManyStateless -DDIM=dim $(CINC) $(COPT) -c $< -o $@
+	$(CDIR) && $(MPICC) -std=c99 -DFUNCNAME=PolyBasis_CPU_Generic_InterpolateArrayManyStateless -DDIM=dim $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/InterpolateArrayManyMultistate.o: src/InterpolateArrayManyMultistate.c
-	$(CDIR) && $(MPICC) -std=c99 -DFUNCNAME=LinearBasis_CPU_Generic_InterpolateArrayManyMultistate -DDIM=dim $(CINC) $(COPT) -c $< -o $@
+	$(CDIR) && $(MPICC) -std=c99 -DFUNCNAME=PolyBasis_CPU_Generic_InterpolateArrayManyMultistate -DDIM=dim $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/libInterpolateValue.sh: src/InterpolateValue.c
 	$(CDIR) && echo cd $(shell pwd) \&\& $(MPICC) -std=c99 $(CINC) $(COPT) -shared -fno-lto $^  > $@
