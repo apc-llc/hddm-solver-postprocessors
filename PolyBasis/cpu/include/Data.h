@@ -158,9 +158,6 @@ class Data
 	std::vector<Matrix<int> > index;
 	std::vector<Matrix<real> > surplus, surplus_t;
 	std::vector<bool> loadedStates;
-	
-	std::vector<int*> indexes;
-	std::vector<real*> surpluses;
 
 	friend class Interpolator;
 
@@ -172,10 +169,6 @@ public :
 	void clear();
 
 	Data(int nstates);
-	
-	const int* const* getIndexes() const;
-	
-	const real* const* getSurpluses() const;
 };
 
 #endif // DATA_H

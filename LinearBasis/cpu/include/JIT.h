@@ -3,26 +3,27 @@
 
 #ifdef HAVE_RUNTIME_OPTIMIZATION
 
+#include "Data.h"
 #include "InterpolateKernel.h"
 
 typedef void (*InterpolateValueFunc)(const int dim, const int nno,
 	const int Dof_choice, const real* x,
-	const int* index, const real* surplus_t,
+	const Matrix<int>& index, const Matrix<real>& surplus,
 	real* value);
 
 typedef void (*InterpolateArrayFunc)(const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const real* x,
-	const int* index, const real* surplus_t,
+	const Matrix<int>& index, const Matrix<real>& surplus,
 	real* value);
 
 typedef void (*InterpolateArrayManyStatelessFunc)(const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const real* x,
-	const int* index, const real* surplus_t,
+	const Matrix<int>& index, const Matrix<real>& surplus,
 	real* value);
 
 typedef void (*InterpolateArrayManyMultistateFunc)(const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const real* const* x,
-	const int* const* index, const real* const* surplus_t,
+	const std::vector<Matrix<int> >& index, const std::vector<Matrix<real> >& surplus,
 	real** value);
 
 typedef InterpolateKernel<InterpolateValueFunc> InterpolateValueKernel;

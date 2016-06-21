@@ -86,6 +86,7 @@ public:
 	}
 };
 
+// Aligned vector.
 template<typename T>
 class Vector
 {
@@ -105,31 +106,52 @@ public :
 		assert(x < data.size());
 		return data[x];
 	}
+
+	const T& operator()(int x) const
+	{
+		assert(x < data.size());
+		return data[x];
+	}
 	
 	int length() { return data.size(); }
 	
 	void resize(int length) { data.resize(length); }
 };
 
+// Matrix with all rows aligned
 template<typename T>
 class Matrix
 {
 	std::vector<T, AlignedAllocator<T> > data;
-	int dimY, dimX;
+	int dimY, dimX, dimX_aligned;
 
 public :
 	Matrix() : data(AlignedAllocator<T>()), dimY(0), dimX(0) { }
 
 	Matrix(int dimY_, int dimX_) : data(AlignedAllocator<T>()), dimY(dimY_), dimX(dimX_)
 	{
-		data.resize(dimY_ * dimX_);
+		dimX_aligned = dimX_;
+		if (dimX_ % AVX_VECTOR_SIZE)
+			dimX_aligned = dimX + AVX_VECTOR_SIZE - dimX_ % AVX_VECTOR_SIZE;
+		data.resize(dimY_ * dimX_aligned);
 	}
 
 	T* getData() { return &data[0]; }
 	
 	T& operator()(int y, int x)
 	{
-		int index = x + dimX * y;
+		assert(x < dimX);
+		assert(y < dimY);
+		int index = x + dimX_aligned * y;
+		assert(index < data.size());
+		return data[index];
+	}
+
+	const T& operator()(int y, int x) const
+	{
+		assert(x < dimX);
+		assert(y < dimY);
+		int index = x + dimX_aligned * y;
 		assert(index < data.size());
 		return data[index];
 	}
@@ -141,7 +163,10 @@ public :
 	void resize(int dimY_, int dimX_)
 	{
 		dimY = dimY_; dimX = dimX_;
-		data.resize(dimY_ * dimX_);
+		dimX_aligned = dimX_;
+		if (dimX_ % AVX_VECTOR_SIZE)
+			dimX_aligned = dimX + AVX_VECTOR_SIZE - dimX_ % AVX_VECTOR_SIZE;
+		data.resize(dimY_ * dimX_aligned);
 	}
 	
 	void fill(T value)
@@ -159,9 +184,6 @@ class Data
 	std::vector<Matrix<real> > surplus, surplus_t;
 	std::vector<bool> loadedStates;
 	
-	std::vector<int*> indexes;
-	std::vector<real*> surpluses;
-
 	friend class Interpolator;
 
 public :
@@ -172,10 +194,6 @@ public :
 	void clear();
 
 	Data(int nstates);
-	
-	const int* const* getIndexes() const;
-	
-	const real* const* getSurpluses() const;
 };
 
 #endif // DATA_H
