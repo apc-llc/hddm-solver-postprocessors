@@ -41,7 +41,6 @@ extern "C" void FUNCNAME(
 #endif
 		for (int i = 0; i < nno; i++)
 		{
-			int zero = 0;
 			__m256d temp = double4_1_1_1_1;
 			for (int j = 0; j < DIM; j += AVX_VECTOR_SIZE)
 			{
@@ -58,37 +57,35 @@ extern "C" void FUNCNAME(
 					_mm256_sub_pd(_mm256_mul_pd(x4, _mm256_cvtepi32_pd(i4)), _mm256_cvtepi32_pd(j4))));
 				const __m256d d = _mm256_cmp_pd(xp, double4_0_0_0_0, _CMP_GT_OQ);
 				if (_mm256_movemask_pd(d) != (int)0xf)
-				{
-					zero = 1;
-					break;
-				}
+					goto zero;
 				temp = _mm256_mul_pd(temp, xp);
 			}
-			if (zero) continue;
-			const __m128d pairwise_sum = _mm_mul_pd(_mm256_castpd256_pd128(temp), _mm256_extractf128_pd(temp, 1));
-			const double temps = _mm_cvtsd_f64(_mm_mul_pd(pairwise_sum,
-				(__m128d)_mm_movehl_ps((__m128)pairwise_sum, (__m128)pairwise_sum)));
-			for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
-				value[Dof_choice - b] += temps * surplus(i, Dof_choice);
+
+			{
+				const __m128d pairwise_sum = _mm_mul_pd(_mm256_castpd256_pd128(temp), _mm256_extractf128_pd(temp, 1));
+				const double temps = _mm_cvtsd_f64(_mm_mul_pd(pairwise_sum,
+					(__m128d)_mm_movehl_ps((__m128)pairwise_sum, (__m128)pairwise_sum)));
+				for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
+					value[Dof_choice - b] += temps * surplus(i, Dof_choice);
+			}
+
+			zero: continue;
 		}		
 #else
 		for (int i = 0; i < nno; i++)
 		{
-			int zero = 0;
 			double temp = 1.0;
 			for (int j = 0; j < DIM; j++)
 			{
 				double xp = LinearBasis(x[j], index(i, j), index(i, + j + vdim));
 				if (xp <= 0.0)
-				{
-					zero = 1;
-					break;
-				}
+					goto zero;
 				temp *= xp;
 			}
-			if (zero) continue;
 			for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
 				value[Dof_choice - b] += temp * surplus(i, Dof_choice);
+
+			zero: continue;
 		}
 #endif
 

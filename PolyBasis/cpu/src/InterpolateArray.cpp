@@ -97,21 +97,18 @@ void FUNCNAME(
 
 	for (int i = 0; i < nno; i++)
 	{
-		int zero = 0;
 		double temp = 1.0;
 		for (int j = 0; j < DIM; j++)
 		{
 			double xp = PolyBasis(x[j], index(i, j), index(i, j + vdim));
 			if (xp <= 0.0)
-			{
-				zero = 1;
-				break;
-			}
+				goto zero;
 			temp *= xp;
 		}
-		if (zero) continue;
 		for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
 			value[Dof_choice - b] += temp * surplus(i, Dof_choice);
+
+		zero : continue;
 	}
 }
 
