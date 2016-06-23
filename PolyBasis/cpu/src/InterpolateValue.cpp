@@ -6,23 +6,23 @@
 #include "LinearBasis.h"
 #endif
 
+#include "Data.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
 #define STR(funcname) #funcname
 
-void FUNCNAME(
+extern "C" void FUNCNAME(
 	const int dim, const int nno,
 	const int Dof_choice, const double* x,
-	const int* index, const double* surplus_t, double* value_)
+	const Matrix<int>& index, const Matrix<double>& surplus, double* value_)
 {
 	printf("%s is not implemented\n", STR(FUNCNAME));
 	abort();
 
 #ifdef HAVE_AVX
 	assert(((size_t)x % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "x vector must be sufficiently memory-aligned");
-	assert(((size_t)index % (AVX_VECTOR_SIZE * sizeof(int)) == 0) && "index vector must be sufficiently memory-aligned");
-	assert(((size_t)surplus_t % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "surplus_t vector must be sufficiently memory-aligned");
 #endif
 
 	double value = 0.0;
@@ -55,8 +55,8 @@ void FUNCNAME(
 				x4 = _mm256_load_pd(x + j);
 			}
 
-			__m128i i4 = _mm_load_si128((const __m128i*)&index[i * 2 * vdim + j]);
-			__m128i j4 = _mm_load_si128((const __m128i*)&index[i * 2 * vdim + j + vdim]);
+			__m128i i4 = _mm_load_si128(reinterpret_cast<const __m128i*>(&index(i, j)));
+			__m128i j4 = _mm_load_si128(reinterpret_cast<const __m128i*>(&index(i, j + vdim)));
 			const __m256d xp = _mm256_sub_pd(double4_1_1_1_1, _mm256_andnot_pd(sign_mask,
 				_mm256_sub_pd(_mm256_mul_pd(x4, _mm256_cvtepi32_pd(i4)), _mm256_cvtepi32_pd(j4))));
 			const __m256d d = _mm256_cmp_pd(xp, double4_0_0_0_0, _CMP_GT_OQ);
@@ -70,7 +70,7 @@ void FUNCNAME(
 		if (zero) continue;
 		const __m128d pairwise_mul = _mm_mul_pd(_mm256_castpd256_pd128(temp), _mm256_extractf128_pd(temp, 1));
 		value += _mm_cvtsd_f64(_mm_mul_pd(pairwise_mul, (__m128d)_mm_movehl_ps((__m128)pairwise_mul, (__m128)pairwise_mul))) *
-			surplus_t[Dof_choice * nno + i];
+			surplus(i, Dof_choice);
 	}
 #else
 	for (int i = 0; i < nno; i++)
@@ -79,8 +79,7 @@ void FUNCNAME(
 		double temp = 1.0;
 		for (int j = 0; j < DIM; j++)
 		{
-			double xp = LinearBasis(x[j], index[i * 2 * vdim + j],
-				index[i * 2 * vdim + j + vdim]);
+			double xp = LinearBasis(x[j], index(i, j), index(i, j + vdim));
 			if (xp <= 0.0)
 			{
 				zero = 1;
@@ -89,7 +88,7 @@ void FUNCNAME(
 			temp *= xp;
 		}
 		if (zero) continue;
-		value += temp * surplus_t[Dof_choice * nno + i];
+		value += temp * surplus(i, Dof_choice);
 	}
 #endif
 	*value_ = value;

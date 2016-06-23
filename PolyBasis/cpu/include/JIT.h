@@ -3,6 +3,7 @@
 
 #ifdef HAVE_RUNTIME_OPTIMIZATION
 
+#include "Data.h"
 #include "InterpolateKernel.h"
 
 typedef void (*InterpolateValueFunc)(const int dim, const int nno,

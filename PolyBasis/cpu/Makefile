@@ -17,29 +17,29 @@ $(INSTALL)/bin/postprocessors/PolyBasis/cpu/libpostprocessor.so: \
 	$(BUILD)/priority.o $(BUILD)/supported.o $(BUILD)/available.o
 	mkdir -p $(INSTALL)/bin/postprocessors/PolyBasis/cpu && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -lpolybasis
 
-$(BUILD)/InterpolateValue.o: src/InterpolateValue.c
-	$(CDIR) && $(MPICC) -std=c99 -DFUNCNAME=PolyBasis_CPU_Generic_InterpolateValue -DDIM=dim $(CINC) $(COPT) -c $< -o $@
+$(BUILD)/InterpolateValue.o: src/InterpolateValue.cpp
+	$(CDIR) && $(MPICXX) -std=c99 -DFUNCNAME=PolyBasis_CPU_Generic_InterpolateValue -DDIM=dim $(CINC) $(COPT) -c $< -o $@
 
-$(BUILD)/InterpolateArray.o: src/InterpolateArray.c
-	$(CDIR) && $(MPICC) -std=c99 -DFUNCNAME=PolyBasis_CPU_Generic_InterpolateArray -DDIM=dim $(CINC) $(COPT) -c $< -o $@
+$(BUILD)/InterpolateArray.o: src/InterpolateArray.cpp
+	$(CDIR) && $(MPICXX) -std=c99 -DFUNCNAME=PolyBasis_CPU_Generic_InterpolateArray -DDIM=dim $(CINC) $(COPT) -c $< -o $@
 
-$(BUILD)/InterpolateArrayManyStateless.o: src/InterpolateArrayManyStateless.c
-	$(CDIR) && $(MPICC) -std=c99 -DFUNCNAME=PolyBasis_CPU_Generic_InterpolateArrayManyStateless -DDIM=dim $(CINC) $(COPT) -c $< -o $@
+$(BUILD)/InterpolateArrayManyStateless.o: src/InterpolateArrayManyStateless.cpp
+	$(CDIR) && $(MPICXX) -std=c99 -DFUNCNAME=PolyBasis_CPU_Generic_InterpolateArrayManyStateless -DDIM=dim $(CINC) $(COPT) -c $< -o $@
 
-$(BUILD)/InterpolateArrayManyMultistate.o: src/InterpolateArrayManyMultistate.c
-	$(CDIR) && $(MPICC) -std=c99 -DFUNCNAME=PolyBasis_CPU_Generic_InterpolateArrayManyMultistate -DDIM=dim $(CINC) $(COPT) -c $< -o $@
+$(BUILD)/InterpolateArrayManyMultistate.o: src/InterpolateArrayManyMultistate.cpp
+	$(CDIR) && $(MPICXX) -std=c99 -DFUNCNAME=PolyBasis_CPU_Generic_InterpolateArrayManyMultistate -DDIM=dim $(CINC) $(COPT) -c $< -o $@
 
-$(BUILD)/libInterpolateValue.sh: src/InterpolateValue.c
-	$(CDIR) && echo cd $(shell pwd) \&\& $(MPICC) -std=c99 $(CINC) $(COPT) -shared -fno-lto $^  > $@
+$(BUILD)/libInterpolateValue.sh: src/InterpolateValue.cpp
+	$(CDIR) && echo cd $(shell pwd) \&\& $(MPICXX) -std=c99 $(CINC) $(COPT) -shared -fno-lto $^  > $@
 
-$(BUILD)/libInterpolateArray.sh: src/InterpolateArray.c
-	$(CDIR) && echo cd $(shell pwd) \&\& $(MPICC) -std=c99 $(CINC) $(COPT) -shared -fno-lto $^  > $@
+$(BUILD)/libInterpolateArray.sh: src/InterpolateArray.cpp
+	$(CDIR) && echo cd $(shell pwd) \&\& $(MPICXX) -std=c99 $(CINC) $(COPT) -shared -fno-lto $^  > $@
 
-$(BUILD)/libInterpolateArrayManyStateless.sh: src/InterpolateArrayManyStateless.c
-	$(CDIR) && echo cd $(shell pwd) \&\& $(MPICC) -std=c99 $(CINC) $(COPT) -shared -fno-lto $^  > $@
+$(BUILD)/libInterpolateArrayManyStateless.sh: src/InterpolateArrayManyStateless.cpp
+	$(CDIR) && echo cd $(shell pwd) \&\& $(MPICXX) -std=c99 $(CINC) $(COPT) -shared -fno-lto $^  > $@
 
-$(BUILD)/libInterpolateArrayManyMultistate.sh: src/InterpolateArrayManyMultistate.c
-	$(CDIR) && echo cd $(shell pwd) \&\& $(MPICC) -std=c99 $(CINC) $(COPT) -shared -fno-lto $^  > $@
+$(BUILD)/libInterpolateArrayManyMultistate.sh: src/InterpolateArrayManyMultistate.cpp
+	$(CDIR) && echo cd $(shell pwd) \&\& $(MPICXX) -std=c99 $(CINC) $(COPT) -shared -fno-lto $^  > $@
 
 $(BUILD)/Interpolator.o: src/Interpolator.cpp include/JIT.h include/Data.h
 	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
