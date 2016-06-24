@@ -50,7 +50,7 @@ void Interpolator::interpolate(Data* data,
 	{			
 		LinearBasis_CPU_Generic_InterpolateValue(
 			data->dim, data->nno, Dof_choice, x,
-			data->index[istate], data->surplus_t[istate], &value);
+			data->index[istate], data->surplus[istate], &value);
 	}
 }
 
