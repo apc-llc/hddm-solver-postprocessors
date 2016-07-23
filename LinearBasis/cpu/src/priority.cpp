@@ -1,5 +1,7 @@
 #include "interpolator.h"
 
+using namespace cpu;
+
 extern "C" int getPriority()
 {
 	// Interpolator tells the priority it has read from the config file.

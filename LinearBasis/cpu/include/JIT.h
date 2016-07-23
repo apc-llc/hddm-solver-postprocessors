@@ -6,24 +6,36 @@
 #include "Data.h"
 #include "InterpolateKernel.h"
 
-typedef void (*InterpolateValueFunc)(const int dim, const int nno,
+namespace cpu {
+
+class Device;
+
+typedef void (*InterpolateValueFunc)(
+	Device* device,
+	const int dim, const int nno,
 	const int Dof_choice, const real* x,
-	const Matrix<int>& index, const Matrix<real>& surplus,
+	const Matrix<int>* index, const Matrix<real>* surplus,
 	real* value);
 
-typedef void (*InterpolateArrayFunc)(const int dim, const int nno,
+typedef void (*InterpolateArrayFunc)(
+	Device* device,
+	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const real* x,
-	const Matrix<int>& index, const Matrix<real>& surplus,
+	const Matrix<int>* index, const Matrix<real>* surplus,
 	real* value);
 
-typedef void (*InterpolateArrayManyStatelessFunc)(const int dim, const int nno,
+typedef void (*InterpolateArrayManyStatelessFunc)(
+	Device* device,
+	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const real* x,
-	const Matrix<int>& index, const Matrix<real>& surplus,
+	const Matrix<int>* index, const Matrix<real>* surplus,
 	real* value);
 
-typedef void (*InterpolateArrayManyMultistateFunc)(const int dim, const int nno,
+typedef void (*InterpolateArrayManyMultistateFunc)(
+	Device* device,
+	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const real* const* x,
-	const std::vector<Matrix<int> >& index, const std::vector<Matrix<real> >& surplus,
+	const Matrix<int>* index, const Matrix<real>* surplus,
 	real** value);
 
 typedef InterpolateKernel<InterpolateValueFunc> InterpolateValueKernel;
@@ -46,6 +58,8 @@ public :
 	template<typename K, typename F>
 	static K& jitCompile(int dim, const std::string& funcnameTemplate, F fallbackFunc);
 };
+
+} // namespace cpu
 
 #endif // HAVE_RUNTIME_OPTIMIZATION
 

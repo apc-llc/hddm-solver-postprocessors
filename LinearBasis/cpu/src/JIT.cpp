@@ -14,6 +14,7 @@
 #include <vector>
 #include <unistd.h>
 
+using namespace cpu;
 using namespace std;
 
 template<>

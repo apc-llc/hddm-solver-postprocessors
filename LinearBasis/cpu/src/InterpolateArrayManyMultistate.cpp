@@ -8,14 +8,15 @@
 
 #include "Data.h"
 
-#include <vector>
+using namespace cpu;
 
-using namespace std;
+class Device;
 
 extern "C" void FUNCNAME(
+	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
-	const vector<Matrix<int> >& index_, const vector<Matrix<double> >& surplus_, double** value_)
+	const Matrix<int>* index_, const Matrix<double>* surplus_, double** value_)
 {
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
 	// boundary to keep up the required alignment.

@@ -12,6 +12,8 @@
 #include "check.h"
 #include "process.h"
 
+namespace cpu {
+
 // Custom allocator, using code by Sergei Danielian
 // https://github.com/gahcep/Allocators
 template <class T>
@@ -187,14 +189,16 @@ class Data
 	friend class Interpolator;
 
 public :
-	int getNno() const;
+	virtual int getNno() const;
 
-	void load(const char* filename, int istate);
+	virtual void load(const char* filename, int istate);
 	
-	void clear();
+	virtual void clear();
 
 	Data(int nstates);
 };
+
+} // namespace cpu
 
 #endif // DATA_H
 

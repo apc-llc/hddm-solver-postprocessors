@@ -8,14 +8,22 @@
 
 #include "Data.h"
 
+using namespace cpu;
+
+class Device;
+
 extern "C" void FUNCNAME(
+	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice, const double* x,
-	const Matrix<int>& index, const Matrix<double>& surplus, double* value_)
+	const Matrix<int>* index_, const Matrix<double>* surplus_, double* value_)
 {
 #ifdef HAVE_AVX
 	assert(((size_t)x % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "x vector must be sufficiently memory-aligned");
 #endif
+
+	const Matrix<int>& index = *index_;
+	const Matrix<double>& surplus = *surplus_;
 
 	double value = 0.0;
 

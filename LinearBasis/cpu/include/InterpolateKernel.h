@@ -6,6 +6,8 @@
 #include <string>
 #include <unistd.h>
 
+namespace cpu {
+
 class JIT;
 
 template<typename T>
@@ -99,4 +101,6 @@ public :
 	
 	friend class JIT;
 };
+
+} // namespace cpu
 

@@ -7,6 +7,7 @@
 #include <memory>
 #include <mpi.h>
 
+using namespace cpu;
 using namespace std;
 
 int Data::getNno() const { return nno; }
