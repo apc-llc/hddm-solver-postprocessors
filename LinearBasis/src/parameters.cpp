@@ -51,6 +51,7 @@ ASSIGN(binaryio)
 	}
 	
 	map<string, bool> undefParams;
+
 	undefParams["priority"] = true;
 	undefParams["nagents"] = true;
 	undefParams["enableRuntimeOptimization"] = true;
