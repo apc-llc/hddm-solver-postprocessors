@@ -101,23 +101,23 @@ public :
 
 	Vector(int dim, T value) : data(dim, value, AlignedAllocator<T>()) { }
 
-	T* getData() { return &data[0]; }
+	inline __attribute__((always_inline)) T* getData() { return &data[0]; }
 
-	T& operator()(int x)
+	inline __attribute__((always_inline)) T& operator()(int x)
 	{
 		assert(x < data.size());
 		return data[x];
 	}
 
-	const T& operator()(int x) const
+	inline __attribute__((always_inline)) const T& operator()(int x) const
 	{
 		assert(x < data.size());
 		return data[x];
 	}
 	
-	int length() { return data.size(); }
+	inline __attribute__((always_inline)) int length() { return data.size(); }
 	
-	void resize(int length) { data.resize(length); }
+	inline __attribute__((always_inline)) void resize(int length) { data.resize(length); }
 };
 
 // Matrix with all rows aligned
@@ -138,9 +138,9 @@ public :
 		data.resize(dimY_ * dimX_aligned);
 	}
 
-	T* getData() { return &data[0]; }
+	inline __attribute__((always_inline)) T* getData() { return &data[0]; }
 	
-	T& operator()(int y, int x)
+	inline __attribute__((always_inline)) T& operator()(int y, int x)
 	{
 		assert(x < dimX);
 		assert(y < dimY);
@@ -149,7 +149,7 @@ public :
 		return data[index];
 	}
 
-	const T& operator()(int y, int x) const
+	inline __attribute__((always_inline)) const T& operator()(int y, int x) const
 	{
 		assert(x < dimX);
 		assert(y < dimY);
@@ -158,11 +158,11 @@ public :
 		return data[index];
 	}
 
-	int dimy() { return dimY; }
+	inline __attribute__((always_inline)) int dimy() { return dimY; }
 
-	int dimx() { return dimX; }
+	inline __attribute__((always_inline)) int dimx() { return dimX; }
 		
-	void resize(int dimY_, int dimX_)
+	inline __attribute__((always_inline)) void resize(int dimY_, int dimX_)
 	{
 		dimY = dimY_; dimX = dimX_;
 		dimX_aligned = dimX_;
@@ -171,7 +171,7 @@ public :
 		data.resize(dimY_ * dimX_aligned);
 	}
 	
-	void fill(T value)
+	inline __attribute__((always_inline)) void fill(T value)
 	{
 		std::fill(data.begin(), data.end(), value);
 	}
