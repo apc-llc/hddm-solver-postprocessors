@@ -14,7 +14,7 @@ $(INSTALL)/bin/postprocessors/PolyBasis/cpu/libpostprocessor.so: \
 	$(BUILD)/libInterpolateValue.sh $(BUILD)/libInterpolateArray.sh \
 	$(BUILD)/libInterpolateArrayManyStateless.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
 	$(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o \
-	$(BUILD)/priority.o $(BUILD)/supported.o $(BUILD)/available.o
+	$(BUILD)/priority.o $(BUILD)/supported.o $(BUILD)/Device.o $(BUILD)/Devices.o
 	mkdir -p $(INSTALL)/bin/postprocessors/PolyBasis/cpu && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -lpolybasis
 
 $(BUILD)/InterpolateValue.o: src/InterpolateValue.cpp
@@ -56,9 +56,12 @@ $(BUILD)/priority.o: src/priority.cpp
 $(BUILD)/supported.o: src/supported.cpp
 	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
 
-$(BUILD)/available.o: src/available.cpp
+$(BUILD)/Device.o: src/Device.cpp
+	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
+
+$(BUILD)/Devices.o: src/Devices.cpp
 	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
 
 clean:
-	rm -rf $(BUILD) $(INSTALL)/bin/postprocessors/cpu/libpostprocessor.so
+	rm -rf $(BUILD) $(INSTALL)/bin/postprocessors/PolyBasis/cpu/libpostprocessor.so
 

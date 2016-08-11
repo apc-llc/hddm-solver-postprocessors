@@ -5,7 +5,7 @@ include $(LOCATION)/Makefile.inc
 CINC += -I../include -I../../include
 CDIR = mkdir -p $(shell dirname $@)
 
-TARGETS = cpu gpu mic
+TARGETS = cpu cuda mic
 
 .PHONY: $(TARGETS)
 
@@ -20,12 +20,15 @@ $(BUILD)/parameters.o: src/parameters.cpp $(LOCATION)/include/check.h include/pa
 cpu: $(INSTALL)/lib/liblinearbasis.a
 	cd $@ && $(MAKE) -j$(NJOBS)
 
-gpu: $(INSTALL)/lib/liblinearbasis.a
+cuda: $(INSTALL)/lib/liblinearbasis.a
 	cd $@ && $(MAKE) -j$(NJOBS)
 
 mic: $(INSTALL)/lib/liblinearbasis.a
 	cd $@ && $(MAKE) -j$(NJOBS) target=native
 
 clean:
-	rm -rf $(BUILD) $(INSTALL)/lib/liblinearbasis.a && cd mic && $(MAKE) clean
+	rm -rf $(BUILD) && \
+	cd cpu && $(MAKE) clean && cd .. && \
+	cd cuda && $(MAKE) clean && cd .. && \
+	cd mic && $(MAKE) clean && cd ..
 
