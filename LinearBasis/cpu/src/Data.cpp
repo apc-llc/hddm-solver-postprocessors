@@ -4,7 +4,6 @@
 
 #include <fstream>
 #include <iostream>
-#include <memory>
 #include <mpi.h>
 
 using namespace cpu;
@@ -112,13 +111,8 @@ Data::Data(int nstates_) : nstates(nstates_)
 	fill(loadedStates.begin(), loadedStates.end(), false);
 }
 
-static unique_ptr<Data> data = NULL;
-
 extern "C" Data* getData(int nstates)
 {
-	if (!data.get())
-		data.reset(new Data(nstates));
-	
-	return data.get();
+	return new Data(nstates);
 }
 
