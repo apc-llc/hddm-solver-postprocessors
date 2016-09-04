@@ -32,9 +32,29 @@ inline __attribute__((always_inline)) __device__ double warpReduceMultiply(doubl
 	return val;
 }
 
+#ifdef DEFERRED
+// Define a structure-container, that shall be used to pass x vector as
+// a single value via kernel argument. As an argument, it will be implicitly
+// loaded into device constant memory.
+struct X
+{
+	double values[DIM];
+	
+	inline __attribute__((always_inline)) __device__ double operator[](int i) const
+	{
+		return values[i];
+	}
+};
+#endif
+
 static __global__ void InterpolateArray_kernel_large_dim(
 	const int dim, const int vdim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const double* x,
+	const int Dof_choice_start, const int Dof_choice_end,
+#ifdef DEFERRED
+	const X x,
+#else
+ 	const double* x,
+#endif
 	const Matrix<int>::Device* index_, const Matrix<double>::Device* surplus_, double* value)
 {
 	extern __shared__ double temps[];
@@ -159,8 +179,12 @@ extern "C" void FUNCNAME(
 	// inter-warp step of temp value reduction.
 	int nwarps = (blockDim.x * blockDim.y) / device->warpSize;
 
+#ifdef DEFERRED
+	X* dx = (X*)x;
+#else
 	double* dx;
 	CUDA_ERR_CHECK(cudaMalloc(&dx, sizeof(double) * DIM));
+#endif
 
 	const int length = Dof_choice_end - Dof_choice_start + 1;
 	double* dvalue;
@@ -168,16 +192,26 @@ extern "C" void FUNCNAME(
 	
 	cudaStream_t stream;
 	CUDA_ERR_CHECK(cudaStreamCreate(&stream));
+#ifndef DEFERRED
 	CUDA_ERR_CHECK(cudaMemcpyAsync(dx, x, sizeof(double) * DIM, cudaMemcpyHostToDevice, stream));
+#endif
 	CUDA_ERR_CHECK(cudaMemsetAsync(dvalue, 0, sizeof(double) * length, stream));
 	InterpolateArray_kernel_large_dim<<<gridDim, blockDim, nwarps, stream>>>(
-		dim, vdim, nno, Dof_choice_start, Dof_choice_end, dx, index, surplus, dvalue);
+		dim, vdim, nno, Dof_choice_start, Dof_choice_end,
+#ifdef DEFERRED
+		*dx,
+#else
+		dx,
+#endif
+		index, surplus, dvalue);
 	CUDA_ERR_CHECK(cudaGetLastError());
 	CUDA_ERR_CHECK(cudaMemcpyAsync(value, dvalue, sizeof(double) * length, cudaMemcpyDeviceToHost, stream));
 	CUDA_ERR_CHECK(cudaStreamSynchronize(stream));
 	CUDA_ERR_CHECK(cudaStreamDestroy(stream));
 
-	CUDA_ERR_CHECK(cudaFree(dx));	
+#ifndef DEFERRED
+	CUDA_ERR_CHECK(cudaFree(dx));
+#endif
 	CUDA_ERR_CHECK(cudaFree(dvalue));
 }
 
