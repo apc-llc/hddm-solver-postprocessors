@@ -185,30 +185,48 @@ template<typename T>
 class MatrixDevice
 {
 	T* data;
+	bool dataOwner; // whether the instance owns its data pointer or not
 	size_t size;
 	int dimY, dimX, dimX_aligned;
 
 public :
-	__device__
-	MatrixDevice() : data(NULL), size(0), dimY(0), dimX(0) { }
+	__host__ __device__
+	MatrixDevice() : data(NULL), dataOwner(true), size(0), dimY(0), dimX(0) { }
 
-	__device__
-	MatrixDevice(int dimY_, int dimX_) : data(NULL), size(0), dimY(dimY_), dimX(dimX_)
+	__host__ __device__
+	MatrixDevice(int dimY_, int dimX_) : data(NULL), dataOwner(true), size(0), dimY(dimY_), dimX(dimX_)
 	{
 		dimX_aligned = dimX_;
 		if (dimX_ % AVX_VECTOR_SIZE)
 			dimX_aligned = dimX + AVX_VECTOR_SIZE - dimX_ % AVX_VECTOR_SIZE;
 		size = dimY_ * dimX_aligned;
+#if defined(__CUDA_ARCH__)
 		data = new T[size];
+#else
+		CUDA_ERR_CHECK(cudaMalloc(&data, size * sizeof(T)));
+#endif
 	}
 	
-	__device__
+	__host__ __device__
 	~MatrixDevice()
 	{
+		if (!dataOwner) return;
+#if defined(__CUDA_ARCH__)
 		if (data) delete[] data;
+#else
+		CUDA_ERR_CHECK(cudaFree(data));
+#endif
 	}
 
-	__device__
+	// Become an owner of the underlying data pointer.
+	__host__ __device__
+	void ownData() { dataOwner = true; }
+
+	// Disown the underlying data pointer.
+	__host__ __device__
+	void disownData() { dataOwner = false; }
+
+	__host__ __device__
 	inline __attribute__((always_inline)) T* getData() { return &data[0]; }
 	
 	__device__
@@ -237,21 +255,26 @@ public :
 	__device__
 	inline __attribute__((always_inline)) int dimx() { return dimX; }
 		
-	__device__
+	__host__ __device__
 	inline __attribute__((always_inline)) void resize(int dimY_, int dimX_)
 	{
 		dimY = dimY_; dimX = dimX_;
 		dimX_aligned = dimX_;
 		if (dimX_ % AVX_VECTOR_SIZE)
 			dimX_aligned = dimX + AVX_VECTOR_SIZE - dimX_ % AVX_VECTOR_SIZE;
+#if defined(__CUDA_ARCH__)
 		if (data)
 			delete[] data;
+#else
+		if (data)
+			CUDA_ERR_CHECK(cudaFree(data));
+#endif
 		size = dimY_ * dimX_aligned;
+#if defined(__CUDA_ARCH__)
 		data = new T[size];
-	}
-
-	inline __attribute__((always_inline)) void operator=(MatrixHost<T, std::vector<T, AlignedAllocator<T> > >& other)
-	{
+#else
+		CUDA_ERR_CHECK(cudaMalloc(&data, size * sizeof(T)));
+#endif
 	}
 };
 
@@ -270,10 +293,16 @@ class Data
 	
 	class Host
 	{
+		class DataHost;
+
+		// Opaque internal data container.
+		std::unique_ptr<DataHost> data;
+	
 	public :
 
-		std::vector<Matrix<int>::Host> index;
-		std::vector<Matrix<real>::Host> surplus, surplus_t;
+		Matrix<int>::Host* getIndex(int istate);
+		Matrix<real>::Host* getSurplus(int istate);
+		Matrix<real>::Host* getSurplus_t(int istate);
 
 		Host(int nstates);
 	
@@ -283,18 +312,25 @@ class Data
 	
 	class Device
 	{
+		class DataDevice;
+
+		// Opaque internal data container.
+		std::unique_ptr<DataDevice> data;
+
 		int nstates;
 
 	public :
 
-		// These containers shall be entirely in device memory, including vectors.
-		Matrix<int>::Device *index;
-		Matrix<real>::Device *surplus, *surplus_t;
+		Matrix<int>::Device* getIndex(int istate);
+		Matrix<real>::Device* getSurplus(int istate);
+		Matrix<real>::Device* getSurplus_t(int istate);
+
+		void setIndex(int istate, Matrix<int>::Host* matrix);
+		void setSurplus(int istate, Matrix<real>::Host* matrix);
+		void setSurplus_t(int istate, Matrix<real>::Host* matrix);
 	
 		Device(int nstates_);
 		
-		~Device();
-	
 		friend class Data;
 	}
 	device;
