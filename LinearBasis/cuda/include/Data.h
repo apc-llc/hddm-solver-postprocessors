@@ -91,18 +91,18 @@ public:
 	}
 };
 
-// Aligned vector.
-template<typename T>
-class Vector
+// Host memory aligned vector.
+template<typename T, typename VectorType>
+class VectorHost
 {
-	std::vector<T, AlignedAllocator<T> > data;
+	VectorType data;
 
 public :
-	Vector() : data(AlignedAllocator<T>()) { }
+	VectorHost() : data(VectorType()) { }
 
-	Vector(int dim) : data(AlignedAllocator<T>()) { data.resize(dim); }
+	VectorHost(int dim) : data(AlignedAllocator<T>()) { data.resize(dim); }
 
-	Vector(int dim, T value) : data(dim, value, AlignedAllocator<T>()) { }
+	VectorHost(int dim, T value) : data(dim, value, AlignedAllocator<T>()) { }
 
 	inline __attribute__((always_inline)) T* getData() { return &data[0]; }
 
@@ -121,6 +121,99 @@ public :
 	inline __attribute__((always_inline)) int length() { return data.size(); }
 	
 	inline __attribute__((always_inline)) void resize(int length) { data.resize(length); }
+};
+
+// Device memory aligned vector.
+template<typename T>
+class VectorDevice
+{
+	T* data;
+	bool dataOwner; // whether the instance owns its data pointer or not
+	size_t size;
+	int dim, dim_aligned;
+
+public :
+	__host__ __device__
+	VectorDevice() : data(NULL), dataOwner(true), size(0), dim(0) { }
+
+	__host__ __device__
+	VectorDevice(int dim_) : data(NULL), dataOwner(true), size(0), dim(dim_)
+	{
+		dim_aligned = dim_;
+		if (dim_ % AVX_VECTOR_SIZE)
+			dim_aligned = dim + AVX_VECTOR_SIZE - dim_ % AVX_VECTOR_SIZE;
+#if defined(__CUDA_ARCH__)
+		data = new T[dim];
+#else
+		CUDA_ERR_CHECK(cudaMalloc(&data, dim * sizeof(T)));
+#endif
+	}
+	
+	__host__ __device__
+	~VectorDevice()
+	{
+		if (!dataOwner) return;
+#if defined(__CUDA_ARCH__)
+		if (data) delete[] data;
+#else
+		CUDA_ERR_CHECK(cudaFree(data));
+#endif
+	}
+
+	// Become an owner of the underlying data pointer.
+	__host__ __device__
+	void ownData() { dataOwner = true; }
+
+	// Disown the underlying data pointer.
+	__host__ __device__
+	void disownData() { dataOwner = false; }
+
+	__host__ __device__
+	inline __attribute__((always_inline)) T* getData() { return &data[0]; }
+	
+	__device__
+	inline __attribute__((always_inline)) T& operator()(int x)
+	{
+		assert(x < dim);
+		return data[x];
+	}
+
+	__device__
+	inline __attribute__((always_inline)) const T& operator()(int x) const
+	{
+		assert(x < dimX);
+		return data[x];
+	}
+
+	__device__
+	inline __attribute__((always_inline)) int length() { return dim; }
+
+	__host__ __device__
+	inline __attribute__((always_inline)) void resize(int length)
+	{
+		dim = length;
+		if (dim % AVX_VECTOR_SIZE)
+			dim_aligned = dim + AVX_VECTOR_SIZE - dim % AVX_VECTOR_SIZE;
+#if defined(__CUDA_ARCH__)
+		if (data)
+			delete[] data;
+#else
+		if (data)
+			CUDA_ERR_CHECK(cudaFree(data));
+#endif
+#if defined(__CUDA_ARCH__)
+		data = new T[dim];
+#else
+		CUDA_ERR_CHECK(cudaMalloc(&data, dim * sizeof(T)));
+#endif
+	}
+};
+
+template<typename T>
+struct Vector
+{
+	typedef VectorHost<T, std::vector<T, AlignedAllocator<T> > > Host;
+	typedef VectorDevice<T> Device;
 };
 
 // Host memory matrix with all rows aligned
