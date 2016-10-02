@@ -21,29 +21,29 @@ $(INSTALL)/bin/postprocessors/LinearBasis/cuda/libpostprocessor.so: \
 	$(BUILD)/priority.o $(BUILD)/supported.o $(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o
 	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/cuda && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -llinearbasis $(LINK_ACCELERATOR) $(OMPFLAGS)
 
-$(BUILD)/InterpolateValue.o: src/InterpolateValue.cu
+$(BUILD)/InterpolateValue.o: src/InterpolateValue.cu include/Interpolate.h
 	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateValue -DDIM=dim $(CINC) $(NVCCOPT) -c $< -o $@
 
-$(BUILD)/InterpolateArray.o: src/InterpolateArray.cu
+$(BUILD)/InterpolateArray.o: src/InterpolateArray.cu include/Interpolate.h
 	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateArray -DDIM=dim $(CINC) $(NVCCOPT) -c $< -o $@
 
-$(BUILD)/InterpolateArrayManyStateless.o: src/InterpolateArrayManyStateless.cu
+$(BUILD)/InterpolateArrayManyStateless.o: src/InterpolateArrayManyStateless.cu include/Interpolate.h
 	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateArrayManyStateless -DDIM=dim $(CINC) $(NVCCOPT) -c $< -o $@
 
-$(BUILD)/InterpolateArrayManyMultistate.o: src/InterpolateArrayManyMultistate.cu
+$(BUILD)/InterpolateArrayManyMultistate.o: src/InterpolateArrayManyMultistate.cu include/Interpolate.h
 	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateArrayManyMultistate -DDIM=dim $(CINC) $(NVCCOPT) -c $< -o $@
 
 $(BUILD)/libInterpolateValue.sh: src/InterpolateValue.cu
-	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(NVCCOPT) -shared $^ > $@
+	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(NVCCOPT) -shared $< > $@
 
 $(BUILD)/libInterpolateArray.sh: src/InterpolateArray.cu
-	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(NVCCOPT) -shared $^ > $@
+	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(NVCCOPT) -shared $< > $@
 
 $(BUILD)/libInterpolateArrayManyStateless.sh: src/InterpolateArrayManyStateless.cu
-	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(NVCCOPT) -shared $^ > $@
+	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(NVCCOPT) -shared $< > $@
 
 $(BUILD)/libInterpolateArrayManyMultistate.sh: src/InterpolateArrayManyMultistate.cu
-	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(NVCCOPT) -shared $^ > $@
+	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(NVCCOPT) -shared $< > $@
 
 $(BUILD)/Interpolator.o: src/Interpolator.cpp include/JIT.h include/Data.h
 	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
