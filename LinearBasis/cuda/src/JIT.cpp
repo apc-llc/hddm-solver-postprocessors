@@ -114,7 +114,12 @@ K& JIT::jitCompile(int dim, const string& funcnameTemplate, F fallbackFunc)
 					return;
 				close(fd);
 				filename = (char*)&vfilename[0];
-				unlink(filename.c_str());
+				bool keepCache = false;
+				const char* keepCacheValue = getenv("KEEP_CACHE");
+				if (keepCacheValue)
+					keepCache = atoi(keepCacheValue);
+				if (!keepCache)
+					unlink(filename.c_str());
 			}
 		}
 		tmp((string)cwd + "/.cache/fileXXXXXX");
