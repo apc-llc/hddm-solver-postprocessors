@@ -32,6 +32,13 @@ inline __attribute__((always_inline)) __device__ double warpReduceMultiply(doubl
 	return val;
 }
 
+inline __attribute__((always_inline)) __device__ double warpAllReduceMultiply(double val)
+{
+	for (int offset = warpSize / 2; offset > 0; offset /= 2)
+		val *= __shfl_xor(val, offset);
+	return val;
+}
+
 #ifdef DEFERRED
 // Define a structure-container, that shall be used to pass x vector as
 // a single value via kernel argument. As an argument, it will be implicitly
@@ -39,21 +46,36 @@ inline __attribute__((always_inline)) __device__ double warpReduceMultiply(doubl
 struct X
 {
 	double values[DIM];
-	
-	inline __attribute__((always_inline)) __device__ double operator[](int i) const
-	{
-		return values[i];
-	}
 };
+
+// In case of deferred compilation, X vector is loaded as a kernel argument
+// for speed (saves on separate memcpy call). However, if used, brain-damaged CUDA
+// compiler copies entire array into local memory (STL/LDL). In order to avoid this,
+// we do not use the X kernel argument in the code directly, and instead read
+// from 5th argument of PTX kernel representation. Note this is a fragile and
+// compiler-specific hack.
+inline __attribute__((always_inline))  __device__ double x(int j)
+{
+	double ret;
+	asm(
+		".reg .u64 ptr, i;\n\t"
+		"mov.u64 ptr, InterpolateArray_kernel_large_dim_param_5;\n\t"
+		"cvt.u64.u32 i, %1;\n\t"
+		"mad.lo.u64 ptr, i, 8, ptr;\n\t"
+		"ld.param.cs.f64 %0, [ptr];"  : "=d"(ret) : "r"(j));
+	return ret;
+}
+#else
+#define x(j) x_[j]
 #endif
 
-static __global__ void InterpolateArray_kernel_large_dim(
+extern "C" __global__ void InterpolateArray_kernel_large_dim(
 	const int dim, const int vdim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end,
 #ifdef DEFERRED
-	const X x,
+	const X x_,
 #else
- 	const double* x,
+ 	const double* x_,
 #endif
 	const Matrix<int>::Device* index_, const Matrix<double>::Device* surplus_, double* value)
 {
@@ -68,13 +90,16 @@ static __global__ void InterpolateArray_kernel_large_dim(
 	// grid dimension X only.
 	int i = blockIdx.x + threadIdx.y * blockDim.x;
 
+	if (i >= nno) return;
+
 	// Each thread is assigned with a "j" loop index.
 	// If DIM is larger than AVX_VECTOR_SIZE, each thread is
 	// assigned with multiple "j" loop indexes.
 	double temp = 1.0;
-	for (int j = threadIdx.x; (j < DIM) && (i < nno); j += AVX_VECTOR_SIZE)
+	#pragma no unroll
+	for (int j = threadIdx.x; j < DIM; j += AVX_VECTOR_SIZE)
 	{
-		double xp = LinearBasis(x[j], index(i, j), index(i, j + vdim));
+		double xp = LinearBasis(x(j), index(i, j), index(i, j + vdim));
 		temp *= max(0.0, xp);
 	}
 	
@@ -94,21 +119,30 @@ static __global__ void InterpolateArray_kernel_large_dim(
 
 	// We can only exit at this point, when all threads in block are synchronized.
 	if (!temp) return;
-	if (i >= nno) return;
-	
+
 	// Read from shared memory only if that warp existed.
 	temp = (threadIdx.x < blockDim.x / warpSize) ? temps[lane + threadIdx.y * nwarps] : 1.0;
 
 	// Final reduction within the first warp.
-	if (warpId != 0) return;
-	temp = warpReduceMultiply(temp);
-	
-	if (threadIdx.x != 0) return;
+	if (warpId == 0)
+	{
+		temp = warpReduceMultiply(temp);
+
+		// Store result into shared memory to broadcast across all warps.
+		if (threadIdx.x == 0)
+			temps[threadIdx.y * nwarps] = temp;
+	}
+
+	// Wait for the zero thread of the first warp to share temp value in shared memory.
+	__syncthreads();
+
+	// Load final reduction value from shared memory.
+	temp = temps[threadIdx.y * nwarps];
 
 	// Atomically add to the output value.
 	// Uses double precision atomicAdd code above, since all
 	// generations of GPUs before Pascal do not have double atomicAdd builtin.
-	for (int j = Dof_choice_start; j <= Dof_choice_end; j++)
+	for (int j = Dof_choice_start + threadIdx.x; j <= Dof_choice_end; j += blockDim.x)
 		atomicAdd(&value[j - Dof_choice_start], temp * surplus(i, j));
 }
 
@@ -195,7 +229,9 @@ extern "C" void FUNCNAME(
 	CUDA_ERR_CHECK(cudaMemcpyAsync(dx, x, sizeof(double) * DIM, cudaMemcpyHostToDevice, stream));
 #endif
 	CUDA_ERR_CHECK(cudaMemsetAsync(dvalue, 0, sizeof(double) * length, stream));
-	InterpolateArray_kernel_large_dim<<<gridDim, blockDim, nwarps, stream>>>(
+	CUDA_ERR_CHECK(cudaFuncSetSharedMemConfig(
+		InterpolateArray_kernel_large_dim, cudaSharedMemBankSizeEightByte));
+	InterpolateArray_kernel_large_dim<<<gridDim, blockDim, nwarps * sizeof(double), stream>>>(
 		dim, vdim, nno, Dof_choice_start, Dof_choice_end,
 #ifdef DEFERRED
 		*dx,
