@@ -8,12 +8,14 @@
 #include <iostream>
 #include <memory>
 #include <string.h>
-#include <thrust/device_vector.h>
-#include <thrust/system/cuda/execution_policy.h>
 #include <vector>
 
 #include "check.h"
 #include "process.h"
+
+#ifndef __CUDACC__
+#include <cuda_runtime_api.h>
+#endif
 
 namespace cuda {
 
