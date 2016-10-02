@@ -99,6 +99,22 @@ K& JIT::jitCompile(int dim, const string& funcnameTemplate, F fallbackFunc)
 	{
 		cout << "Performing deferred GPU kernel compilation for dim = " << dim << " ..." << endl;
 
+		// Deferred compilation with X vector in kernel argument is only possible,
+		// when X vector fits constant memory. Constant memory consists of 10 (or 11)
+		// discontinous memory banks of 64KB each. Kernel arguments are loaded
+		// into a single constant memory bank. Thus, in order to get the X vector
+		// fit the bank size, we limit vector size by, say, 60KB.
+		// If X vector exceeds this size, then deferred compilation goes
+		// without X vector in kernel argument, only substituting
+		// integer constants.
+		bool deferred = true;
+		size_t maxVectorSize = 60 * 1024;
+		if (dim * sizeof(real) >= maxVectorSize)
+		{
+			cerr << "Deferred GPU kernel compilation without X constant vector, as it exceeds 60KB size" << endl;
+			deferred = false;
+		}
+
 		char* cwd = get_current_dir_name();
 		string dir = (string)cwd + "/.cache";
 		mkdir(dir.c_str(), S_IRWXU);
@@ -159,7 +175,8 @@ K& JIT::jitCompile(int dim, const string& funcnameTemplate, F fallbackFunc)
 			for (int pos = sh.find(newline); pos != string::npos; pos = sh.find(newline))
 				sh.erase(pos, newline.size());
 			cmd << sh;
-			cmd << " -DDEFERRED";
+			if (deferred)
+				cmd << " -DDEFERRED";
 			cmd << " -DFUNCNAME=";
 			cmd << funcname;
 			cmd << " -DDIM=";
