@@ -23,7 +23,7 @@ extern "C" __global__ void KERNEL_NAME(
 	// or partitioned between grid dimension X and block dimension Y.
 	// In case of no partitioning, threadIdx.y is 0, and "i" falls back to
 	// grid dimension X only.
-	int i = blockIdx.x + threadIdx.y * blockDim.x;
+	int i = blockIdx.x + threadIdx.y * gridDim.x;
 
 	if (i >= nno) return;
 
