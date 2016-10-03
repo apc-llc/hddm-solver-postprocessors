@@ -24,10 +24,10 @@ $(BUILD)/InterpolateArray.o: src/InterpolateArray.cpp
 	$(CDIR) && $(MPICXX) -DFUNCNAME=LinearBasis_CPU_Generic_InterpolateArray -DDIM=dim $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/InterpolateArrayManyStateless.o: src/InterpolateArrayManyStateless.cpp
-	$(CDIR) && $(MPICXX) -DFUNCNAME=LinearBasis_CPU_Generic_InterpolateArrayManyStateless -DDIM=dim $(CINC) $(COPT) -c $< -o $@
+	$(CDIR) && $(MPICXX) -DFUNCNAME=LinearBasis_CPU_Generic_InterpolateArrayManyStateless -DDIM=dim -DCOUNT=count $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/InterpolateArrayManyMultistate.o: src/InterpolateArrayManyMultistate.cpp
-	$(CDIR) && $(MPICXX) -DFUNCNAME=LinearBasis_CPU_Generic_InterpolateArrayManyMultistate -DDIM=dim $(CINC) $(COPT) -c $< -o $@
+	$(CDIR) && $(MPICXX) -DFUNCNAME=LinearBasis_CPU_Generic_InterpolateArrayManyMultistate -DDIM=dim -DCOUNT=count $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/libInterpolateValue.sh: src/InterpolateValue.cpp
 	$(CDIR) && echo cd $(shell pwd) \&\& $(MPICXX) $(CINC) $(COPT) -shared $^  > $@

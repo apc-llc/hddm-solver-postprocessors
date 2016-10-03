@@ -27,7 +27,7 @@ template<>
 const string InterpolateArrayManyMultistateKernel::sh = INTERPOLATE_ARRAY_MANY_MULTISTATE_SH;
 
 template<typename K, typename F>
-K& JIT::jitCompile(int dim, const string& funcnameTemplate, F fallbackFunc)
+K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbackFunc)
 {
 	map<int, K>* kernels_tls = NULL;
 
@@ -179,7 +179,9 @@ K& JIT::jitCompile(int dim, const string& funcnameTemplate, F fallbackFunc)
 			cmd << " -DFUNCNAME=";
 			cmd << funcname;
 			cmd << " -DDIM=";
-			cmd << dim;		
+			cmd << dim;
+			cmd << " -DCOUNT=";
+			cmd << count;
 	
 			cmd << " -o ";
 			cmd << tmp.filename;
@@ -283,28 +285,28 @@ InterpolateValueKernel& JIT::jitCompile(
 	int dim, const string& funcnameTemplate, InterpolateValueFunc fallbackFunc)
 {
 	return JIT::jitCompile<InterpolateValueKernel, InterpolateValueFunc>(
-		dim, funcnameTemplate, fallbackFunc);
+		dim, 1, funcnameTemplate, fallbackFunc);
 }
 
 InterpolateArrayKernel& JIT::jitCompile(
 	int dim, const string& funcnameTemplate, InterpolateArrayFunc fallbackFunc)
 {
 	return JIT::jitCompile<InterpolateArrayKernel, InterpolateArrayFunc>(
-		dim, funcnameTemplate, fallbackFunc);
+		dim, 1, funcnameTemplate, fallbackFunc);
 }
 
 InterpolateArrayManyStatelessKernel& JIT::jitCompile(
-	int dim, const string& funcnameTemplate, InterpolateArrayManyStatelessFunc fallbackFunc)
+	int dim, int count, const string& funcnameTemplate, InterpolateArrayManyStatelessFunc fallbackFunc)
 {
 	return JIT::jitCompile<InterpolateArrayManyStatelessKernel, InterpolateArrayManyStatelessFunc>(
-		dim, funcnameTemplate, fallbackFunc);
+		dim, count, funcnameTemplate, fallbackFunc);
 }
 
 InterpolateArrayManyMultistateKernel& JIT::jitCompile(
-	int dim, const string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc)
+	int dim, int count, const string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc)
 {
 	return JIT::jitCompile<InterpolateArrayManyMultistateKernel, InterpolateArrayManyMultistateFunc>(
-		dim, funcnameTemplate, fallbackFunc);
+		dim, count, funcnameTemplate, fallbackFunc);
 }
 
 #endif // HAVE_RUNTIME_OPTIMIZATION

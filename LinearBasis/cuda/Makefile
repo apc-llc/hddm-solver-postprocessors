@@ -28,10 +28,10 @@ $(BUILD)/InterpolateArray.o: src/InterpolateArray.cu include/Interpolate.h
 	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateArray -DDIM=dim $(CINC) $(NVCCOPT) -c $< -o $@
 
 $(BUILD)/InterpolateArrayManyStateless.o: src/InterpolateArrayManyStateless.cu include/Interpolate.h
-	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateArrayManyStateless -DDIM=dim $(CINC) $(NVCCOPT) -c $< -o $@
+	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateArrayManyStateless -DDIM=dim -DCOUNT=count $(CINC) $(NVCCOPT) -c $< -o $@
 
 $(BUILD)/InterpolateArrayManyMultistate.o: src/InterpolateArrayManyMultistate.cu include/Interpolate.h
-	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateArrayManyMultistate -DDIM=dim $(CINC) $(NVCCOPT) -c $< -o $@
+	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateArrayManyMultistate -DDIM=dim -DCOUNT=count $(CINC) $(NVCCOPT) -c $< -o $@
 
 $(BUILD)/libInterpolateValue.sh: src/InterpolateValue.cu
 	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(NVCCOPT) -shared $< > $@

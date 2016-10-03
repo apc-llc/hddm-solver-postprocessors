@@ -5,13 +5,13 @@
 #include "LinearBasis.h"
 
 extern "C" __global__ void KERNEL_NAME(
-	const int dim, const int vdim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end,
 #ifdef DEFERRED
 	const X x_,
 #else
  	const double* x_,
 #endif
+	const int dim, const int vdim, const int nno,
+	const int Dof_choice_start, const int Dof_choice_end,
 	const Matrix<int>::Device* index_, const Matrix<double>::Device* surplus_, double* value)
 {
 	extern __shared__ double temps[];
@@ -114,12 +114,12 @@ extern "C" void FUNCNAME(
 	CUDA_ERR_CHECK(cudaFuncSetSharedMemConfig(
 		InterpolateArray_kernel_large_dim, cudaSharedMemBankSizeEightByte));
 	InterpolateArray_kernel_large_dim<<<gridDim, blockDim, nwarps * sizeof(double), stream>>>(
-		dim, vdim, nno, Dof_choice_start, Dof_choice_end,
 #ifdef DEFERRED
 		*dx,
 #else
 		dx,
 #endif
+		dim, vdim, nno, Dof_choice_start, Dof_choice_end,
 		index, surplus, dvalue);
 	CUDA_ERR_CHECK(cudaGetLastError());
 	CUDA_ERR_CHECK(cudaMemcpyAsync(value, dvalue, sizeof(double) * length, cudaMemcpyDeviceToHost, stream));

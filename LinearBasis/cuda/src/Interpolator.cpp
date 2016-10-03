@@ -117,7 +117,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 		if (!LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyStateless)
 		{
 			LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyStateless =
-				JIT::jitCompile(data->dim, "LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyStateless_",
+				JIT::jitCompile(data->dim, count, "LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyStateless_",
 				(Func)LinearBasis_CUDA_Generic_InterpolateArrayManyStateless).getFunc();
 		}
 
@@ -156,7 +156,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 		if (!LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyMultistate)
 		{
 			LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyMultistate =
-				JIT::jitCompile(data->dim, "LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyMultistate_",
+				JIT::jitCompile(data->dim, data->nstates, "LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyMultistate_",
 				(Func)LinearBasis_CUDA_Generic_InterpolateArrayManyMultistate).getFunc();
 		}
 

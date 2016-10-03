@@ -40,17 +40,23 @@ inline __attribute__((always_inline)) __device__ double warpAllReduceMultiply(do
 }
 
 #ifdef DEFERRED
+// Multi- interpolators define COUNT value. Define unit COUNT for
+// all other interpolators.
+#ifndef COUNT
+#define COUNT 1
+#endif
+
 // Define a structure-container, that shall be used to pass x vector as
 // a single value via kernel argument. As an argument, it will be implicitly
 // loaded into device constant memory.
 struct X
 {
-	double values[DIM];
+	double values[DIM * COUNT];
 };
 
-#define KERNEL_PARAM_5_STR(name) #name
-#define KERNEL_PARAM_5_CAT(name) KERNEL_PARAM_5_STR(name ## _param_5)
-#define KERNEL_PARAM_5(name) KERNEL_PARAM_5_CAT(name)
+#define KERNEL_PARAM_0_STR(name) #name
+#define KERNEL_PARAM_0_CAT(name) KERNEL_PARAM_0_STR(name ## _param_0)
+#define KERNEL_PARAM_0(name) KERNEL_PARAM_0_CAT(name)
 
 // In case of deferred compilation, X vector is loaded as a kernel argument
 // for speed (saves on separate memcpy call). However, if used, brain-damaged CUDA
@@ -64,7 +70,7 @@ inline __attribute__((always_inline))  __device__ double x(int j)
 	asm(
 		".reg .u64 ptr, i;\n\t"
 		"mov.u64 ptr, "
-		KERNEL_PARAM_5(KERNEL_NAME)
+		KERNEL_PARAM_0(KERNEL_NAME)
 		";\n\t"
 		"cvt.u64.u32 i, %1;\n\t"
 		"mad.lo.u64 ptr, i, 8, ptr;\n\t"

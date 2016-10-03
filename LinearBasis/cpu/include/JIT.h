@@ -51,12 +51,12 @@ public :
 	static InterpolateArrayKernel& jitCompile(
 		int dim, const std::string& funcnameTemplate, InterpolateArrayFunc fallbackFunc);
 	static InterpolateArrayManyStatelessKernel& jitCompile(
-		int dim, const std::string& funcnameTemplate, InterpolateArrayManyStatelessFunc fallbackFunc);
+		int dim, int count, const std::string& funcnameTemplate, InterpolateArrayManyStatelessFunc fallbackFunc);
 	static InterpolateArrayManyMultistateKernel& jitCompile(
-		int dim, const std::string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc);
+		int dim, int count, const std::string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc);
 
 	template<typename K, typename F>
-	static K& jitCompile(int dim, const std::string& funcnameTemplate, F fallbackFunc);
+	static K& jitCompile(int dim, int count, const std::string& funcnameTemplate, F fallbackFunc);
 };
 
 } // namespace cpu
