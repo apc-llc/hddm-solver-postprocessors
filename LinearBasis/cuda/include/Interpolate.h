@@ -74,7 +74,12 @@ inline __attribute__((always_inline))  __device__ double x(int j)
 		";\n\t"
 		"cvt.u64.u32 i, %1;\n\t"
 		"mad.lo.u64 ptr, i, 8, ptr;\n\t"
-		"ld.param.cs.f64 %0, [ptr];"  : "=d"(ret) : "r"(j));
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 320
+		"ld.param.f64 %0, [ptr];"  : "=d"(ret) : "r"(j)
+#else
+		"ld.param.nc.f64 %0, [ptr];"  : "=d"(ret) : "r"(j)
+#endif
+	);
 	return ret;
 }
 #else
