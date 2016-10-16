@@ -92,6 +92,10 @@ static void configureKernel(
 	const int dim, const int nno,
 	int& vdim, dim3& blockDim, dim3& gridDim, int& nwarps)
 {
+	printf("nno = %d\n", nno);
+
+	int nno_per_block = 2;
+
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
 	// boundary to keep up the required alignment.
 	vdim = dim / AVX_VECTOR_SIZE;
@@ -116,8 +120,13 @@ static void configureKernel(
 			if (blockDim.x % device->warpSize)
 				blockDim.x += device->warpSize - blockDim.x % device->warpSize;
 		}
+		
+		blockDim.y = nno_per_block;
+		gridDim.x = nno / blockDim.y;
+		if (nno % blockDim.y)
+			gridDim.x++;
 
-		// If the first dimension is still smaller than AVX_VECTOR_SIZE,
+		/*// If the first dimension is still smaller than AVX_VECTOR_SIZE,
 		// pick up a part of nno to get a close value.
 		if (blockDim.x < AVX_VECTOR_SIZE)
 		{
@@ -133,10 +142,12 @@ static void configureKernel(
 		{
 			// Otherwise, whole nno goes as grid dimension.
 			gridDim.x = nno;
-		}
+		}*/
 	}
 	else
 	{
+		// ??? I don't understand this anymore :(
+	
 		// Pick up a part of nno to have a block of at least
 		// AVX_VECTOR_SIZE.
 		blockDim.x = AVX_VECTOR_SIZE;
