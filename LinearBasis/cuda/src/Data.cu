@@ -66,7 +66,7 @@ void Data::load(const char* filename, int istate)
 	// Pad all indexes to 4-element boundary.
 	vdim = dim / AVX_VECTOR_SIZE;
 	if (dim % AVX_VECTOR_SIZE) vdim++;
-	int nsd = 2 * vdim * AVX_VECTOR_SIZE;
+	int nsd = vdim * AVX_VECTOR_SIZE;
 
 	Matrix<int>::Host& index = *host.getIndex(istate);
 	Matrix<real>::Host& surplus = *host.getSurplus(istate);
@@ -76,6 +76,11 @@ void Data::load(const char* filename, int istate)
 	index.fill(0);
 	surplus.resize(nno, TotalDof);
 	surplus.fill(0.0);
+	
+	struct IndexPair
+	{
+		unsigned short i, j;
+	};
 
 	// For better caching we use transposed surplus.
 	surplus_t.resize(TotalDof, nno);
@@ -91,7 +96,8 @@ void Data::load(const char* filename, int istate)
 			{
 				int value; infile >> value;
 				value = 2 << (value - 2);
-				index(j, i) = value;
+				IndexPair& pair = (IndexPair&)index(j, i);
+				pair.i = value;
 			}
 		}
 		for (int i = 0; i < dim; )
@@ -103,7 +109,8 @@ void Data::load(const char* filename, int istate)
 				// Precompute "j" to merge two cases into one:
 				// (((i) == 0) ? (1) : (1 - fabs((x) * (i) - (j)))).
 				if (!index(j, i)) value = 0;
-				index(j, i + vdim * AVX_VECTOR_SIZE) = value;
+				IndexPair& pair = (IndexPair&)index(j, i);
+				pair.j = value;
 			}
 		}
 		for (int i = 0; i < TotalDof; i++)

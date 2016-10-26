@@ -59,10 +59,15 @@ extern "C" __global__ void KERNEL_NAME(
 			#pragma no unroll
 			for (int j = threadIdx.x; j < DIM; j += AVX_VECTOR_SIZE)
 			{
-				int i1 = index(i, j);
-				int i2 = index(i, j + vdim);
-				if ((i1 == 0) && (i2 == 0)) continue;
-				double xp = LinearBasis(x(j + many * DIM), i1, i2);
+				struct IndexPair
+				{
+					unsigned short i, j;
+				};
+				IndexPair& pair = (IndexPair&)index(i, j);
+				if ((pair.i == 0) && (pair.j == 0))
+					continue;
+
+				double xp = LinearBasis(x(j + many * DIM), pair.i, pair.j);
 				temp *= fmax(0.0, xp);
 			}
 
