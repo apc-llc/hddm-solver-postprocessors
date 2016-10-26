@@ -74,7 +74,7 @@ extern "C" __global__ void KERNEL_NAME(
 		#pragma no unroll
 		for (int j = threadIdx.x; j < DIM; j += AVX_VECTOR_SIZE)
 		{
-			double xp = LinearBasis(x(j), index(i, j), index(i, j + vdim));
+			double xp = LinearBasis(x(j + many * DIM), index(i, j), index(i, j + vdim));
 			temp *= fmax(0.0, xp);
 		}
 
