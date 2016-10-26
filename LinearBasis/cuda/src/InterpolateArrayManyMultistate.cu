@@ -63,7 +63,13 @@ extern "C" __global__ void KERNEL_NAME(
 				{
 					unsigned short i, j;
 				};
-				IndexPair& pair = (IndexPair&)index(i, j);
+				union IndexUnion
+				{
+					int i;
+					IndexPair pair;
+				};
+				IndexUnion iu; iu.i = index(i, j);
+				IndexPair& pair = iu.pair;
 				if ((pair.i == 0) && (pair.j == 0))
 					continue;
 
@@ -160,6 +166,8 @@ extern "C" void FUNCNAME(
 	CUDA_ERR_CHECK(cudaStreamSynchronize(stream));
 	CUDA_ERR_CHECK(cudaFuncSetSharedMemConfig(
 		InterpolateArrayManyMultistate_kernel_large_dim, cudaSharedMemBankSizeEightByte));
+	CUDA_ERR_CHECK(cudaFuncSetCacheConfig(
+		InterpolateArrayManyMultistate_kernel_large_dim, cudaFuncCachePreferL1));
 	InterpolateArrayManyMultistate_kernel_large_dim<<<gridDim, blockDim, (blockDim.y * nwarps) * sizeof(double), stream>>>(
 #ifdef DEFERRED
 		*dx,

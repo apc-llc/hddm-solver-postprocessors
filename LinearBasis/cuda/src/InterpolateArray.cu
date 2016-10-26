@@ -54,7 +54,13 @@ extern "C" __global__ void KERNEL_NAME(
 			{
 				unsigned short i, j;
 			};
-			IndexPair& pair = (IndexPair&)index(i, j);
+			union IndexUnion
+			{
+				int i;
+				IndexPair pair;
+			};
+			IndexUnion iu; iu.i = index(i, j);
+			IndexPair& pair = iu.pair;
 			if ((pair.i == 0) && (pair.j == 0))
 				continue;
 
