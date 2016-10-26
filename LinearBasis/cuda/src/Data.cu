@@ -100,7 +100,7 @@ void Data::load(const char* filename, int istate)
 			{
 				int value; infile >> value;
 				value--;
-				// Percompute "j" to merge two cases into one:
+				// Precompute "j" to merge two cases into one:
 				// (((i) == 0) ? (1) : (1 - fabs((x) * (i) - (j)))).
 				if (!index(j, i)) value = 0;
 				index(j, i + vdim * AVX_VECTOR_SIZE) = value;
