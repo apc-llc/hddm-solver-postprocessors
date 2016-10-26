@@ -184,6 +184,7 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 			cmd << " -DCOUNT=";
 			cmd << count;
 			cmd << " -keep";
+			cmd << " -lineinfo";
 	
 			cmd << " -o ";
 			cmd << tmp.filename;

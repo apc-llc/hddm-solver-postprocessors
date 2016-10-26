@@ -4,14 +4,6 @@
 #include "Interpolate.h"
 #include "LinearBasis.h"
 
-/*
-if no write at all: 0.0010
-odd/even COUNT recomb: 0.0017
-global no atomic: 0.0013
-shared atomic: 0.0013
-shared no atomic: 0.0012
-*/
-
 #ifdef DEFERRED
 #include <vector>
 
@@ -27,34 +19,15 @@ extern "C" __global__ void KERNEL_NAME(
 	const int dim, const int vdim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count,
 	const Matrix<int>::Device* index_, const Matrix<double>::Device* surplus_, double* value_,
-	int length, int nwarps)
+	int length, int nwarps, int nnoPerBlock)
 {
 	int lane = threadIdx.x % warpSize;
 	int warpId = threadIdx.x / warpSize;
 
 	extern __shared__ double temps[];
-	double* value_shared = temps + blockDim.y * nwarps;
 
-	int begin = 0;
-	int end = COUNT;
-	int inc = 1;
-	if (blockIdx.x % 2)
+	for (int many = 0; many < COUNT; many++)
 	{
-		begin = COUNT - 1;
-		end = -1;
-		inc = -1;
-	}
-	for (int many = begin; many != end; many += inc)
-	{
-		// Sync before previous iteration.
-/*		if (many)
-			__syncthreads();
-		
-		// Flush shared memory contents.
-		if (threadIdx.y == 0)
-			for (int j = Dof_choice_start + threadIdx.x; j <= Dof_choice_end; j += blockDim.x)
-				value_shared[j - Dof_choice_start] = 0;*/
-
 		const Matrix<int>::Device& index = index_[many];
 		const Matrix<double>::Device& surplus = surplus_[many];
 		double* value = value_ + many * length;
@@ -63,68 +36,74 @@ extern "C" __global__ void KERNEL_NAME(
 		// or partitioned between grid dimension X and block dimension Y.
 		// In case of no partitioning, threadIdx.y is 0, and "i" falls back to
 		// grid dimension X only.
-		int i = blockIdx.x + threadIdx.y * gridDim.x;
+		int i = (blockIdx.x + threadIdx.y * gridDim.x) * nnoPerBlock;
 	
-		if (i >= nno) goto finish;
+		if (i >= nno) continue;
 
-		// Each thread is assigned with a "j" loop index.
-		// If DIM is larger than AVX_VECTOR_SIZE, each thread is
-		// assigned with multiple "j" loop indexes.
-		double temp = 1.0;
-		#pragma no unroll
-		for (int j = threadIdx.x; j < DIM; j += AVX_VECTOR_SIZE)
+#define szcache 4
+		// Each thread hosts a part of blockDim.x-shared register cache
+		// to accumulate nnoPerBlock intermediate additions.
+		// blockDim.x -sharing is done due to limited number of registers
+		// available per thread.
+		double cache[szcache];
+		for (int i = 0; i < szcache; i++)
+			cache[i] = 0;
+#undef szcache
+
+		for (int e = i + nnoPerBlock; i < e; i++)
 		{
-			double xp = LinearBasis(x(j + many * DIM), index(i, j), index(i, j + vdim));
-			temp *= fmax(0.0, xp);
-		}
+			// Each thread is assigned with a "j" loop index.
+			// If DIM is larger than AVX_VECTOR_SIZE, each thread is
+			// assigned with multiple "j" loop indexes.
+			double temp = 1.0;
+			#pragma no unroll
+			for (int j = threadIdx.x; j < DIM; j += AVX_VECTOR_SIZE)
+			{
+				double xp = LinearBasis(x(j + many * DIM), index(i, j), index(i, j + vdim));
+				temp *= fmax(0.0, xp);
+			}
 
-		// Multiply all partial temps within a warp.
-		temp = warpReduceMultiply(temp);
-
-		// Gather temps from all participating warps corresponding to the single DIM
-		// into a shared memory array.
-		if (lane == 0)
-			temps[warpId + threadIdx.y * nwarps] = temp;
-
-		// Wait for all partial reductions.
-		__syncthreads();
-
-		// Read from shared memory only if that warp existed.
-		temp = (threadIdx.x < blockDim.x / warpSize) ? temps[lane + threadIdx.y * nwarps] : 1.0;
-
-		// Final reduction within the first warp.
-		if (warpId == 0)
-		{
+			// Multiply all partial temps within a warp.
 			temp = warpReduceMultiply(temp);
 
-			// Store result into shared memory to broadcast across all warps.
-			if (threadIdx.x == 0)
-				temps[threadIdx.y * nwarps] = temp;
+			// Gather temps from all participating warps corresponding to the single DIM
+			// into a shared memory array.
+			if (lane == 0)
+				temps[warpId + threadIdx.y * nwarps] = temp;
+
+			// Wait for all partial reductions.
+			__syncthreads();
+
+			// Read from shared memory only if that warp existed.
+			temp = (threadIdx.x < blockDim.x / warpSize) ? temps[lane + threadIdx.y * nwarps] : 1.0;
+
+			// Final reduction within the first warp.
+			if (warpId == 0)
+			{
+				temp = warpReduceMultiply(temp);
+
+				// Store result into shared memory to broadcast across all warps.
+				if (threadIdx.x == 0)
+					temps[threadIdx.y * nwarps] = temp;
+			}
+
+			// Wait for the zero thread of the first warp to share temp value in shared memory.
+			__syncthreads();
+
+			// Load final reduction value from shared memory.
+			temp = temps[threadIdx.y * nwarps];
+
+			// We can only exit at this point, when temp is synchronized for all warps in block.
+			if (!temp) continue;
+			
+			// Collect values into blockDim.x-shared register cache.
+			for (int j = Dof_choice_start + threadIdx.x, icache = 0; j <= Dof_choice_end; j += blockDim.x, icache++)
+				cache[icache] += temp * surplus(i, j);
 		}
 
-		// Wait for the zero thread of the first warp to share temp value in shared memory.
-		__syncthreads();
-
-		// Load final reduction value from shared memory.
-		temp = temps[threadIdx.y * nwarps];
-
-		// We can only exit at this point, when temp is synchronized for all warps in block.
-		if (!temp) goto finish;
-
-		// Collect values in shared memory.
-		for (int j = Dof_choice_start + threadIdx.x; j <= Dof_choice_end; j += blockDim.x)
-			atomicAdd(&value[j - Dof_choice_start], temp * surplus(i, j));
-
-finish:
-
-		/*__syncthreads();
-
-		// Atomically add to the output value.
-		// Uses double precision atomicAdd code above, since all
-		// generations of GPUs before Pascal do not have double atomicAdd builtin.
-		if (threadIdx.y == 0)
-			for (int j = Dof_choice_start + threadIdx.x; j <= Dof_choice_end; j += blockDim.x)
-				atomicAdd(&value[j - Dof_choice_start], value_shared[j - Dof_choice_start]);*/
+		// Collect values into global memory.
+		for (int j = Dof_choice_start + threadIdx.x, icache = 0; j <= Dof_choice_end; j += blockDim.x, icache++)
+			atomicAdd(&value[j - Dof_choice_start], cache[icache]);
 	}
 }
 
@@ -139,7 +118,8 @@ extern "C" void FUNCNAME(
 	dim3 blockDim(1, 1, 1);
 	dim3 gridDim(1, 1, 1);
 	int nwarps = 1;
-	configureKernel(device, dim, nno, vdim, blockDim, gridDim, nwarps);
+	int nnoPerBlock = 1;
+	configureKernel(device, dim, nno, vdim, blockDim, gridDim, nwarps, nnoPerBlock);
 
 #ifdef DEFERRED
 	std::vector<double> vx;
@@ -172,19 +152,22 @@ extern "C" void FUNCNAME(
 	CUDA_ERR_CHECK(cudaStreamSynchronize(stream));
 	CUDA_ERR_CHECK(cudaFuncSetSharedMemConfig(
 		InterpolateArrayManyMultistate_kernel_large_dim, cudaSharedMemBankSizeEightByte));
-	InterpolateArrayManyMultistate_kernel_large_dim<<<gridDim, blockDim, (blockDim.y * nwarps /*+ length*/) * sizeof(double), stream>>>(
+	InterpolateArrayManyMultistate_kernel_large_dim<<<gridDim, blockDim, (blockDim.y * nwarps) * sizeof(double), stream>>>(
 #ifdef DEFERRED
 		*dx,
 #else
 		dx,
 #endif
 		dim, vdim, nno, Dof_choice_start, Dof_choice_end, COUNT,
-		index, surplus, dvalue, length, nwarps);
+		index, surplus, dvalue, length, nwarps, nnoPerBlock);
 	CUDA_ERR_CHECK(cudaGetLastError());
 	CUDA_ERR_CHECK(cudaStreamSynchronize(stream));
 	CUDA_ERR_CHECK(cudaDeviceSynchronize());
+	std::vector<double> vvalue;
+	vvalue.resize(length * COUNT);
+	CUDA_ERR_CHECK(cudaMemcpyAsync(&vvalue[0], dvalue, sizeof(double) * length * COUNT, cudaMemcpyDeviceToHost, stream));
 	for (int i = 0; i < COUNT; i++)
-		CUDA_ERR_CHECK(cudaMemcpyAsync(value[i], dvalue + i * length, sizeof(double) * length, cudaMemcpyDeviceToHost, stream));
+		memcpy(value[i], &vvalue[0] + i * length, sizeof(double) * length);
 	CUDA_ERR_CHECK(cudaStreamSynchronize(stream));
 	CUDA_ERR_CHECK(cudaStreamDestroy(stream));
 

@@ -67,18 +67,14 @@ struct X
 inline __attribute__((always_inline))  __device__ double x(int j)
 {
 	double ret;
-	asm(
-		".reg .u64 ptr, i;\n\t"
+	asm("{\n\t"
+		".reg .u64 ptr;\n\t"
 		"mov.u64 ptr, "
 		KERNEL_PARAM_0(KERNEL_NAME)
 		";\n\t"
-		"cvt.u64.u32 i, %1;\n\t"
-		"mad.lo.u64 ptr, i, 8, ptr;\n\t"
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 320
-		"ld.param.f64 %0, [ptr];"  : "=d"(ret) : "r"(j)
-#else
-		"ld.param.nc.f64 %0, [ptr];"  : "=d"(ret) : "r"(j)
-#endif
+		"mad.wide.u32 ptr, %1, 8, ptr;\n\t"
+		"ld.param.f64 %0, [ptr];"
+		"}" : "=d"(ret) : "r"(j)
 	);
 	return ret;
 }
@@ -90,11 +86,10 @@ inline __attribute__((always_inline))  __device__ double x(int j)
 static void configureKernel(
 	Device* device, 
 	const int dim, const int nno,
-	int& vdim, dim3& blockDim, dim3& gridDim, int& nwarps)
+	int& vdim, dim3& blockDim, dim3& gridDim,
+	int& nwarps, int& nnoPerBlock)
 {
-	printf("nno = %d\n", nno);
-
-	int nno_per_block = 2;
+	nnoPerBlock = 16;
 
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
 	// boundary to keep up the required alignment.
@@ -121,12 +116,7 @@ static void configureKernel(
 				blockDim.x += device->warpSize - blockDim.x % device->warpSize;
 		}
 		
-		blockDim.y = nno_per_block;
-		gridDim.x = nno / blockDim.y;
-		if (nno % blockDim.y)
-			gridDim.x++;
-
-		/*// If the first dimension is still smaller than AVX_VECTOR_SIZE,
+		// If the first dimension is still smaller than AVX_VECTOR_SIZE,
 		// pick up a part of nno to get a close value.
 		if (blockDim.x < AVX_VECTOR_SIZE)
 		{
@@ -134,19 +124,22 @@ static void configureKernel(
 			if (AVX_VECTOR_SIZE % blockDim.x)
 				blockDim.y++;
 			
-			gridDim.x = nno / blockDim.y;
-			if (nno % blockDim.y)
+			// The rest of nno goes as grid dimension.
+			gridDim.x = nno / (nnoPerBlock * blockDim.y);
+			if (nno % (nnoPerBlock * blockDim.y))
 				gridDim.x++;
 		}
 		else
 		{
-			// Otherwise, whole nno goes as grid dimension.
-			gridDim.x = nno;
-		}*/
+			// The rest of nno goes as grid dimension.
+			gridDim.x = nno / nnoPerBlock;
+			if (nno % nnoPerBlock)
+				gridDim.x++;
+		}
 	}
 	else
 	{
-		// ??? I don't understand this anymore :(
+		assert(false && "Not tested yet");
 	
 		// Pick up a part of nno to have a block of at least
 		// AVX_VECTOR_SIZE.
