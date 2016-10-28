@@ -183,7 +183,7 @@ public :
 	__device__
 	inline __attribute__((always_inline)) const T& operator()(int x) const
 	{
-		assert(x < dimX);
+		assert(x < dim);
 		return data[x];
 	}
 
