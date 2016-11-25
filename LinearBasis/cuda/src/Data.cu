@@ -101,7 +101,8 @@ static void read_index(ifstream& infile, int nno, int dim, Matrix<int>::Host& in
 	for (int i = 1, e = IA.size(); i != e; i++)
 		if (IA[i] < IA[i - 1])
 		{
-			cerr << "IA[i] must be not less than IA[i - 1] - not true for i = " << i << endl;
+			cerr << "IA[i] must be not less than IA[i - 1] - not true for IA[" << i << "] >= IA[" << (i - 1) <<
+				"] : " << IA[i] << " < " << IA[i - 1] << endl;
 			process->abort();
 		}
 	
@@ -118,7 +119,7 @@ static void read_index(ifstream& infile, int nno, int dim, Matrix<int>::Host& in
 	{
 		if (JA[i] >= dim)
 		{
-			cerr << "JA[i] must be within column index range - not true for i = " << i << endl;
+			cerr << "JA[i] must be within column index range - not true for JA[" << i << "] = " << JA[i] << endl;
 			process->abort();
 		}
 	}
@@ -170,7 +171,8 @@ static void read_surplus(ifstream& infile, int nno, int TotalDof, Matrix<double>
 	for (int i = 1, e = IA.size(); i != e; i++)
 		if (IA[i] < IA[i - 1])
 		{
-			cerr << "IA[i] must be not less than IA[i - 1] - not true for i = " << i << endl;
+			cerr << "IA[i] must be not less than IA[i - 1] - not true for IA[" << i << "] >= IA[" << (i - 1) <<
+				"] : " << IA[i] << " < " << IA[i - 1] << endl;
 			process->abort();
 		}
 	
@@ -187,7 +189,7 @@ static void read_surplus(ifstream& infile, int nno, int TotalDof, Matrix<double>
 	{
 		if (JA[i] >= TotalDof)
 		{
-			cerr << "JA[i] must be within column index range - not true for i = " << i << endl;
+			cerr << "JA[i] must be within column index range - not true for JA[" << i << "] = " << JA[i] << endl;
 			process->abort();
 		}
 	}
