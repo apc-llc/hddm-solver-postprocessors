@@ -41,7 +41,7 @@ extern "C" __global__ void KERNEL_NAME(
 		cache[i] = 0;
 #undef szcache
 
-	for (int e = i + nnoPerBlock; i < e; i++)
+	for (int e = min(i + nnoPerBlock, nno); i < e; i++)
 	{
 		// Each thread is assigned with a "j" loop index.
 		// If DIM is larger than AVX_VECTOR_SIZE, each thread is
