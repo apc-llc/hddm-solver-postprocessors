@@ -47,16 +47,22 @@ class JIT
 {
 public :
 	static InterpolateValueKernel& jitCompile(
-		int dim, const std::string& funcnameTemplate, InterpolateValueFunc fallbackFunc);
+		const Device* device, int dim, const std::string& funcnameTemplate,
+		InterpolateValueFunc fallbackFunc);
 	static InterpolateArrayKernel& jitCompile(
-		int dim, const std::string& funcnameTemplate, InterpolateArrayFunc fallbackFunc);
+		const Device* device, int dim, const std::string& funcnameTemplate,
+		InterpolateArrayFunc fallbackFunc);
 	static InterpolateArrayManyStatelessKernel& jitCompile(
-		int dim, int count, const std::string& funcnameTemplate, InterpolateArrayManyStatelessFunc fallbackFunc);
+		const Device* device, int dim, int count, const std::string& funcnameTemplate,
+		InterpolateArrayManyStatelessFunc fallbackFunc);
 	static InterpolateArrayManyMultistateKernel& jitCompile(
-		int dim, int count, const std::string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc);
+		const Device* device, int dim, int count, const std::string& funcnameTemplate,
+		InterpolateArrayManyMultistateFunc fallbackFunc);
 
 	template<typename K, typename F>
-	static K& jitCompile(int dim, int count, const std::string& funcnameTemplate, F fallbackFunc);
+	static K& jitCompile(
+		const Device* device, int dim, int count, const std::string& funcnameTemplate,
+		F fallbackFunc);
 };
 
 #endif // HAVE_RUNTIME_OPTIMIZATION

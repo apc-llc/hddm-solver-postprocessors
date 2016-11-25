@@ -14,10 +14,16 @@ class Device
 
 	Postprocessor* post;
 
-public :
-	
+	long long id;
 	int warpSize;
-	
+	int cc;
+
+public :
+
+	long long getID() const;
+	int getWarpSize() const;
+	int getCC() const;
+		
 	Device();
 	
 	friend class Devices;

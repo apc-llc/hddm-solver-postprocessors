@@ -25,7 +25,7 @@ public :
 		case 8 :
 			// Warps do 128-byte or 256-byte coalesced memory transactions
 			// for float and double data, respectively.
-			return device->warpSize;
+			return device->getWarpSize();
 		default :
 			{
 				MPI_Process* process;

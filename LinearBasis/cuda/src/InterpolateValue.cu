@@ -82,7 +82,8 @@ extern "C" void FUNCNAME(
 
 	// If DIM is larger than the warp size, then pick up aligned dim
 	// as the first dimension.
-	if (DIM >= device->warpSize)
+	int warpSize = device->getWarpSize();
+	if (DIM >= warpSize)
 	{
 		// If DIM is larger than AVX_VECTOR_SIZE, assign multiple
 		// indexes per thread, with stepping.
@@ -91,8 +92,8 @@ extern "C" void FUNCNAME(
 		else
 		{
 			blockDim.x = DIM;
-			if (blockDim.x % device->warpSize)
-				blockDim.x += device->warpSize - blockDim.x % device->warpSize;
+			if (blockDim.x % warpSize)
+				blockDim.x += warpSize - blockDim.x % warpSize;
 		}
 
 		// If the first dimension is still smaller than AVX_VECTOR_SIZE,

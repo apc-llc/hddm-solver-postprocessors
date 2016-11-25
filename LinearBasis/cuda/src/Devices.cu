@@ -38,7 +38,12 @@ Devices::Devices()
 	for (int igpu = 0; igpu < ngpus; igpu++)
 	{
 		CUDA_ERR_CHECK(cudaGetDeviceProperties(&props, igpu));
+		int id[2];
+		id[0] = props.pciBusID;
+		id[1] = props.pciDeviceID;
+		devices[igpu].id = *(long long*)id;
 		devices[igpu].warpSize = props.warpSize;
+		devices[igpu].cc = props.major * 10 + props.minor;
 	}
 }
 

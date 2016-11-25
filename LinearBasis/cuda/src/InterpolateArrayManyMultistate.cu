@@ -163,7 +163,6 @@ extern "C" void FUNCNAME(
 #endif
 	}
 	CUDA_ERR_CHECK(cudaMemsetAsync(dvalue, 0, sizeof(double) * length * COUNT, stream));
-	CUDA_ERR_CHECK(cudaStreamSynchronize(stream));
 	CUDA_ERR_CHECK(cudaFuncSetSharedMemConfig(
 		InterpolateArrayManyMultistate_kernel_large_dim, cudaSharedMemBankSizeEightByte));
 	CUDA_ERR_CHECK(cudaFuncSetCacheConfig(
@@ -177,8 +176,6 @@ extern "C" void FUNCNAME(
 		dim, vdim, nno, Dof_choice_start, Dof_choice_end, COUNT,
 		index, surplus, dvalue, length, nwarps, nnoPerBlock);
 	CUDA_ERR_CHECK(cudaGetLastError());
-	CUDA_ERR_CHECK(cudaStreamSynchronize(stream));
-	CUDA_ERR_CHECK(cudaDeviceSynchronize());
 	std::vector<double> vvalue;
 	vvalue.resize(length * COUNT);
 	CUDA_ERR_CHECK(cudaMemcpyAsync(&vvalue[0], dvalue, sizeof(double) * length * COUNT, cudaMemcpyDeviceToHost, stream));

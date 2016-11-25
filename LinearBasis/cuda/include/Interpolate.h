@@ -103,7 +103,8 @@ static void configureKernel(
 
 	// If DIM is larger than the warp size, then pick up aligned dim
 	// as the first dimension.
-	if (DIM >= device->warpSize)
+	int warpSize = device->getWarpSize();
+	if (DIM >= warpSize)
 	{
 		// If DIM is larger than AVX_VECTOR_SIZE, assign multiple
 		// indexes per thread, with stepping.
@@ -112,8 +113,8 @@ static void configureKernel(
 		else
 		{
 			blockDim.x = DIM;
-			if (blockDim.x % device->warpSize)
-				blockDim.x += device->warpSize - blockDim.x % device->warpSize;
+			if (blockDim.x % warpSize)
+				blockDim.x += warpSize - blockDim.x % warpSize;
 		}
 		
 		// If the first dimension is still smaller than AVX_VECTOR_SIZE,
@@ -154,7 +155,7 @@ static void configureKernel(
 	// Calculate the number of warps in block.
 	// It shall denote the size of shared memory used for
 	// inter-warp step of temp value reduction.
-	nwarps = (blockDim.x * blockDim.y) / device->warpSize;
+	nwarps = (blockDim.x * blockDim.y) / warpSize;
 }
 
 #endif // INTERPOLATE_H
