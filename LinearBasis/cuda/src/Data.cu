@@ -364,7 +364,7 @@ void Data::load(const char* filename, int istate)
 	// Copy data from host to device memory.
 	device.setIndex(istate, &index);
 	device.setSurplus(istate, &surplus);
-	device.setSurplus_t(istate, &surplus_t);
+//	device.setSurplus_t(istate, &surplus_t);
 }
 
 void Data::clear()
