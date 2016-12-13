@@ -8,10 +8,10 @@ namespace NAMESPACE {
 
 class Device;
 
-enum Basis
+enum BasisType
 {
-	LinearBasis,
-	PolynomialBasis
+	LinearBasisType,
+	PolynomialBasisType
 };
 
 class Interpolator
