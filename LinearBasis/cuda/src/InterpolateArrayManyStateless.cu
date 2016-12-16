@@ -20,7 +20,7 @@ extern "C" void FUNCNAME(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, double* x,
-	const Matrix<int>::Device::Dense* index, const Matrix<double>::Device::Dense* surplus, double* value)
+	const Matrix::Device::Dense<int>* index, const Matrix::Device::Dense<double>* surplus, double* value)
 {
 	printf("%s is not implemented\n", STR(FUNCNAME));
 	abort();

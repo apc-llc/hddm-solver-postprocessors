@@ -44,7 +44,18 @@ Devices::Devices()
 		devices[igpu].id = *(long long*)id;
 		devices[igpu].warpSize = props.warpSize;
 		devices[igpu].cc = props.major * 10 + props.minor;
+
+		CUDA_ERR_CHECK(cudaSetDevice(igpu));
+
+		CUDA_ERR_CHECK(cudaDeviceReset());
+
+		// Call cudaSetDeviceFlags() with the cudaDeviceMapHost flag
+		// in order for the cudaHostAllocMapped flag to have effect
+		// in cudaHostAlloc mapped memory allocations.
+		CUDA_ERR_CHECK(cudaSetDeviceFlags(cudaDeviceMapHost));
 	}
+	
+	CUDA_ERR_CHECK(cudaSetDevice(0));
 }
 
 int Devices::getCount()

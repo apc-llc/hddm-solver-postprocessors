@@ -13,8 +13,8 @@ int Data::getNno() const { return nno; }
 
 class Data::Host::DataHost
 {
-	std::vector<Matrix<int>::Host::Dense> index;
-	std::vector<Matrix<real>::Host::Dense> surplus, surplus_t;
+	Vector::Host<Matrix::Host::Dense<int> > index;
+	Vector::Host<Matrix::Host::Dense<real> > surplus, surplus_t;
 
 public :
 
@@ -62,7 +62,7 @@ struct IndexPair
 };
 
 template<typename T>
-static void read_index(ifstream& infile, int nno, int dim, Matrix<int>::Host::Dense& index_)
+static void read_index(ifstream& infile, int nno, int dim, Matrix::Host::Dense<int>& index_)
 {
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
@@ -132,7 +132,7 @@ static void read_index(ifstream& infile, int nno, int dim, Matrix<int>::Host::De
 }
 
 template<typename T>
-static void read_surplus(ifstream& infile, int nno, int TotalDof, Matrix<double>::Host::Dense& surplus_)
+static void read_surplus(ifstream& infile, int nno, int TotalDof, Matrix::Host::Dense<double>& surplus_)
 {
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
@@ -256,9 +256,9 @@ void Data::load(const char* filename, int istate)
 	if (dim % AVX_VECTOR_SIZE) vdim++;
 	int nsd = vdim * AVX_VECTOR_SIZE;
 
-	Matrix<int>::Host::Dense& index = *host.getIndex(istate);
-	Matrix<real>::Host::Dense& surplus = *host.getSurplus(istate);
-	Matrix<real>::Host::Dense& surplus_t = *host.getSurplus_t(istate);
+	Matrix::Host::Dense<int>& index = *host.getIndex(istate);
+	Matrix::Host::Dense<real>& surplus = *host.getSurplus(istate);
+	Matrix::Host::Dense<real>& surplus_t = *host.getSurplus_t(istate);
 	
 	index.resize(nno, nsd);
 	index.fill(0);
@@ -362,9 +362,9 @@ void Data::load(const char* filename, int istate)
 	loadedStates[istate] = true;
 
 	// Copy data from host to device memory.
-	device.setIndex(istate, &index);
-	device.setSurplus(istate, &surplus);
-//	device.setSurplus_t(istate, &surplus_t);
+	device.setIndex(istate, index);
+	device.setSurplus(istate, surplus);
+//	device.setSurplus_t(istate, surplus_t);
 }
 
 void Data::clear()
@@ -383,118 +383,26 @@ Data::Host::Host(int nstates)
 	data.reset(new DataHost(nstates));
 }
 
-Matrix<int>::Host::Dense* Data::Host::getIndex(int istate)
+Matrix::Host::Dense<int>* Data::Host::getIndex(int istate)
 {
-	return &data->index[istate];
+	return &data->index(istate);
 }
 
-Matrix<real>::Host::Dense* Data::Host::getSurplus(int istate)
+Matrix::Host::Dense<real>* Data::Host::getSurplus(int istate)
 {
-	return &data->surplus[istate];
+	return &data->surplus(istate);
 }
 
-Matrix<real>::Host::Dense* Data::Host::getSurplus_t(int istate)
+Matrix::Host::Dense<real>* Data::Host::getSurplus_t(int istate)
 {
-	return &data->surplus_t[istate];
+	return &data->surplus_t(istate);
 }
-
-// Determine the size of type on device.
-template<typename T>
-static __global__ void deviceSizeOf(size_t* result)
-{
-	*result = sizeof(T);
-}
-
-template<typename T>
-static __global__ void constructDeviceData(int length, char* ptr)
-{
-	for (int i = 0; i < length; i++)
-		new(&ptr[i * sizeof(T)]) T();
-}
-
-template<typename T>
-static __global__ void destroyDeviceData(int length, char* ptr)
-{
-	for (int i = 0; i < length; i++)
-		delete (T*)&ptr[i * sizeof(T)];
-}
-
-// Host array of elements in device memory, whose size is
-// determined on device in runtime.
-template<typename T>
-class DeviceSizedArray
-{
-	int length;
-	size_t size;
-	char* ptr;
-
-public :
-
-	DeviceSizedArray(int length_) : length(length_)
-	{
-		// Determine the size of target type.
-		size_t* dSize;
-		CUDA_ERR_CHECK(cudaMalloc(&dSize, sizeof(size_t)));
-		deviceSizeOf<T><<<1, 1>>>(dSize);
-		CUDA_ERR_CHECK(cudaGetLastError());
-		CUDA_ERR_CHECK(cudaDeviceSynchronize());
-		CUDA_ERR_CHECK(cudaMemcpy(&size, dSize, sizeof(size_t), cudaMemcpyDeviceToHost));
-		CUDA_ERR_CHECK(cudaFree(dSize));
-		
-		// Make sure the size of type is the same on host and on device.
-		if (size != sizeof(T))
-		{
-			cerr << "Unexpected unequal sizes of type T in DeviceSizedArray<T> on host and device" << endl;
-			MPI_Process* process;
-			MPI_ERR_CHECK(MPI_Process_get(&process));
-			process->abort();
-		}
-
-		// Allocate array.		
-		CUDA_ERR_CHECK(cudaMalloc(&ptr, size * length));
-		
-		// Construct individual array elements from within the device kernel code,
-		// using placement new operator.
-		constructDeviceData<T><<<1, 1>>>(length, ptr);
-		CUDA_ERR_CHECK(cudaGetLastError());
-		CUDA_ERR_CHECK(cudaDeviceSynchronize());
-	}
-	
-	~DeviceSizedArray()
-	{
-		// Destroy individual array elements from within the device kernel code.
-		destroyDeviceData<T><<<1, 1>>>(length, ptr);
-		CUDA_ERR_CHECK(cudaGetLastError());
-		CUDA_ERR_CHECK(cudaDeviceSynchronize());			
-
-		// Delete each indivudual element on host, which triggers deletion of
-		// data buffer previously allocated on host with cudaMalloc.
-		vector<T> elements;
-		elements.resize(length);
-		CUDA_ERR_CHECK(cudaMemcpy(&elements[0], ptr, length * sizeof(T), cudaMemcpyDeviceToHost));
-		for (int i = 0; i < length; i++)
-		{
-			// Set that matrix owns its underlying data buffer.
-			elements[i].disownData();
-
-			delete &elements[i];
-		}
-
-		// Free device memory used for array elements.
-		CUDA_ERR_CHECK(cudaFree(ptr));
-	}
-
-	T& operator[](int i)
-	{
-		return (T&)ptr[i * size];
-	}
-};
 
 class Data::Device::DataDevice
 {
 	// These containers shall be entirely in device memory, including vectors.
-	DeviceSizedArray<Matrix<int>::Device::Dense> index;
-	DeviceSizedArray<Matrix<real>::Device::Dense> surplus, surplus_t;
+	Vector::Device<Matrix::Device::Dense<int> > index;
+	Vector::Device<Matrix::Device::Dense<real> > surplus, surplus_t;
 
 public :
 
@@ -508,56 +416,34 @@ Data::Device::Device(int nstates_) : nstates(nstates_)
 	data.reset(new DataDevice(nstates_));
 }
 
-Matrix<int>::Device::Dense* Data::Device::getIndex(int istate)
+Matrix::Device::Dense<int>* Data::Device::getIndex(int istate)
 {
-	return &data->index[istate];
+	return &data->index(istate);
 }
 
-Matrix<real>::Device::Dense* Data::Device::getSurplus(int istate)
+Matrix::Device::Dense<real>* Data::Device::getSurplus(int istate)
 {
-	return &data->surplus[istate];
+	return &data->surplus(istate);
 }
 
-Matrix<real>::Device::Dense* Data::Device::getSurplus_t(int istate)
+Matrix::Device::Dense<real>* Data::Device::getSurplus_t(int istate)
 {
-	return &data->surplus_t[istate];
+	return &data->surplus_t(istate);
 }
 
-template<typename T>
-static void setMatrix(int istate,
-	MatrixHostDense<T, std::vector<T, AlignedAllocator<T> > > * pMatrixHost, MatrixDeviceDense<T>* pMatrixDevice)
+void Data::Device::setIndex(int istate, Matrix::Host::Dense<int>& matrix)
 {
-	MatrixHostDense<T, std::vector<T, AlignedAllocator<T> > >& matrixHost = *pMatrixHost;
-
-	MatrixDeviceDense<T> matrixDevice;
-	CUDA_ERR_CHECK(cudaMemcpy(&matrixDevice, pMatrixDevice, sizeof(MatrixDeviceDense<T>), cudaMemcpyDeviceToHost));
-	matrixDevice.resize(matrixHost.dimy(), matrixHost.dimx());
-
-	// It is assumed to be safe to copy padded data from host to device matrix,
-	// as they use the same memory allocation policy.
-	size_t size = (ptrdiff_t)&matrixHost(matrixHost.dimy() - 1, matrixHost.dimx() - 1) -
-		(ptrdiff_t)matrixHost.getData() + sizeof(T);
-	CUDA_ERR_CHECK(cudaMemcpy(matrixDevice.getData(), pMatrixHost->getData(), size, cudaMemcpyHostToDevice));
-
-	// Set that matrix does not own its underlying data buffer.
-	matrixDevice.disownData();
-
-	CUDA_ERR_CHECK(cudaMemcpy(pMatrixDevice, &matrixDevice, sizeof(MatrixDeviceDense<T>), cudaMemcpyHostToDevice));
+	data->index(istate) = matrix;
 }
 
-void Data::Device::setIndex(int istate, Matrix<int>::Host::Dense* matrix)
+void Data::Device::setSurplus(int istate, Matrix::Host::Dense<real>& matrix)
 {
-	setMatrix<int>(istate, matrix, &data->index[istate]);
+	data->surplus(istate) = matrix;
 }
 
-void Data::Device::setSurplus(int istate, Matrix<real>::Host::Dense* matrix)
+void Data::Device::setSurplus_t(int istate, Matrix::Host::Dense<real>& matrix)
 {
-	setMatrix<double>(istate, matrix, &data->surplus[istate]);
-}
-
-void Data::Device::setSurplus_t(int istate, Matrix<real>::Host::Dense* matrix)
-{
-	setMatrix<double>(istate, matrix, &data->surplus_t[istate]);
+	data->surplus_t(istate) = matrix;
 }
 		
 extern "C" Data* getData(int nstates)

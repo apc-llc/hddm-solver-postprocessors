@@ -12,7 +12,7 @@ extern "C" __global__ void KERNEL_NAME(
 #endif
 	const int dim, const int vdim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end,
-	const Matrix<int>::Device::Dense* index_, const Matrix<double>::Device::Dense* surplus_, double* value,
+	const Matrix::Device::Dense<int>* index_, const Matrix::Device::Dense<double>* surplus_, double* value,
 	int length, int nwarps, int nnoPerBlock)
 {
 	int lane = threadIdx.x % warpSize;
@@ -20,8 +20,8 @@ extern "C" __global__ void KERNEL_NAME(
 
 	extern __shared__ double temps[];
 
-	const Matrix<int>::Device::Dense& index = *index_;
-	const Matrix<double>::Device::Dense& surplus = *surplus_;
+	const Matrix::Device::Dense<int>& index = *index_;
+	const Matrix::Device::Dense<double>& surplus = *surplus_;
 
 	// The "i" is the index by nno, which could be either grid dimension X,
 	// or partitioned between grid dimension X and block dimension Y.
@@ -115,7 +115,7 @@ extern "C" void FUNCNAME(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const double* x,
-	const Matrix<int>::Device::Dense* index, const Matrix<double>::Device::Dense* surplus, double* value)
+	const Matrix::Device::Dense<int>* index, const Matrix::Device::Dense<double>* surplus, double* value)
 {
 	// Configure kernel compute grid.
 	int vdim = 1;
@@ -144,7 +144,7 @@ extern "C" void FUNCNAME(
 	CUDA_ERR_CHECK(cudaMemsetAsync(dvalue, 0, sizeof(double) * length, stream));
 	CUDA_ERR_CHECK(cudaFuncSetSharedMemConfig(
 		InterpolateArray_kernel_large_dim, cudaSharedMemBankSizeEightByte));
-	InterpolateArray_kernel_large_dim<<<gridDim, blockDim, (blockDim.y * nwarps /*+ length*/) * sizeof(double), stream>>>(
+	InterpolateArray_kernel_large_dim<<<gridDim, blockDim, (blockDim.y * nwarps) * sizeof(double), stream>>>(
 #ifdef DEFERRED
 		*dx,
 #else

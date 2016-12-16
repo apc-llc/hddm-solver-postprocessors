@@ -28,10 +28,10 @@ inline __attribute__((always_inline)) __device__ double atomicAdd(double* addres
 static __global__ void InterpolateValue_kernel_large_dim(
 	const int dim, const int vdim,
 	const int Dof_choice, const double* x,
-	const Matrix<int>::Device::Dense* index_, const Matrix<double>::Device::Dense* surplus_, double* value)
+	const Matrix::Device::Dense<int>* index_, const Matrix::Device::Dense<double>* surplus_, double* value)
 {
-	const Matrix<int>::Device::Dense& index = *index_;
-	const Matrix<double>::Device::Dense& surplus = *surplus_;
+	const Matrix::Device::Dense<int>& index = *index_;
+	const Matrix::Device::Dense<double>& surplus = *surplus_;
 
 	// The "i" is the index by nno, which could be either grid dimension X,
 	// or partitioned between grid dimension X and block dimension Y.
@@ -68,7 +68,7 @@ extern "C" void FUNCNAME(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice, const double* x,
-	const Matrix<int>::Device::Dense* index, const Matrix<double>::Device::Dense* surplus, double* value)
+	const Matrix::Device::Dense<int>* index, const Matrix::Device::Dense<double>* surplus, double* value)
 {
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
 	// boundary to keep up the required alignment.

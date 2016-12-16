@@ -18,7 +18,7 @@ extern "C" __global__ void KERNEL_NAME(
 #endif
 	const int dim, const int vdim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count,
-	const Matrix<int>::Device::Dense* index_, const Matrix<double>::Device::Dense* surplus_, double* value_,
+	const Matrix::Device::Dense<int>* index_, const Matrix::Device::Dense<double>* surplus_, double* value_,
 	int length, int nwarps, int nnoPerBlock)
 {
 	int lane = threadIdx.x % warpSize;
@@ -28,8 +28,8 @@ extern "C" __global__ void KERNEL_NAME(
 
 	for (int many = 0; many < COUNT; many++)
 	{
-		const Matrix<int>::Device::Dense& index = index_[many];
-		const Matrix<double>::Device::Dense& surplus = surplus_[many];
+		const Matrix::Device::Dense<int>& index = index_[many];
+		const Matrix::Device::Dense<double>& surplus = surplus_[many];
 		double* value = value_ + many * length;
 
 		// The "i" is the index by nno, which could be either grid dimension X,
@@ -125,7 +125,7 @@ extern "C" void FUNCNAME(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x,
-	const Matrix<int>::Device::Dense* index, const Matrix<double>::Device::Dense* surplus, double** value)
+	const Matrix::Device::Dense<int>* index, const Matrix::Device::Dense<double>* surplus, double** value)
 {
 	// Configure kernel compute grid.
 	int vdim = 1;
