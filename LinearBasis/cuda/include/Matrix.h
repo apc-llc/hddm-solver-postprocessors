@@ -252,19 +252,25 @@ public :
 	__host__
 	void operator=(Matrix::Host::Dense<T, VectorType>& other)
 	{
-		Matrix::Device::Dense<T> matrix;
-		CUDA_ERR_CHECK(cudaMemcpy(&matrix, this, sizeof(Matrix::Device::Dense<T>),
+		// Use byte container preventing destruction of matrix
+		// mirrored from device. Otherwise it will be destroyed
+		// together with newly created data array after resizing.
+		std::vector<char> container(sizeof(Matrix::Device::Dense<T>));
+		
+		Matrix::Device::Dense<T>* matrix =
+			reinterpret_cast<Matrix::Device::Dense<T>*>(&container[0]);
+		CUDA_ERR_CHECK(cudaMemcpy(matrix, this, sizeof(Matrix::Device::Dense<T>),
 			cudaMemcpyDeviceToHost));
-		matrix.resize(other.dimy(), other.dimx());
+		matrix->resize(other.dimy(), other.dimx());
 
 		// It is assumed safe to copy padded data from host to device matrix,
 		// as they use the same memory allocation policy.
 		size_t size = (ptrdiff_t)&other(other.dimy() - 1, other.dimx() - 1) -
 			(ptrdiff_t)other.getData() + sizeof(T);
-		CUDA_ERR_CHECK(cudaMemcpy(matrix.getData(), other.getData(), size,
+		CUDA_ERR_CHECK(cudaMemcpy(matrix->getData(), other.getData(), size,
 			cudaMemcpyHostToDevice));
 		
-		CUDA_ERR_CHECK(cudaMemcpy(this, &matrix, sizeof(Matrix::Device::Dense<T>),
+		CUDA_ERR_CHECK(cudaMemcpy(this, matrix, sizeof(Matrix::Device::Dense<T>),
 			cudaMemcpyHostToDevice));
 	}
 };
