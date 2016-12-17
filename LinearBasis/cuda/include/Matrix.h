@@ -291,16 +291,17 @@ namespace Sparse {
 
 // Host memory sparse matrix in CSR format
 template<typename TValue, typename TIndex>
-class CSR
+class CSR : public DataContainer<TValue>
 {
 	Vector::Device<TValue> a_;
 	Vector::Device<TIndex> ia_, ja_;
 	int dimY, dimX, nnZ;
 
 public :
-	CSR() : dimY(0), dimX(0), nnZ(0) { }
+	CSR() : DataContainer<TValue>(), dimY(0), dimX(0), nnZ(0) { }
 
 	CSR(int dimY_, int dimX_, int nnz_) :
+		DataContainer<TValue>(),
 		a_(nnz_), ia_(dimY_ + 1), ja_(nnz_),
 		dimY(dimY_), dimX(dimX_), nnZ(nnz_) { }
 
