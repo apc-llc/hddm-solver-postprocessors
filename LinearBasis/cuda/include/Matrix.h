@@ -72,63 +72,63 @@ namespace Sparse {
 template<typename TValue, typename TIndex, template<typename, typename> class TVector = std::vector, template<typename> class TAllocator = AlignedAllocator::Host>
 class CSR
 {
-	TVector<TValue, TAllocator<TValue> > a;
-	TVector<TIndex, TAllocator<TIndex> > ia, ja;
+	TVector<TValue, TAllocator<TValue> > a_;
+	TVector<TIndex, TAllocator<TIndex> > ia_, ja_;
 	int dimY, dimX, nnZ;
 
 public :
 	CSR() :
-		a(TVector<TValue, TAllocator<TValue> >()),
-		ia(TVector<TIndex, TAllocator<TIndex> >()),
-		ja(TVector<TIndex, TAllocator<TIndex> >()),
+		a_(TVector<TValue, TAllocator<TValue> >()),
+		ia_(TVector<TIndex, TAllocator<TIndex> >()),
+		ja_(TVector<TIndex, TAllocator<TIndex> >()),
 		dimY(0), dimX(0), nnZ(0)
 	{ }
 
 	CSR(int dimY_, int dimX_, int nnz_) :
-		a(TVector<TValue, TAllocator<TValue> >()),
-		ia(TVector<TIndex, TAllocator<TIndex> >()),
-		ja(TVector<TIndex, TAllocator<TIndex> >()),
+		a_(TVector<TValue, TAllocator<TValue> >()),
+		ia_(TVector<TIndex, TAllocator<TIndex> >()),
+		ja_(TVector<TIndex, TAllocator<TIndex> >()),
 		dimY(dimY_), dimX(dimX_), nnZ(nnz_)
 	{
-		a.resize(nnZ);
-		ia.resize(dimY + 1);
-		ja.resize(nnZ);
+		a_.resize(nnZ);
+		ia_.resize(dimY + 1);
+		ja_.resize(nnZ);
 	}
 
-	inline __attribute__((always_inline)) TValue& A(int i)
+	inline __attribute__((always_inline)) TValue& a(int i)
 	{
 		assert(i < nnZ);
-		return a[i];
+		return a_[i];
 	}
 
-	inline __attribute__((always_inline)) const TValue& A(int i) const
+	inline __attribute__((always_inline)) const TValue& a(int i) const
 	{
 		assert(i < nnZ);
-		return a[i];
+		return a_[i];
 	}
 	
-	inline __attribute__((always_inline)) TIndex& IA(int i)
+	inline __attribute__((always_inline)) TIndex& ia(int i)
 	{
 		assert(i < dimY + 1);
-		return ia[i];
+		return ia_[i];
 	}
 
-	inline __attribute__((always_inline)) const TIndex& IA(int i) const
+	inline __attribute__((always_inline)) const TIndex& ia(int i) const
 	{
 		assert(i < dimY + 1);
-		return ia[i];
+		return ia_[i];
 	}
 	
-	inline __attribute__((always_inline)) TIndex& JA(int i)
+	inline __attribute__((always_inline)) TIndex& ja(int i)
 	{
 		assert(i < nnZ);
-		return ja[i];
+		return ja_[i];
 	}
 
-	inline __attribute__((always_inline)) const TIndex& JA(int i) const
+	inline __attribute__((always_inline)) const TIndex& ja(int i) const
 	{
 		assert(i < nnZ);
-		return ja[i];
+		return ja_[i];
 	}
 
 	inline __attribute__((always_inline)) const TValue& operator()(int y, int x) const
@@ -139,13 +139,13 @@ public :
 		for (int i = 0; ; )
 		{
 			for (int row = 0; row < y; row++)
-				for (int col = IA[row]; (col < IA[row + 1]) && (i < nnZ); col++)
+				for (int col = ia_[row]; (col < ia_[row + 1]) && (i < nnZ); col++)
 					i++;
 
 			assert (i < nnZ);
 
-			for (int col = IA[y]; col < IA[y + 1]; col++, i++)
-				if (JA[i] == x) return A[i];
+			for (int col = ia_[y]; col < ia_[y + 1]; col++, i++)
+				if (ja_[i] == x) return a_[i];
 
 			return (TValue) 0;
 		}
@@ -160,14 +160,14 @@ public :
 	inline __attribute__((always_inline)) void resize(int dimY_, int dimX_, int nnz_)
 	{
 		dimY = dimY_; dimX = dimX_; nnZ = nnz_;
-		a.resize(nnZ);
-		ia.resize(dimY + 1);
-		ja.resize(nnZ);
+		a_.resize(nnZ);
+		ia_.resize(dimY + 1);
+		ja_.resize(nnZ);
 	}
 	
 	inline __attribute__((always_inline)) void fill(TValue value)
 	{
-		std::fill(a.begin(), a.end(), value);
+		std::fill(a_.begin(), a_.end(), value);
 	}
 };
 
@@ -252,15 +252,24 @@ public :
 	__host__
 	void operator=(Matrix::Host::Dense<T, VectorType>& other)
 	{
+		Matrix::Device::Dense<T>* matrix = this;
+
 		// Use byte container preventing destruction of matrix
 		// mirrored from device. Otherwise it will be destroyed
 		// together with newly created data array after resizing.
 		std::vector<char> container(sizeof(Matrix::Device::Dense<T>));
+	
+		// Determine, in which memory the current matrix instance
+		// resides.
+		cudaPointerAttributes attrs;
+		CUDA_ERR_CHECK(cudaPointerGetAttributes(&attrs, this));
+		if (attrs.memoryType == cudaMemoryTypeDevice)
+		{		
+			matrix = reinterpret_cast<Matrix::Device::Dense<T>*>(&container[0]);
+			CUDA_ERR_CHECK(cudaMemcpy(matrix, this, sizeof(Matrix::Device::Dense<T>),
+				cudaMemcpyDeviceToHost));
+		}
 		
-		Matrix::Device::Dense<T>* matrix =
-			reinterpret_cast<Matrix::Device::Dense<T>*>(&container[0]);
-		CUDA_ERR_CHECK(cudaMemcpy(matrix, this, sizeof(Matrix::Device::Dense<T>),
-			cudaMemcpyDeviceToHost));
 		matrix->resize(other.dimy(), other.dimx());
 
 		// It is assumed safe to copy padded data from host to device matrix,
@@ -269,9 +278,12 @@ public :
 			(ptrdiff_t)other.getData() + sizeof(T);
 		CUDA_ERR_CHECK(cudaMemcpy(matrix->getData(), other.getData(), size,
 			cudaMemcpyHostToDevice));
-		
-		CUDA_ERR_CHECK(cudaMemcpy(this, matrix, sizeof(Matrix::Device::Dense<T>),
-			cudaMemcpyHostToDevice));
+
+		if (attrs.memoryType == cudaMemoryTypeDevice)
+		{		
+			CUDA_ERR_CHECK(cudaMemcpy(this, matrix, sizeof(Matrix::Device::Dense<T>),
+				cudaMemcpyHostToDevice));
+		}
 	}
 };
 
@@ -281,98 +293,39 @@ namespace Sparse {
 template<typename TValue, typename TIndex>
 class CSR
 {
-	TValue *a;
-	TIndex *ia, *ja;
-	bool dataOwner; // whether the instance owns its data pointer or not
+	Vector::Device<TValue> a_;
+	Vector::Device<TIndex> ia_, ja_;
 	int dimY, dimX, nnZ;
 
 public :
-	CSR() :
-		a(NULL), ia(NULL), ja(NULL),
-		dimY(0), dimX(0), nnZ(0)
-	{ }
+	CSR() : dimY(0), dimX(0), nnZ(0) { }
 
 	CSR(int dimY_, int dimX_, int nnz_) :
-		a(NULL), ia(NULL), ja(NULL),
-		dimY(dimY_), dimX(dimX_), nnZ(nnz_)
-	{
-#if defined(__CUDA_ARCH__)
-		a = new TValue[nnZ];
-		ia = new TIndex[dimY + 1];
-		ja = new TIndex[nnZ];
-#else
-		CUDA_ERR_CHECK(cudaMalloc(&a, nnZ * sizeof(TValue)));
-		CUDA_ERR_CHECK(cudaMalloc(&ia, (dimY + 1) * sizeof(TIndex)));
-		CUDA_ERR_CHECK(cudaMalloc(&ja, nnZ * sizeof(TIndex)));
-#endif
-	}
+		a_(nnz_), ia_(dimY_ + 1), ja_(nnz_),
+		dimY(dimY_), dimX(dimX_), nnZ(nnz_) { }
 
 	__host__ __device__
-	~CSR()
-	{
-		if (!dataOwner) return;
-#if defined(__CUDA_ARCH__)
-		if (a) delete[] a;
-		if (ia) delete[] ia;
-		if (ja) delete[] ja;
-#else
-		CUDA_ERR_CHECK(cudaFree(a));
-		CUDA_ERR_CHECK(cudaFree(ia));
-		CUDA_ERR_CHECK(cudaFree(ja));
-#endif
-	}
+	~CSR() { }
 
-	// Become an owner of the underlying data pointer.
 	__host__ __device__
-	void ownData() { dataOwner = true; }
+	inline __attribute__((always_inline)) TValue& a(int i) { return a_(i); }
 
-	// Disown the underlying data pointer.
 	__host__ __device__
-	void disownData() { dataOwner = false; }
+	inline __attribute__((always_inline)) const TValue& a(int i) const { return a_(i); }
 
-	__device__
-	inline __attribute__((always_inline)) TValue& A(int i)
-	{
-		assert(i < nnZ);
-		return a[i];
-	}
+	__host__ __device__
+	inline __attribute__((always_inline)) TIndex& ia(int i) { return ia_(i); }
 
-	__device__
-	inline __attribute__((always_inline)) const TValue& A(int i) const
-	{
-		assert(i < nnZ);
-		return a[i];
-	}
-
-	__device__
-	inline __attribute__((always_inline)) TIndex& IA(int i)
-	{
-		assert(i < dimY + 1);
-		return ia[i];
-	}
-
-	__device__
-	inline __attribute__((always_inline)) const TIndex& IA(int i) const
-	{
-		assert(i < dimY + 1);
-		return ia[i];
-	}
+	__host__ __device__
+	inline __attribute__((always_inline)) const TIndex& IA(int i) const { return ia_(i); }
 	
-	__device__
-	inline __attribute__((always_inline)) TIndex& JA(int i)
-	{
-		assert(i < nnZ);
-		return ja[i];
-	}
+	__host__ __device__
+	inline __attribute__((always_inline)) TIndex& ja(int i) { return ja_(i); }
 
-	__device__
-	inline __attribute__((always_inline)) const TIndex& JA(int i) const
-	{
-		assert(i < nnZ);
-		return ja[i];
-	}
+	__host__ __device__
+	inline __attribute__((always_inline)) const TIndex& JA(int i) const { return ja_(i); }
 
-	__device__
+	__host__ __device__
 	inline __attribute__((always_inline)) const TValue& operator()(int y, int x) const
 	{
 		assert(x < dimX);
@@ -381,49 +334,88 @@ public :
 		for (int i = 0; ; )
 		{
 			for (int row = 0; row < y; row++)
-				for (int col = IA[row]; (col < IA[row + 1]) && (i < nnZ); col++)
+				for (int col = ia_[row]; (col < ia_[row + 1]) && (i < nnZ); col++)
 					i++;
 
 			assert (i < nnZ);
 
-			for (int col = IA[y]; col < IA[y + 1]; col++, i++)
-				if (JA[i] == x) return A[i];
+			for (int col = ia_[y]; col < ia_[y + 1]; col++, i++)
+				if (ja_[i] == x) return a_[i];
 
 			return (TValue) 0;
 		}
 	}
 
-	__device__
+	__host__ __device__
 	inline __attribute__((always_inline)) int dimy() { return dimY; }
 
-	__device__
+	__host__ __device__
 	inline __attribute__((always_inline)) int dimx() { return dimX; }
 
-	__device__
+	__host__ __device__
 	inline __attribute__((always_inline)) int nnz() { return nnZ; }
 		
 	__host__ __device__
 	inline __attribute__((always_inline)) void resize(int dimY_, int dimX_, int nnz_)
 	{
 		dimY = dimY_; dimX = dimX_; nnZ = nnz_;
-#if defined(__CUDA_ARCH__)
-		if (a) delete[] a;
-		if (ia) delete[] ia;
-		if (ja) delete[] ja;
-#else
-		if (a) CUDA_ERR_CHECK(cudaFree(a));
-		if (ia) CUDA_ERR_CHECK(cudaFree(ia));
-		if (ja) CUDA_ERR_CHECK(cudaFree(ja));
-#endif
-#if defined(__CUDA_ARCH__)
-		a = new TValue[nnZ];
-		ia = new TIndex[dimY + 1];
-		ja = new TIndex[nnZ];
-#else
-		CUDA_ERR_CHECK(cudaMalloc(&a, nnZ * sizeof(TValue)));
-		CUDA_ERR_CHECK(cudaMalloc(&ia, (dimY + 1) * sizeof(TIndex)));
-		CUDA_ERR_CHECK(cudaMalloc(&ja, nnZ * sizeof(TIndex)));
-#endif
+		a_.resize(nnZ);
+		ia_.resize(dimY + 1);
+		ja_.resize(nnZ);
+	}
+
+	template<template<typename, typename> class TVector = std::vector, template<typename> class TAllocator = AlignedAllocator::Host>
+	__host__
+	void operator=(Matrix::Host::Sparse::CSR<TValue, TIndex, TVector, TAllocator>& other)
+	{
+		Matrix::Device::Sparse::CSR<TValue, TIndex>* matrix = this;
+
+		// Use byte container preventing destruction of matrix
+		// mirrored from device. Otherwise it will be destroyed
+		// together with newly created data array after resizing.
+		std::vector<char> container(sizeof(Matrix::Device::Sparse::CSR<TValue, TIndex>));
+
+		// Determine, in which memory the current matrix instance
+		// resides.
+		cudaPointerAttributes attrs;
+		CUDA_ERR_CHECK(cudaPointerGetAttributes(&attrs, this));
+		if (attrs.memoryType == cudaMemoryTypeDevice)
+		{		
+			matrix = reinterpret_cast<Matrix::Device::Sparse::CSR<TValue, TIndex>*>(&container[0]);
+			CUDA_ERR_CHECK(cudaMemcpy(matrix, this,
+				sizeof(Matrix::Device::Sparse::CSR<TValue, TIndex>),
+				cudaMemcpyDeviceToHost));
+		}
+		
+		matrix->resize(other.dimy(), other.dimx(), other.nnz());
+
+		// It is assumed safe to copy padded data from host to device matrix,
+		// as they use the same memory allocation policy.
+		{
+			size_t size = (ptrdiff_t)&other.a(other.nnz() - 1) -
+				(ptrdiff_t)other.a(0) + sizeof(TValue);
+			CUDA_ERR_CHECK(cudaMemcpy(matrix->a(0), other.a(0), size,
+				cudaMemcpyHostToDevice));
+		}
+		{
+			size_t size = (ptrdiff_t)&other.ia(other.dimY()) -
+				(ptrdiff_t)other.ia(0) + sizeof(TIndex);
+			CUDA_ERR_CHECK(cudaMemcpy(matrix->ia(0), other.ia(0), size,
+				cudaMemcpyHostToDevice));
+		}
+		{
+			size_t size = (ptrdiff_t)&other.ja(other.nnz() - 1) -
+				(ptrdiff_t)other.ja(0) + sizeof(TIndex);
+			CUDA_ERR_CHECK(cudaMemcpy(matrix->ja(0), other.ja(0), size,
+				cudaMemcpyHostToDevice));
+		}
+		
+		if (attrs.memoryType == cudaMemoryTypeDevice)
+		{
+			CUDA_ERR_CHECK(cudaMemcpy(this, matrix,
+				sizeof(Matrix::Device::Sparse::CSR<TValue, TIndex>),
+				cudaMemcpyHostToDevice));
+		}
 	}
 };
 
