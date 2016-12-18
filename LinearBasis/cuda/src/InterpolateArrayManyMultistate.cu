@@ -18,7 +18,8 @@ extern "C" __global__ void KERNEL_NAME(
 #endif
 	const int dim, const int vdim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count,
-	const Matrix::Device::Dense<int>* index_, const Matrix::Device::Dense<double>* surplus_, double* value_,
+	const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* index_,
+	const Matrix::Device::Dense<double>* surplus_, double* value_,
 	int length, int nwarps, int nnoPerBlock)
 {
 	int lane = threadIdx.x % warpSize;
@@ -28,7 +29,7 @@ extern "C" __global__ void KERNEL_NAME(
 
 	for (int many = 0; many < COUNT; many++)
 	{
-		const Matrix::Device::Dense<int>& index = index_[many];
+		const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>& index = index_[many];
 		const Matrix::Device::Dense<double>& surplus = surplus_[many];
 		double* value = value_ + many * length;
 
@@ -59,17 +60,8 @@ extern "C" __global__ void KERNEL_NAME(
 			#pragma no unroll
 			for (int j = threadIdx.x; j < DIM; j += AVX_VECTOR_SIZE)
 			{
-				struct IndexPair
-				{
-					unsigned short i, j;
-				};
-				union IndexUnion
-				{
-					int i;
-					IndexPair pair;
-				};
-				IndexUnion iu; iu.i = index(i, j);
-				IndexPair& pair = iu.pair;
+				const IndexUnion iu = { *(const uint32_t*)&index(i, j) };
+				const IndexPair& pair = iu.pair;
 				if ((pair.i == 0) && (pair.j == 0))
 					continue;
 
@@ -125,7 +117,8 @@ extern "C" void FUNCNAME(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x,
-	const Matrix::Device::Dense<int>* index, const Matrix::Device::Dense<double>* surplus, double** value)
+	const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* index,
+	const Matrix::Device::Dense<double>* surplus, double** value)
 {
 	// Configure kernel compute grid.
 	int vdim = 1;

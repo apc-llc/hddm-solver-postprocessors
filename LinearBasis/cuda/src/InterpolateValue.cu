@@ -28,9 +28,10 @@ inline __attribute__((always_inline)) __device__ double atomicAdd(double* addres
 static __global__ void InterpolateValue_kernel_large_dim(
 	const int dim, const int vdim,
 	const int Dof_choice, const double* x,
-	const Matrix::Device::Dense<int>* index_, const Matrix::Device::Dense<double>* surplus_, double* value)
+	const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* index_,
+	const Matrix::Device::Dense<double>* surplus_, double* value)
 {
-	const Matrix::Device::Dense<int>& index = *index_;
+	const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>& index = *index_;
 	const Matrix::Device::Dense<double>& surplus = *surplus_;
 
 	// The "i" is the index by nno, which could be either grid dimension X,
@@ -45,8 +46,13 @@ static __global__ void InterpolateValue_kernel_large_dim(
 	double temp = 1.0;
 	for (int j = threadIdx.x; j < DIM; j += AVX_VECTOR_SIZE)
 	{
-		double xp = LinearBasis(x[j], index(i, j), index(i, j + vdim));
-		temp *= max(0.0, xp);
+		const IndexUnion iu = { *(const uint32_t*)&index(i, j) };
+		const IndexPair& pair = iu.pair;
+		if ((pair.i == 0) && (pair.j == 0))
+			continue;
+
+		double xp = LinearBasis(x[j], pair.i, pair.j);
+		temp *= fmax(0.0, xp);
 	}
 	
 	__syncthreads();
@@ -68,7 +74,8 @@ extern "C" void FUNCNAME(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice, const double* x,
-	const Matrix::Device::Dense<int>* index, const Matrix::Device::Dense<double>* surplus, double* value)
+	const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* index,
+	const Matrix::Device::Dense<double>* surplus, double* value)
 {
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
 	// boundary to keep up the required alignment.

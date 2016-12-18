@@ -24,6 +24,17 @@ namespace cuda {
 
 class Interpolator;
 
+struct IndexPair
+{
+	unsigned short i, j;
+};
+
+union IndexUnion
+{
+	uint32_t i;
+	IndexPair pair;
+};
+
 class Data
 {
 	int nstates, dim, vdim, nno, TotalDof, Level;
@@ -37,7 +48,7 @@ class Data
 	
 	public :
 
-		Matrix::Host::Dense<int>* getIndex(int istate);
+		Matrix::Host::Sparse::CSR<IndexPair, uint32_t>* getIndex(int istate);
 		Matrix::Host::Dense<real>* getSurplus(int istate);
 		Matrix::Host::Dense<real>* getSurplus_t(int istate);
 
@@ -58,11 +69,11 @@ class Data
 
 	public :
 
-		Matrix::Device::Dense<int>* getIndex(int istate);
+		Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* getIndex(int istate);
 		Matrix::Device::Dense<real>* getSurplus(int istate);
 		Matrix::Device::Dense<real>* getSurplus_t(int istate);
 
-		void setIndex(int istate, Matrix::Host::Dense<int>& matrix);
+		void setIndex(int istate, Matrix::Host::Sparse::CSR<IndexPair, uint32_t>& matrix);
 		void setSurplus(int istate, Matrix::Host::Dense<real>& matrix);
 		void setSurplus_t(int istate, Matrix::Host::Dense<real>& matrix);
 	

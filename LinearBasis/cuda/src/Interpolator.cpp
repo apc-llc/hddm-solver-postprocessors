@@ -34,7 +34,7 @@ extern "C" void LinearBasis_CUDA_Generic_InterpolateValue(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice, const double* x,
-	const Matrix::Device::Dense<int>* index, const Matrix::Device::Dense<real>* surplus, double* value_);
+	const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* index, const Matrix::Device::Dense<real>* surplus, double* value_);
 	
 // Interpolate a single value.
 void Interpolator::interpolate(Device* device, Data* data,
@@ -46,7 +46,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 			Device* device,
 			const int dim, const int nno,
 			const int Dof_choice, const double* x,
-			const Matrix::Device::Dense<int>* index, const Matrix::Device::Dense<real>* surplus, double* value_);
+			const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* index, const Matrix::Device::Dense<real>* surplus, double* value_);
 
 		static map<long long, Func> LinearBasis_CUDA_RuntimeOpt_InterpolateValue;
 
@@ -72,7 +72,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 extern "C" void LinearBasis_CUDA_Generic_InterpolateArray(
 	Device* device, const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const double* x,
-	const Matrix::Device::Dense<int>* index, const Matrix::Device::Dense<real>* surplus, double* value);
+	const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* index, const Matrix::Device::Dense<real>* surplus, double* value);
 
 // Interpolate array of values.
 void Interpolator::interpolate(Device* device, Data* data,
@@ -83,7 +83,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 		typedef void (*Func)(
 			Device* device, const int dim, const int nno,
 			const int Dof_choice_start, const int Dof_choice_end, const double* x,
-			const Matrix::Device::Dense<int>* index, const Matrix::Device::Dense<real>* surplus, double* value);
+			const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* index, const Matrix::Device::Dense<real>* surplus, double* value);
 
 		static map<long long, Func> LinearBasis_CUDA_RuntimeOpt_InterpolateArray;
 
@@ -109,7 +109,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 extern "C" void LinearBasis_CUDA_Generic_InterpolateArrayManyStateless(
 	Device* device, const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* x_,
-	const Matrix::Device::Dense<int>* index, const Matrix::Device::Dense<real>* surplus, double* value);
+	const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* index, const Matrix::Device::Dense<real>* surplus, double* value);
 
 // TODO
 // Interpolate multiple arrays of values, with single surplus state.
@@ -121,7 +121,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 		typedef void (*Func)(
 			Device* device, const int dim, const int nno,
 			const int Dof_choice_start, const int Dof_choice_end, const int count, const double* x_,
-			const Matrix::Device::Dense<int>* index, const Matrix::Device::Dense<real>* surplus, double* value);
+			const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* index, const Matrix::Device::Dense<real>* surplus, double* value);
 
 		static map<long long, Func> LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyStateless;
 
@@ -148,7 +148,7 @@ extern "C" void LinearBasis_CUDA_Generic_InterpolateArrayManyMultistate(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
-	const Matrix::Device::Dense<int>* index, const Matrix::Device::Dense<real>* surplus, double** value);
+	const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* index, const Matrix::Device::Dense<real>* surplus, double** value);
 
 // Interpolate multiple arrays of values, with multiple surplus states.
 void Interpolator::interpolate(Device* device, Data* data,
@@ -160,7 +160,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 			Device* device,
 			const int dim, const int nno,
 			const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
-			const Matrix::Device::Dense<int>* index, const Matrix::Device::Dense<real>* surplus, double** value);
+			const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* index, const Matrix::Device::Dense<real>* surplus, double** value);
 
 		static map<long long, Func> LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyMultistate;
 

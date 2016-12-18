@@ -13,7 +13,7 @@ int Data::getNno() const { return nno; }
 
 class Data::Host::DataHost
 {
-	Vector::Host<Matrix::Host::Dense<int> > index;
+	Vector::Host<Matrix::Host::Sparse::CSR<IndexPair, uint32_t> > index;
 	Vector::Host<Matrix::Host::Dense<real> > surplus, surplus_t;
 
 public :
@@ -56,13 +56,8 @@ static bool isCompressed(const char* filename)
 	return compressed;
 }
 
-struct IndexPair
-{
-	unsigned short i, j;
-};
-
 template<typename T>
-static void read_index(ifstream& infile, int nno, int dim, Matrix::Host::Dense<int>& index_)
+static void read_index(ifstream& infile, int nno, int nsd, int dim, Matrix::Host::Sparse::CSR<IndexPair, uint32_t>& index)
 {
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
@@ -72,67 +67,51 @@ static void read_index(ifstream& infile, int nno, int dim, Matrix::Host::Dense<i
 
 	unsigned int index_nonzeros = 0;
 	infile.read(reinterpret_cast<char*>(&index_nonzeros), sizeof(unsigned int));
+	
+	index.resize(nno, nsd, index_nonzeros);
 
-	vector<int> A;
-	A.resize(index_nonzeros);
-	for (int i = 0, e = A.size(); i != e; i++)
-		infile.read(reinterpret_cast<char*>(&A[i]), sizeof(IndexPair));
+	for (int i = 0, e = index_nonzeros; i < e; i++)
+		infile.read(reinterpret_cast<char*>(&index.a(i)), sizeof(IndexPair));
 
-	vector<int> IA;
-	IA.resize(nno + 1);
+	infile.read(reinterpret_cast<char*>(&index.ia(0)), sizeof(T));
+	for (int i = 1, e = nno + 1; i < e; i++)
 	{
 		T value;
 		infile.read(reinterpret_cast<char*>(&value), sizeof(T));
-		IA[0] = value;
-	}
-	for (int i = 1, e = IA.size(); i != e; i++)
-	{
-		T value;
-		infile.read(reinterpret_cast<char*>(&value), sizeof(T));
-		IA[i] = (int)value + IA[i - 1];
+		index.ia(i) = (uint32_t)value + index.ia(i - 1);
 	}
 	
-	if (IA[0] != 0)
+	if (index.ia(0) != 0)
 	{
 		cerr << "IA[0] must be 0" << endl;
 		process->abort();
 	}
 
-	for (int i = 1, e = IA.size(); i != e; i++)
-		if (IA[i] < IA[i - 1])
+	for (int i = 1, e = nno + 1; i < e; i++)
+	{
+		if (index.ia(i) < index.ia(i - 1))
 		{
 			cerr << "IA[i] must be not less than IA[i - 1] - not true for IA[" << i << "] >= IA[" << (i - 1) <<
-				"] : " << IA[i] << " < " << IA[i - 1] << endl;
+				"] : " << index.ia(i) << " < " << index.ia(i - 1) << endl;
 			process->abort();
 		}
-	
-	vector<int> JA;
-	JA.resize(index_nonzeros);
-	for (int i = 0, e = JA.size(); i != e; i++)
-	{
-		T value;
-		infile.read(reinterpret_cast<char*>(&value), sizeof(T));
-		JA[i] = (int)value;
 	}
 	
-	for (int i = 0, e = JA.size(); i != e; i++)
+	for (int i = 0; i < index_nonzeros; i++)
+		infile.read(reinterpret_cast<char*>(&index.ja(i)), sizeof(T));
+	
+	for (int i = 0; i < index_nonzeros; i++)
 	{
-		if (JA[i] >= dim)
+		if (index.ja(i) >= dim)
 		{
-			cerr << "JA[i] must be within column index range - not true for JA[" << i << "] = " << JA[i] << endl;
+			cerr << "JA[i] must be within column index range - not true for JA[" << i << "] = " << index.ja(i) << endl;
 			process->abort();
 		}
 	}
-
-	for (int i = 0, row = 0; row < nno; row++)
-		for (int col = IA[row]; col < IA[row + 1]; col++, i++)
-			index_(row, JA[i]) = A[i];
-	
-	//cout << (100 - (double)index_nonzeros / (nno * dim) * 100) << "% index sparsity" << endl;
 }
 
 template<typename T>
-static void read_surplus(ifstream& infile, int nno, int TotalDof, Matrix::Host::Dense<double>& surplus_)
+static void read_surplus(ifstream& infile, int nno, int TotalDof, Matrix::Host::Dense<double>& surplus)
 {
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
@@ -196,9 +175,7 @@ static void read_surplus(ifstream& infile, int nno, int TotalDof, Matrix::Host::
 
 	for (int i = 0, row = 0; row < nno; row++)
 		for (int col = IA[row]; col < IA[row + 1]; col++, i++)
-			surplus_(row, JA[i]) = A[i];
-	
-	//cout << (100 - (double)surplus_nonzeros / (nno * TotalDof) * 100) << "% surplus sparsity" << endl;
+			surplus(row, JA[i]) = A[i];
 }
 
 void Data::load(const char* filename, int istate)
@@ -256,12 +233,10 @@ void Data::load(const char* filename, int istate)
 	if (dim % AVX_VECTOR_SIZE) vdim++;
 	int nsd = vdim * AVX_VECTOR_SIZE;
 
-	Matrix::Host::Dense<int>& index = *host.getIndex(istate);
+	Matrix::Host::Sparse::CSR<IndexPair, uint32_t>& index = *host.getIndex(istate);
 	Matrix::Host::Dense<real>& surplus = *host.getSurplus(istate);
 	Matrix::Host::Dense<real>& surplus_t = *host.getSurplus_t(istate);
 	
-	index.resize(nno, nsd);
-	index.fill(0);
 	surplus.resize(nno, TotalDof);
 	surplus.fill(0.0);
 
@@ -323,13 +298,13 @@ void Data::load(const char* filename, int istate)
 		switch (szt)
 		{
 		case 1 :
-			read_index<unsigned char>(infile, nno, dim, index);
+			read_index<unsigned char>(infile, nno, nsd, dim, index);
 			break;
 		case 2 :
-			read_index<unsigned short>(infile, nno, dim, index);
+			read_index<unsigned short>(infile, nno, nsd, dim, index);
 			break;
 		case 4 :
-			read_index<unsigned int>(infile, nno, dim, index);
+			read_index<unsigned int>(infile, nno, nsd, dim, index);
 			break;
 		}
 
@@ -383,7 +358,7 @@ Data::Host::Host(int nstates)
 	data.reset(new DataHost(nstates));
 }
 
-Matrix::Host::Dense<int>* Data::Host::getIndex(int istate)
+Matrix::Host::Sparse::CSR<IndexPair, uint32_t>* Data::Host::getIndex(int istate)
 {
 	return &data->index(istate);
 }
@@ -401,7 +376,7 @@ Matrix::Host::Dense<real>* Data::Host::getSurplus_t(int istate)
 class Data::Device::DataDevice
 {
 	// These containers shall be entirely in device memory, including vectors.
-	Vector::Device<Matrix::Device::Dense<int> > index;
+	Vector::Device<Matrix::Device::Sparse::CSR<IndexPair, uint32_t> > index;
 	Vector::Device<Matrix::Device::Dense<real> > surplus, surplus_t;
 
 public :
@@ -416,7 +391,7 @@ Data::Device::Device(int nstates_) : nstates(nstates_)
 	data.reset(new DataDevice(nstates_));
 }
 
-Matrix::Device::Dense<int>* Data::Device::getIndex(int istate)
+Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* Data::Device::getIndex(int istate)
 {
 	return &data->index(istate);
 }
@@ -431,7 +406,7 @@ Matrix::Device::Dense<real>* Data::Device::getSurplus_t(int istate)
 	return &data->surplus_t(istate);
 }
 
-void Data::Device::setIndex(int istate, Matrix::Host::Dense<int>& matrix)
+void Data::Device::setIndex(int istate, Matrix::Host::Sparse::CSR<IndexPair, uint32_t>& matrix)
 {
 	data->index(istate) = matrix;
 }

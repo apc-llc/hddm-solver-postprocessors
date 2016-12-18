@@ -75,20 +75,21 @@ class CSR
 	TVector<TValue, TAllocator<TValue> > a_;
 	TVector<TIndex, TAllocator<TIndex> > ia_, ja_;
 	int dimY, dimX, nnZ;
+	TValue zero;
 
 public :
 	CSR() :
 		a_(TVector<TValue, TAllocator<TValue> >()),
 		ia_(TVector<TIndex, TAllocator<TIndex> >()),
 		ja_(TVector<TIndex, TAllocator<TIndex> >()),
-		dimY(0), dimX(0), nnZ(0)
+		dimY(0), dimX(0), nnZ(0), zero(TValue())
 	{ }
 
 	CSR(int dimY_, int dimX_, int nnz_) :
 		a_(TVector<TValue, TAllocator<TValue> >()),
 		ia_(TVector<TIndex, TAllocator<TIndex> >()),
 		ja_(TVector<TIndex, TAllocator<TIndex> >()),
-		dimY(dimY_), dimX(dimX_), nnZ(nnz_)
+		dimY(dimY_), dimX(dimX_), nnZ(nnz_), zero(TValue())
 	{
 		a_.resize(nnZ);
 		ia_.resize(dimY + 1);
@@ -147,7 +148,7 @@ public :
 			for (int col = ia_[y]; col < ia_[y + 1]; col++, i++)
 				if (ja_[i] == x) return a_[i];
 
-			return (TValue) 0;
+			return zero;
 		}
 	}
 
@@ -291,19 +292,24 @@ namespace Sparse {
 
 // Host memory sparse matrix in CSR format
 template<typename TValue, typename TIndex>
+// Although CSR matrix relies on self-managing A/IA/JA data containers,
+// it still inherits from DataContainer to check the type size.
 class CSR : public DataContainer<TValue>
 {
 	Vector::Device<TValue> a_;
 	Vector::Device<TIndex> ia_, ja_;
 	int dimY, dimX, nnZ;
+	TValue zero;
 
 public :
-	CSR() : DataContainer<TValue>(), dimY(0), dimX(0), nnZ(0) { }
+	__host__ __device__
+	CSR() : DataContainer<TValue>(), dimY(0), dimX(0), nnZ(0), zero(TValue()) { }
 
+	__host__ __device__
 	CSR(int dimY_, int dimX_, int nnz_) :
 		DataContainer<TValue>(),
 		a_(nnz_), ia_(dimY_ + 1), ja_(nnz_),
-		dimY(dimY_), dimX(dimX_), nnZ(nnz_) { }
+		dimY(dimY_), dimX(dimX_), nnZ(nnz_), zero(TValue()) { }
 
 	__host__ __device__
 	~CSR() { }
@@ -335,15 +341,15 @@ public :
 		for (int i = 0; ; )
 		{
 			for (int row = 0; row < y; row++)
-				for (int col = ia_[row]; (col < ia_[row + 1]) && (i < nnZ); col++)
+				for (int col = ia_(row); (col < ia_(row + 1)) && (i < nnZ); col++)
 					i++;
 
 			assert (i < nnZ);
 
-			for (int col = ia_[y]; col < ia_[y + 1]; col++, i++)
-				if (ja_[i] == x) return a_[i];
+			for (int col = ia_(y); col < ia_(y + 1); col++, i++)
+				if (ja_(i) == x) return a_(i);
 
-			return (TValue) 0;
+			return zero;
 		}
 	}
 
@@ -394,20 +400,20 @@ public :
 		// as they use the same memory allocation policy.
 		{
 			size_t size = (ptrdiff_t)&other.a(other.nnz() - 1) -
-				(ptrdiff_t)other.a(0) + sizeof(TValue);
-			CUDA_ERR_CHECK(cudaMemcpy(matrix->a(0), other.a(0), size,
+				(ptrdiff_t)&other.a(0) + sizeof(TValue);
+			CUDA_ERR_CHECK(cudaMemcpy(&matrix->a(0), &other.a(0), size,
 				cudaMemcpyHostToDevice));
 		}
 		{
-			size_t size = (ptrdiff_t)&other.ia(other.dimY()) -
-				(ptrdiff_t)other.ia(0) + sizeof(TIndex);
-			CUDA_ERR_CHECK(cudaMemcpy(matrix->ia(0), other.ia(0), size,
+			size_t size = (ptrdiff_t)&other.ia(other.dimy()) -
+				(ptrdiff_t)&other.ia(0) + sizeof(TIndex);
+			CUDA_ERR_CHECK(cudaMemcpy(&matrix->ia(0), &other.ia(0), size,
 				cudaMemcpyHostToDevice));
 		}
 		{
 			size_t size = (ptrdiff_t)&other.ja(other.nnz() - 1) -
-				(ptrdiff_t)other.ja(0) + sizeof(TIndex);
-			CUDA_ERR_CHECK(cudaMemcpy(matrix->ja(0), other.ja(0), size,
+				(ptrdiff_t)&other.ja(0) + sizeof(TIndex);
+			CUDA_ERR_CHECK(cudaMemcpy(&matrix->ja(0), &other.ja(0), size,
 				cudaMemcpyHostToDevice));
 		}
 		
@@ -433,7 +439,7 @@ namespace Device
 	
 	namespace Sparse
 	{
-		template<typename T>
+		template<typename TValue, typename TIndex>
 		class CSR;
 	}
 }
