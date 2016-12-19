@@ -137,19 +137,10 @@ public :
 		assert(x < dimX);
 		assert(y < dimY);
 
-		for (int i = 0; ; )
-		{
-			for (int row = 0; row < y; row++)
-				for (int col = ia_[row]; (col < ia_[row + 1]) && (i < nnZ); col++)
-					i++;
+		for (int i = ia_[y]; i < ia_[y + 1]; i++)
+			if (ja_[i] == x) return a_[i];
 
-			assert (i < nnZ);
-
-			for (int col = ia_[y]; col < ia_[y + 1]; col++, i++)
-				if (ja_[i] == x) return a_[i];
-
-			return zero;
-		}
+		return zero;
 	}
 
 	inline __attribute__((always_inline)) int dimy() { return dimY; }
@@ -290,6 +281,30 @@ public :
 
 namespace Sparse {
 
+// Host memory sparse matrix in consequtive row-wise
+// format (CCW). Essentially, CCW format packs elements
+// into lines organized from 1 non-zero element from each
+// row. Example:
+// 1 0 0 2
+// 0 4 3 0
+// 1 0 6 0
+// 5 7 0 0
+// packs into:
+//  a = (1, 4, 1, 5, 2, 3, 6, 7),
+// ja = (0, 1, 0, 0, 3, 2, 2, 1)
+//
+// If the number of non-zeros in rows is not equal,
+// line size is the maximum # of non-zeros across all rows,
+// missing elements are packed as zeros.
+/*template<typename TValue, typename TIndex>
+class CCW : public DataContainer<TValue>*/
+
+// TODO rearrange the order of CSR matrix in such way,
+// i-th non-zero elements of each row shall stand
+// in consequtive memory locations (for coalescing).
+// This ordering assumes rows have ~same number of
+// non-zero elements.
+
 // Host memory sparse matrix in CSR format
 template<typename TValue, typename TIndex>
 // Although CSR matrix relies on self-managing A/IA/JA data containers,
@@ -324,13 +339,13 @@ public :
 	inline __attribute__((always_inline)) TIndex& ia(int i) { return ia_(i); }
 
 	__host__ __device__
-	inline __attribute__((always_inline)) const TIndex& IA(int i) const { return ia_(i); }
+	inline __attribute__((always_inline)) const TIndex& ia(int i) const { return ia_(i); }
 	
 	__host__ __device__
 	inline __attribute__((always_inline)) TIndex& ja(int i) { return ja_(i); }
 
 	__host__ __device__
-	inline __attribute__((always_inline)) const TIndex& JA(int i) const { return ja_(i); }
+	inline __attribute__((always_inline)) const TIndex& ja(int i) const { return ja_(i); }
 
 	__host__ __device__
 	inline __attribute__((always_inline)) const TValue& operator()(int y, int x) const
@@ -338,19 +353,10 @@ public :
 		assert(x < dimX);
 		assert(y < dimY);
 
-		for (int i = 0; ; )
-		{
-			for (int row = 0; row < y; row++)
-				for (int col = ia_(row); (col < ia_(row + 1)) && (i < nnZ); col++)
-					i++;
+		for (int i = ia_(y); i < ia_(y + 1); i++)
+			if (ja_(i) == x) return a_(i);
 
-			assert (i < nnZ);
-
-			for (int col = ia_(y); col < ia_(y + 1); col++, i++)
-				if (ja_(i) == x) return a_(i);
-
-			return zero;
-		}
+		return zero;
 	}
 
 	__host__ __device__
