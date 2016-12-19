@@ -32,6 +32,7 @@ extern "C" __global__ void KERNEL_NAME(
 		const Matrix::Device::Sparse::CRW<IndexPair, uint32_t>& index = index_[many];
 		const Matrix::Device::Dense<double>& surplus = surplus_[many];
 		double* value = value_ + many * length;
+//		int nnzPerRow = index.nnzperrow();
 
 		// The "i" is the index by nno, which could be either grid dimension X,
 		// or partitioned between grid dimension X and block dimension Y.
@@ -40,6 +41,11 @@ extern "C" __global__ void KERNEL_NAME(
 		int i = (blockIdx.x + threadIdx.y * gridDim.x) * nnoPerBlock;
 	
 		if (i >= nno) continue;
+
+/*		for (int j = 0; j < nnzPerRow; j++)
+		{
+			const IndexUnion iu = { *(const uint32_t*)&index.a(threadIdx.x * nnz(i, j) };
+			const IndexPair& pair = iu.pair;*/
 
 #define szcache 4
 		// Each thread hosts a part of blockDim.x-shared register cache

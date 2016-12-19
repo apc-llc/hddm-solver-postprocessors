@@ -337,7 +337,7 @@ public :
 		assert(x < dimX);
 		assert(y < dimY);
 
-		for (int i = nnzPerRow * y; i < nnzPerRow * (y + 1); i++)
+		for (int i = y; i < nnzPerRow * dimY; i += dimY)
 			if (ja_(i) == x) return a_(i);
 		
 		return zero;
@@ -393,16 +393,20 @@ public :
 				sizeof(Matrix::Device::Sparse::CRW<TValue, TIndex>),
 				cudaMemcpyDeviceToHost));
 		}
+
+		int dimy = other.dimy();
+		int dimx = other.dimx();
 		
-		matrix->resize(other.dimy(), other.dimx(), nnzPerRow);
+		matrix->resize(dimy, dimx, nnzPerRow);
 		
-		std::vector<TValue> a(other.dimy() * nnzPerRow);
-		std::vector<TIndex> ja(other.dimy() * nnzPerRow);
-		for (int j = 0, je = other.dimy(); j < je; j++)
-			for (int i = other.ia(j), ie = other.ia(j + 1), k = 0; i < ie; i++, k++)
+		std::vector<TValue> a(dimy * nnzPerRow);
+		std::vector<TIndex> ja(dimy * nnzPerRow);
+		std::vector<int> nnz(dimy);
+		for (int j = 0, je = dimy; j < je; j++)
+			for (int i = other.ia(j), ie = other.ia(j + 1); i < ie; i++, nnz[j]++)
 			{
-				a[j * nnzPerRow + k] = other.a(i);
-				ja[j * nnzPerRow + k] = other.ja(i);
+				a[dimy * nnz[j] + j] = other.a(i);
+				ja[dimy * nnz[j] + j] = other.ja(i);
 			}	
 		
 		// It is assumed safe to copy padded data from host to device matrix,
