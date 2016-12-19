@@ -18,7 +18,7 @@ extern "C" __global__ void KERNEL_NAME(
 #endif
 	const int dim, const int vdim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count,
-	const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* index_,
+	const Matrix::Device::Sparse::CRW<IndexPair, uint32_t>* index_,
 	const Matrix::Device::Dense<double>* surplus_, double* value_,
 	int length, int nwarps, int nnoPerBlock)
 {
@@ -29,7 +29,7 @@ extern "C" __global__ void KERNEL_NAME(
 
 	for (int many = 0; many < COUNT; many++)
 	{
-		const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>& index = index_[many];
+		const Matrix::Device::Sparse::CRW<IndexPair, uint32_t>& index = index_[many];
 		const Matrix::Device::Dense<double>& surplus = surplus_[many];
 		double* value = value_ + many * length;
 
@@ -117,7 +117,7 @@ extern "C" void FUNCNAME(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x,
-	const Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* index,
+	const Matrix::Device::Sparse::CRW<IndexPair, uint32_t>* index,
 	const Matrix::Device::Dense<double>* surplus, double** value)
 {
 	// Configure kernel compute grid.

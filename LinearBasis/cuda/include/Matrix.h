@@ -282,7 +282,7 @@ public :
 namespace Sparse {
 
 // Host memory sparse matrix in consequtive row-wise
-// format (CCW). Essentially, CCW format packs elements
+// format (CRW). Essentially, CRW format packs elements
 // into lines organized from 1 non-zero element from each
 // row. Example:
 // 1 0 0 2
@@ -296,14 +296,143 @@ namespace Sparse {
 // If the number of non-zeros in rows is not equal,
 // line size is the maximum # of non-zeros across all rows,
 // missing elements are packed as zeros.
-/*template<typename TValue, typename TIndex>
-class CCW : public DataContainer<TValue>*/
+template<typename TValue, typename TIndex>
+// Although CSR matrix relies on self-managing A/JA data containers,
+// it still inherits from DataContainer to check the type size.
+class CRW : public DataContainer<TValue>
+{
+	Vector::Device<TValue> a_;
+	Vector::Device<TIndex> ja_;
+	int dimY, dimX, nnzPerRow;
+	TValue zero;
 
-// TODO rearrange the order of CSR matrix in such way,
-// i-th non-zero elements of each row shall stand
-// in consequtive memory locations (for coalescing).
-// This ordering assumes rows have ~same number of
-// non-zero elements.
+public :
+	__host__ __device__
+	CRW() : DataContainer<TValue>(), dimY(0), dimX(0), nnzPerRow(0), zero(TValue()) { }
+
+	__host__ __device__
+	CRW(int dimY_, int dimX_, int nnzPerRow_) :
+		DataContainer<TValue>(),
+		a_(nnzPerRow_ * dimY_), ja_(nnzPerRow_ * dimY_),
+		dimY(dimY_), dimX(dimX_), nnzPerRow(nnzPerRow_), zero(TValue()) { }
+
+	__host__ __device__
+	~CRW() { }
+
+	__host__ __device__
+	inline __attribute__((always_inline)) TValue& a(int i) { return a_(i); }
+
+	__host__ __device__
+	inline __attribute__((always_inline)) const TValue& a(int i) const { return a_(i); }
+
+	__host__ __device__
+	inline __attribute__((always_inline)) TIndex& ja(int i) { return ja_(i); }
+
+	__host__ __device__
+	inline __attribute__((always_inline)) const TIndex& ja(int i) const { return ja_(i); }
+
+	__host__ __device__
+	inline __attribute__((always_inline)) const TValue& operator()(int y, int x) const
+	{
+		assert(x < dimX);
+		assert(y < dimY);
+
+		for (int i = nnzPerRow * y; i < nnzPerRow * (y + 1); i++)
+			if (ja_(i) == x) return a_(i);
+		
+		return zero;
+	}
+
+	__host__ __device__
+	inline __attribute__((always_inline)) int dimy() { return dimY; }
+
+	__host__ __device__
+	inline __attribute__((always_inline)) int dimx() { return dimX; }
+
+	__host__ __device__
+	inline __attribute__((always_inline)) int nnzperrow() { return nnzPerRow; }
+		
+	__host__ __device__
+	inline __attribute__((always_inline)) void resize(int dimY_, int dimX_, int nnzPerRow_)
+	{
+		dimY = dimY_; dimX = dimX_; nnzPerRow = nnzPerRow_;
+		a_.resize(nnzPerRow * dimY);
+		ja_.resize(nnzPerRow * dimY);
+	}
+
+	template<template<typename, typename> class TVector = std::vector, template<typename> class TAllocator = AlignedAllocator::Host>
+	__host__
+	void operator=(Matrix::Host::Sparse::CSR<TValue, TIndex, TVector, TAllocator>& other)
+	{
+		// Calculate the number of non-zeros per row in the host matrix.
+		int maxNnzPerRow = 0;
+		for (int j = 0; j < other.dimy(); j++)
+		{
+			int nnzPerRow = 0;
+			for (int i = 0; i < other.dimx(); i++)
+				if (*(int*)&other(j, i) != 0)
+					nnzPerRow++;
+
+			if (nnzPerRow > maxNnzPerRow)
+				maxNnzPerRow = nnzPerRow;
+		}
+		int nnzPerRow = maxNnzPerRow;
+
+		std::cout << "max NNZ per row: " << maxNnzPerRow << std::endl;
+
+		Matrix::Device::Sparse::CRW<TValue, TIndex>* matrix = this;
+
+		// Use byte container preventing destruction of matrix
+		// mirrored from device. Otherwise it will be destroyed
+		// together with newly created data array after resizing.
+		std::vector<char> container(sizeof(Matrix::Device::Sparse::CRW<TValue, TIndex>));
+
+		// Determine, in which memory the current matrix instance
+		// resides.
+		cudaPointerAttributes attrs;
+		CUDA_ERR_CHECK(cudaPointerGetAttributes(&attrs, this));
+		if (attrs.memoryType == cudaMemoryTypeDevice)
+		{		
+			matrix = reinterpret_cast<Matrix::Device::Sparse::CRW<TValue, TIndex>*>(&container[0]);
+			CUDA_ERR_CHECK(cudaMemcpy(matrix, this,
+				sizeof(Matrix::Device::Sparse::CRW<TValue, TIndex>),
+				cudaMemcpyDeviceToHost));
+		}
+		
+		matrix->resize(other.dimy(), other.dimx(), nnzPerRow);
+		
+		std::vector<TValue> a(other.dimy() * nnzPerRow);
+		std::vector<TIndex> ja(other.dimy() * nnzPerRow);
+		for (int j = 0, je = other.dimy(); j < je; j++)
+			for (int i = other.ia(j), ie = other.ia(j + 1), k = 0; i < ie; i++, k++)
+			{
+				a[j * nnzPerRow + k] = other.a(i);
+				ja[j * nnzPerRow + k] = other.ja(i);
+			}	
+		
+		// It is assumed safe to copy padded data from host to device matrix,
+		// as they use the same memory allocation policy.
+		{
+			size_t size = (ptrdiff_t)&a[a.size() - 1] -
+				(ptrdiff_t)&a[0] + sizeof(TValue);
+			CUDA_ERR_CHECK(cudaMemcpy(&matrix->a(0), &a[0], size,
+				cudaMemcpyHostToDevice));
+		}
+		{
+			size_t size = (ptrdiff_t)&ja[ja.size() - 1] -
+				(ptrdiff_t)&ja[0] + sizeof(TIndex);
+			CUDA_ERR_CHECK(cudaMemcpy(&matrix->ja(0), &ja[0], size,
+				cudaMemcpyHostToDevice));
+		}
+		
+		if (attrs.memoryType == cudaMemoryTypeDevice)
+		{
+			CUDA_ERR_CHECK(cudaMemcpy(this, matrix,
+				sizeof(Matrix::Device::Sparse::CRW<TValue, TIndex>),
+				cudaMemcpyHostToDevice));
+		}
+	}
+};
 
 // Host memory sparse matrix in CSR format
 template<typename TValue, typename TIndex>
@@ -445,6 +574,9 @@ namespace Device
 	
 	namespace Sparse
 	{
+		template<typename TValue, typename TIndex>
+		class CRW;
+
 		template<typename TValue, typename TIndex>
 		class CSR;
 	}

@@ -376,7 +376,7 @@ Matrix::Host::Dense<real>* Data::Host::getSurplus_t(int istate)
 class Data::Device::DataDevice
 {
 	// These containers shall be entirely in device memory, including vectors.
-	Vector::Device<Matrix::Device::Sparse::CSR<IndexPair, uint32_t> > index;
+	Vector::Device<Matrix::Device::Sparse::CRW<IndexPair, uint32_t> > index;
 	Vector::Device<Matrix::Device::Dense<real> > surplus, surplus_t;
 
 public :
@@ -391,7 +391,7 @@ Data::Device::Device(int nstates_) : nstates(nstates_)
 	data.reset(new DataDevice(nstates_));
 }
 
-Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* Data::Device::getIndex(int istate)
+Matrix::Device::Sparse::CRW<IndexPair, uint32_t>* Data::Device::getIndex(int istate)
 {
 	return &data->index(istate);
 }

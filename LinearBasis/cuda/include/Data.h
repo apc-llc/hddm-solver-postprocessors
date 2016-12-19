@@ -69,7 +69,7 @@ class Data
 
 	public :
 
-		Matrix::Device::Sparse::CSR<IndexPair, uint32_t>* getIndex(int istate);
+		Matrix::Device::Sparse::CRW<IndexPair, uint32_t>* getIndex(int istate);
 		Matrix::Device::Dense<real>* getSurplus(int istate);
 		Matrix::Device::Dense<real>* getSurplus_t(int istate);
 
