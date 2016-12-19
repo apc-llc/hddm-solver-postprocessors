@@ -366,19 +366,14 @@ public :
 	{
 		// Calculate the number of non-zeros per row in the host matrix.
 		int maxNnzPerRow = 0;
-		for (int j = 0; j < other.dimy(); j++)
+		for (int j = 0, je = other.dimy(); j < je; j++)
 		{
-			int nnzPerRow = 0;
-			for (int i = 0; i < other.dimx(); i++)
-				if (*(int*)&other(j, i) != 0)
-					nnzPerRow++;
+			int nnzPerRow = other.ia(j + 1) - other.ia(j);
 
 			if (nnzPerRow > maxNnzPerRow)
 				maxNnzPerRow = nnzPerRow;
 		}
 		int nnzPerRow = maxNnzPerRow;
-
-		std::cout << "max NNZ per row: " << maxNnzPerRow << std::endl;
 
 		Matrix::Device::Sparse::CRW<TValue, TIndex>* matrix = this;
 
