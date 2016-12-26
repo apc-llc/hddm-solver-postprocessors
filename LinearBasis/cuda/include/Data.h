@@ -45,12 +45,19 @@ class Data
 
 		// Opaque internal data container.
 		std::unique_ptr<DataHost> data;
+		
+		const DataHost* getHost() const;
+		DataHost* getHost();
 	
 	public :
 
 		Matrix::Host::Sparse::CSR<IndexPair, uint32_t>* getIndex(int istate);
 		Matrix::Host::Dense<real>* getSurplus(int istate);
 		Matrix::Host::Dense<real>* getSurplus_t(int istate);
+
+		const Matrix::Host::Sparse::CSR<IndexPair, uint32_t>* getIndex(int istate) const;
+		const Matrix::Host::Dense<real>* getSurplus(int istate) const;
+		const Matrix::Host::Dense<real>* getSurplus_t(int istate) const;
 
 		Host(int nstates);
 	
@@ -64,6 +71,9 @@ class Data
 
 		// Opaque internal data container.
 		std::unique_ptr<DataDevice> data;
+		
+		const DataDevice* getData() const;
+		DataDevice* getData();
 
 		int nstates;
 
@@ -72,6 +82,10 @@ class Data
 		Matrix::Device::Sparse::CRW<IndexPair, uint32_t>* getIndex(int istate);
 		Matrix::Device::Dense<real>* getSurplus(int istate);
 		Matrix::Device::Dense<real>* getSurplus_t(int istate);
+
+		const Matrix::Device::Sparse::CRW<IndexPair, uint32_t>* getIndex(int istate) const;
+		const Matrix::Device::Dense<real>* getSurplus(int istate) const;
+		const Matrix::Device::Dense<real>* getSurplus_t(int istate) const;
 
 		void setIndex(int istate, Matrix::Host::Sparse::CSR<IndexPair, uint32_t>& matrix);
 		void setSurplus(int istate, Matrix::Host::Dense<real>& matrix);
@@ -94,6 +108,10 @@ public :
 	
 	virtual void clear();
 
+	const Host* getHost() const;
+
+	const Device* getDevice() const;
+	
 	Data(int nstates);
 };
 

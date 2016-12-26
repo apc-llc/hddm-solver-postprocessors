@@ -3,15 +3,17 @@
 
 #include "AlignedAllocator.h"
 #include "ConstructionKernels.h"
+#include "Lock.h"
 #include "MappedAllocator.h"
 
 namespace cuda {
 
 #if defined(__CUDACC__)
 
-class DataModificationIndicator
+// TODO pack access and modify pairs into a single class instance for perf!
+class DataOperationIndicator
 {
-	bool* lastModifiedOnHost;
+	bool* lastOperationOnHost;
 	
 public :
 
@@ -19,10 +21,10 @@ public :
 	inline __attribute__((always_inline)) bool isOnHost() const
 	{
 #if defined(__CUDA_ARCH__)
-		return *lastModifiedOnHost;
+		return *lastOperationOnHost;
 #else
 		bool value;
-		CUDA_ERR_CHECK(cudaMemcpy(&value, lastModifiedOnHost, sizeof(bool),
+		CUDA_ERR_CHECK(cudaMemcpy(&value, lastOperationOnHost, sizeof(bool),
 			cudaMemcpyDeviceToHost));
 		return value;
 #endif // __CUDA_ARCH__
@@ -38,10 +40,10 @@ public :
 	inline __attribute__((always_inline)) void setOnHost()
 	{
 #if defined(__CUDA_ARCH__)
-		*lastModifiedOnHost = true;
+		*lastOperationOnHost = true;
 #else
 		bool value = true;
-		CUDA_ERR_CHECK(cudaMemcpy(lastModifiedOnHost, &value, sizeof(bool),
+		CUDA_ERR_CHECK(cudaMemcpy(lastOperationOnHost, &value, sizeof(bool),
 			cudaMemcpyHostToDevice));
 #endif // __CUDA_ARCH__
 	}
@@ -50,18 +52,18 @@ public :
 	inline __attribute__((always_inline)) void setOnDevice()
 	{
 #if defined(__CUDA_ARCH__)
-		*lastModifiedOnHost = false;
+		*lastOperationOnHost = false;
 #else
 		bool value = false;
-		CUDA_ERR_CHECK(cudaMemcpy(lastModifiedOnHost, &value, sizeof(bool),
+		CUDA_ERR_CHECK(cudaMemcpy(lastOperationOnHost, &value, sizeof(bool),
 			cudaMemcpyHostToDevice));
 #endif // __CUDA_ARCH__
 	}
 
 	__host__ __device__
-	DataModificationIndicator()
+	DataOperationIndicator()
 	{
-		lastModifiedOnHost = AlignedAllocator::Device<bool>().allocate(1);
+		lastOperationOnHost = AlignedAllocator::Device<bool>().allocate(1);
 #if defined(__CUDA_ARCH__)
 		setOnDevice();
 #else
@@ -70,9 +72,9 @@ public :
 	}
 
 	__host__ __device__
-	~DataModificationIndicator()
+	~DataOperationIndicator()
 	{
-		AlignedAllocator::Device<bool>().deallocate(lastModifiedOnHost, 1);
+		AlignedAllocator::Device<bool>().deallocate(lastOperationOnHost, 1);
 	}
 };
 
@@ -95,7 +97,9 @@ class DataContainer
 	// Indicate where the data has been last time modified.
 	// If the data was last time modified by client different
 	// from currently accessing it, then the data has to be refreshed.
-	DataModificationIndicator lastModified;
+	DataOperationIndicator lastAccessed, lastModified;
+	
+	Lock::Device lock;
 
 	struct Kernels
 	{
@@ -130,8 +134,9 @@ class DataContainer
 protected :
 
 	__host__ __device__
-	inline __attribute__((always_inline)) void initialize(int length)
+	inline __attribute__((always_inline)) void initialize(int length_)
 	{
+		length = length_;
 #if defined(__CUDA_ARCH__)
 		data = AlignedAllocator::Device<T>().allocate(length);
 		// TODO map onto kernel, if device parallelism is available
@@ -224,14 +229,33 @@ protected :
 	}
 
 	__host__ __device__
+	inline __attribute__((always_inline)) void prefetch_l2(char* addr)
+	{
+#if defined(__CUDA_ARCH__)
+		asm("prefetch.global.L2 [%0];" :: __LD128_PTR(addr));
+#endif
+	}
+
+	__host__ __device__
 	inline __attribute__((always_inline)) const T& accessDataAt(int offset)
 	{
 #if defined(__CUDA_ARCH__)
-		if (lastModified.isOnHost())
+		if (lastAccessed.isOnHost() && lastModified.isOnHost())
 		{
-			#pragma unroll 1
-			for (int i = 0, e = length * sizeof(T); i < e; i += 4)
-				ld128(&((char*)data)[i], &((char*)(*dataHostPtr))[i]);
+			lock.lock();
+			if (lastAccessed.isOnHost() && lastModified.isOnHost())
+			{
+				#pragma unroll 1
+				for (int i = 0, e = length * sizeof(T); i < e; i += 16)
+				{
+					prefetch_l2(&((char*)data)[i + 16]);
+					prefetch_l2(&((char*)(*dataHostPtr))[i + 16]);
+					ld128(&((char*)data)[i], &((char*)(*dataHostPtr))[i]);
+				}
+	
+				lastAccessed.setOnDevice();
+			}
+			lock.unlock();
 		}
 		return data[offset];
 #else
@@ -243,10 +267,12 @@ protected :
 			CUDA_ERR_CHECK(cudaMemcpy(dataHostPtr, &hostPtr, sizeof(T*),
 				cudaMemcpyHostToDevice));
 		}
-		if (lastModified.isOnDevice())
+		if (lastAccessed.isOnDevice() && lastModified.isOnDevice())
 		{
-			CUDA_ERR_CHECK(cudaMemcpy(&dataHost[0], getData(), length * sizeof(T),
+			CUDA_ERR_CHECK(cudaMemcpy(&dataHost[0], &data[0], length * sizeof(T),
 				cudaMemcpyDeviceToHost));
+
+			lastAccessed.setOnHost();
 		}
 		return dataHost[offset];
 #endif
@@ -256,13 +282,23 @@ protected :
 	inline __attribute__((always_inline)) T& modifyDataAt(int offset)
 	{
 #if defined(__CUDA_ARCH__)
-		if (lastModified.isOnHost())
+		if (lastAccessed.isOnHost() && lastModified.isOnHost())
 		{
-			#pragma unroll 1
-			for (int i = 0, e = length * sizeof(T); i < e; i += 4)
-				ld128(&((char*)data)[i], &((char*)(*dataHostPtr))[i]);
+			lock.lock();
+			if (lastModified.isOnHost() && lastModified.isOnHost())
+			{
+				#pragma unroll 1
+				for (int i = 0, e = length * sizeof(T); i < e; i += 16)
+				{
+					prefetch_l2(&((char*)data)[i + 16]);
+					prefetch_l2(&((char*)(*dataHostPtr))[i + 16]);
+					ld128(&((char*)data)[i], &((char*)(*dataHostPtr))[i]);
+				}
 
-			lastModified.setOnDevice();
+				lastAccessed.setOnDevice();
+				lastModified.setOnDevice();
+			}
+			lock.unlock();
 		}
 		return data[offset];
 #else
@@ -274,20 +310,18 @@ protected :
 			CUDA_ERR_CHECK(cudaMemcpy(dataHostPtr, &hostPtr, sizeof(T*),
 				cudaMemcpyHostToDevice));
 		}
-		if (lastModified.isOnDevice())
+		if (lastAccessed.isOnDevice() && lastModified.isOnDevice())
 		{
 			dataHost.resize(length);
-			CUDA_ERR_CHECK(cudaMemcpy(&dataHost[0], getData(), length * sizeof(T),
+			CUDA_ERR_CHECK(cudaMemcpy(&dataHost[0], &data[0], length * sizeof(T),
 				cudaMemcpyDeviceToHost));
 
+			lastAccessed.setOnHost();
 			lastModified.setOnHost();
 		}
-		return data[offset];
+		return dataHost[offset];
 #endif
 	}
-
-	__host__ __device__
-	inline __attribute__((always_inline)) T* getData() const { return &data[0]; }
 };
 
 #endif // __CUDACC__

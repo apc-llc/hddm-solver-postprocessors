@@ -151,7 +151,7 @@ extern "C" void LinearBasis_CUDA_Generic_InterpolateArrayManyMultistate(
 	const Matrix::Device::Sparse::CRW<IndexPair, uint32_t>* index, const Matrix::Device::Dense<real>* surplus, double** value);
 
 // Interpolate multiple arrays of values, with multiple surplus states.
-void Interpolator::interpolate(Device* device, Data* data,
+void Interpolator::interpolate(Device* device, const Data* data,
 	const real** x, const int Dof_choice_start, const int Dof_choice_end, real** value)
 {
 	if (jit)
@@ -173,13 +173,13 @@ void Interpolator::interpolate(Device* device, Data* data,
 
 		LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyMultistate[device->getID()](
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
-			data->device.getIndex(0), data->device.getSurplus(0), value);
+			data->getDevice()->getIndex(0), data->getDevice()->getSurplus_t(0), value);
 	}
 	else
 	{
 		LinearBasis_CUDA_Generic_InterpolateArrayManyMultistate(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
-			data->device.getIndex(0), data->device.getSurplus(0), value);
+			data->device.getIndex(0), data->device.getSurplus_t(0), value);
 	}
 }
 

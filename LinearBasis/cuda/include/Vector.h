@@ -37,7 +37,7 @@ public :
 		return data[x];
 	}
 	
-	inline __attribute__((always_inline)) int length() { return data.size(); }
+	inline __attribute__((always_inline)) int length() const { return data.size(); }
 	
 	inline __attribute__((always_inline)) void resize(int length) { data.resize(length); }
 };
@@ -85,7 +85,7 @@ public :
 	}
 
 	__host__ __device__
-	inline __attribute__((always_inline)) int length() { return dim; }
+	inline __attribute__((always_inline)) int length() const { return dim; }
 
 	__host__ __device__
 	inline __attribute__((always_inline)) void resize(int dim_)

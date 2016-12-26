@@ -108,10 +108,28 @@ static void read_index(ifstream& infile, int nno, int nsd, int dim, Matrix::Host
 			process->abort();
 		}
 	}
+
+	/*int good_rows = 0;
+	for (int j = 0; j < nno; j++)
+	{
+		int inc = 1;
+		for (int i = index.ia(j); i < index.ia(j + 1); i++)
+		{
+			const IndexPair& pair = index.a(i);
+			if (pair.i < pair.j + 1)
+			{
+				cout << "nno " << j << ": i = " << pair.i << ", j = " << pair.j << " do not hold i >= j + 1" << endl;
+				inc = 0;
+			}
+		}
+		good_rows += inc;
+	}
+	cout << "Overall, " << good_rows << " good nno rows (" << (good_rows / (double)nno * 100) << "%)" << endl;*/
 }
 
 template<typename T>
-static void read_surplus(ifstream& infile, int nno, int TotalDof, Matrix::Host::Dense<double>& surplus)
+static void read_surplus(ifstream& infile, int nno, int TotalDof,
+	Matrix::Host::Dense<double>& surplus, Matrix::Host::Dense<double>& surplus_t)
 {
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
@@ -175,7 +193,10 @@ static void read_surplus(ifstream& infile, int nno, int TotalDof, Matrix::Host::
 
 	for (int i = 0, row = 0; row < nno; row++)
 		for (int col = IA[row]; col < IA[row + 1]; col++, i++)
+		{
 			surplus(row, JA[i]) = A[i];
+			surplus_t(JA[i], row) = A[i];
+		}
 }
 
 void Data::load(const char* filename, int istate)
@@ -321,13 +342,13 @@ void Data::load(const char* filename, int istate)
 		switch (szt)
 		{
 		case 1 :
-			read_surplus<unsigned char>(infile, nno, TotalDof, surplus);
+			read_surplus<unsigned char>(infile, nno, TotalDof, surplus, surplus_t);
 			break;
 		case 2 :
-			read_surplus<unsigned short>(infile, nno, TotalDof, surplus);
+			read_surplus<unsigned short>(infile, nno, TotalDof, surplus, surplus_t);
 			break;
 		case 4 :
-			read_surplus<unsigned int>(infile, nno, TotalDof, surplus);
+			read_surplus<unsigned int>(infile, nno, TotalDof, surplus, surplus_t);
 			break;
 		}
 	}
@@ -339,12 +360,22 @@ void Data::load(const char* filename, int istate)
 	// Copy data from host to device memory.
 	device.setIndex(istate, index);
 	device.setSurplus(istate, surplus);
-//	device.setSurplus_t(istate, surplus_t);
+	device.setSurplus_t(istate, surplus_t);
 }
 
 void Data::clear()
 {
 	fill(loadedStates.begin(), loadedStates.end(), false);
+}
+
+const Data::Host* Data::getHost() const
+{
+	return &host;
+}
+
+const Data::Device* Data::getDevice() const
+{
+	return &device;
 }
 
 Data::Data(int nstates_) : nstates(nstates_), host(nstates), device(nstates)
@@ -353,9 +384,34 @@ Data::Data(int nstates_) : nstates(nstates_), host(nstates), device(nstates)
 	fill(loadedStates.begin(), loadedStates.end(), false);
 }
 
+const Data::Host::DataHost* Data::Host::getHost() const
+{
+	return data.get();
+}
+
+Data::Host::DataHost* Data::Host::getHost()
+{
+	return data.get();
+}
+
 Data::Host::Host(int nstates)
 {
 	data.reset(new DataHost(nstates));
+}
+
+const Matrix::Host::Sparse::CSR<IndexPair, uint32_t>* Data::Host::getIndex(int istate) const
+{
+	return &data->index(istate);
+}
+
+const Matrix::Host::Dense<real>* Data::Host::getSurplus(int istate) const
+{
+	return &data->surplus(istate);
+}
+
+const Matrix::Host::Dense<real>* Data::Host::getSurplus_t(int istate) const
+{
+	return &data->surplus_t(istate);
 }
 
 Matrix::Host::Sparse::CSR<IndexPair, uint32_t>* Data::Host::getIndex(int istate)
@@ -386,9 +442,34 @@ public :
 	friend class Data::Device;
 };	
 
+const Data::Device::DataDevice* Data::Device::getData() const
+{
+	return data.get();
+}
+
+Data::Device::DataDevice* Data::Device::getData()
+{
+	return data.get();
+}
+
 Data::Device::Device(int nstates_) : nstates(nstates_)
 {
 	data.reset(new DataDevice(nstates_));
+}
+
+const Matrix::Device::Sparse::CRW<IndexPair, uint32_t>* Data::Device::getIndex(int istate) const
+{
+	return &data->index(istate);
+}
+
+const Matrix::Device::Dense<real>* Data::Device::getSurplus(int istate) const
+{
+	return &data->surplus(istate);
+}
+
+const Matrix::Device::Dense<real>* Data::Device::getSurplus_t(int istate) const
+{
+	return &getData()->surplus_t(istate);
 }
 
 Matrix::Device::Sparse::CRW<IndexPair, uint32_t>* Data::Device::getIndex(int istate)

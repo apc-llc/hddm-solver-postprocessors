@@ -40,7 +40,7 @@ public :
 		const int istate, const real* x, const int Dof_choice_start, const int Dof_choice_end, const int count, real* value);
 
 	// Interpolate multiple arrays of values in continuous vector, with multiple surplus states.
-	virtual void interpolate(Device* device, Data* data,
+	virtual void interpolate(Device* device, const Data* data,
 		const real** x, const int Dof_choice_start, const int Dof_choice_end, real** value);
 };
 

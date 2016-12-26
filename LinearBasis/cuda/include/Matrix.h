@@ -27,8 +27,6 @@ public :
 		data.resize(dimY_ * dimX_aligned);
 	}
 
-	inline __attribute__((always_inline)) T* getData() { return &data[0]; }
-	
 	inline __attribute__((always_inline)) T& operator()(int y, int x)
 	{
 		assert(x < dimX);
@@ -47,9 +45,9 @@ public :
 		return data[index];
 	}
 
-	inline __attribute__((always_inline)) int dimy() { return dimY; }
+	inline __attribute__((always_inline)) int dimy() const { return dimY; }
 
-	inline __attribute__((always_inline)) int dimx() { return dimX; }
+	inline __attribute__((always_inline)) int dimx() const { return dimX; }
 		
 	inline __attribute__((always_inline)) void resize(int dimY_, int dimX_)
 	{
@@ -143,11 +141,11 @@ public :
 		return zero;
 	}
 
-	inline __attribute__((always_inline)) int dimy() { return dimY; }
+	inline __attribute__((always_inline)) int dimy() const { return dimY; }
 
-	inline __attribute__((always_inline)) int dimx() { return dimX; }
+	inline __attribute__((always_inline)) int dimx() const { return dimX; }
 
-	inline __attribute__((always_inline)) int nnz() { return nnZ; }
+	inline __attribute__((always_inline)) int nnz() const { return nnZ; }
 		
 	inline __attribute__((always_inline)) void resize(int dimY_, int dimX_, int nnz_)
 	{
@@ -225,10 +223,10 @@ public :
 	}
 
 	__host__ __device__
-	inline __attribute__((always_inline)) int dimy() { return dimY; }
+	inline __attribute__((always_inline)) int dimy() const { return dimY; }
 
 	__host__ __device__
-	inline __attribute__((always_inline)) int dimx() { return dimX; }
+	inline __attribute__((always_inline)) int dimx() const { return dimX; }
 		
 	__host__ __device__
 	inline __attribute__((always_inline)) void resize(int dimY_, int dimX_)
@@ -255,11 +253,13 @@ public :
 		// resides.
 		cudaPointerAttributes attrs;
 		CUDA_ERR_CHECK(cudaPointerGetAttributes(&attrs, this));
+		cudaMemcpyKind kind = cudaMemcpyHostToHost;
 		if (attrs.memoryType == cudaMemoryTypeDevice)
 		{		
 			matrix = reinterpret_cast<Matrix::Device::Dense<T>*>(&container[0]);
 			CUDA_ERR_CHECK(cudaMemcpy(matrix, this, sizeof(Matrix::Device::Dense<T>),
 				cudaMemcpyDeviceToHost));
+			kind = cudaMemcpyHostToDevice;
 		}
 		
 		matrix->resize(other.dimy(), other.dimx());
@@ -267,9 +267,8 @@ public :
 		// It is assumed safe to copy padded data from host to device matrix,
 		// as they use the same memory allocation policy.
 		size_t size = (ptrdiff_t)&other(other.dimy() - 1, other.dimx() - 1) -
-			(ptrdiff_t)other.getData() + sizeof(T);
-		CUDA_ERR_CHECK(cudaMemcpy(matrix->getData(), other.getData(), size,
-			cudaMemcpyHostToDevice));
+			(ptrdiff_t)&other(0, 0) + sizeof(T);
+		CUDA_ERR_CHECK(cudaMemcpy(&matrix->operator()(0, 0), &other(0, 0), size, kind));
 
 		if (attrs.memoryType == cudaMemoryTypeDevice)
 		{		
@@ -303,18 +302,27 @@ class CRW : public DataContainer<TValue>
 {
 	Vector::Device<TValue> a_;
 	Vector::Device<TIndex> ja_;
-	int dimY, dimX, nnzPerRow;
+	int dimY, dimYAligned, dimX, nnzPerRow;
 	TValue zero;
+
+	__host__ __device__
+	static int dimAlign(int dim)
+	{
+		int dimAligned = dim;
+		if (dim % AVX_VECTOR_SIZE)
+			dimAligned = dim + AVX_VECTOR_SIZE - dim % AVX_VECTOR_SIZE;
+		return dimAligned;
+	}
 
 public :
 	__host__ __device__
-	CRW() : DataContainer<TValue>(), dimY(0), dimX(0), nnzPerRow(0), zero(TValue()) { }
+	CRW() : DataContainer<TValue>(), dimY(0), dimYAligned(0), dimX(0), nnzPerRow(0), zero(TValue()) { }
 
 	__host__ __device__
 	CRW(int dimY_, int dimX_, int nnzPerRow_) :
 		DataContainer<TValue>(),
-		a_(nnzPerRow_ * dimY_), ja_(nnzPerRow_ * dimY_),
-		dimY(dimY_), dimX(dimX_), nnzPerRow(nnzPerRow_), zero(TValue()) { }
+		a_(nnzPerRow_ * dimAlign(dimY_)), ja_(nnzPerRow_ * dimAlign(dimY_)),
+		dimY(dimY_), dimYAligned(dimAlign(dimY_)), dimX(dimX_), nnzPerRow(nnzPerRow_), zero(TValue()) { }
 
 	__host__ __device__
 	~CRW() { }
@@ -337,27 +345,28 @@ public :
 		assert(x < dimX);
 		assert(y < dimY);
 
-		for (int i = y; i < nnzPerRow * dimY; i += dimY)
+		for (int i = y; i < nnzPerRow * dimYAligned; i += dimYAligned)
 			if (ja_(i) == x) return a_(i);
 		
 		return zero;
 	}
 
 	__host__ __device__
-	inline __attribute__((always_inline)) int dimy() { return dimY; }
+	inline __attribute__((always_inline)) int dimy() const { return dimY; }
 
 	__host__ __device__
-	inline __attribute__((always_inline)) int dimx() { return dimX; }
+	inline __attribute__((always_inline)) int dimx() const { return dimX; }
 
 	__host__ __device__
-	inline __attribute__((always_inline)) int nnzperrow() { return nnzPerRow; }
+	inline __attribute__((always_inline)) int nnzperrow() const { return nnzPerRow; }
 		
 	__host__ __device__
 	inline __attribute__((always_inline)) void resize(int dimY_, int dimX_, int nnzPerRow_)
 	{
-		dimY = dimY_; dimX = dimX_; nnzPerRow = nnzPerRow_;
-		a_.resize(nnzPerRow * dimY);
-		ja_.resize(nnzPerRow * dimY);
+		dimY = dimY_; dimYAligned = dimAlign(dimY_);
+		dimX = dimX_; nnzPerRow = nnzPerRow_;
+		a_.resize(nnzPerRow * dimYAligned);
+		ja_.resize(nnzPerRow * dimYAligned);
 	}
 
 	template<template<typename, typename> class TVector = std::vector, template<typename> class TAllocator = AlignedAllocator::Host>
@@ -386,27 +395,30 @@ public :
 		// resides.
 		cudaPointerAttributes attrs;
 		CUDA_ERR_CHECK(cudaPointerGetAttributes(&attrs, this));
+		cudaMemcpyKind kind = cudaMemcpyHostToHost;
 		if (attrs.memoryType == cudaMemoryTypeDevice)
 		{		
 			matrix = reinterpret_cast<Matrix::Device::Sparse::CRW<TValue, TIndex>*>(&container[0]);
 			CUDA_ERR_CHECK(cudaMemcpy(matrix, this,
 				sizeof(Matrix::Device::Sparse::CRW<TValue, TIndex>),
 				cudaMemcpyDeviceToHost));
+			kind = cudaMemcpyHostToDevice;
 		}
 
-		int dimy = other.dimy();
-		int dimx = other.dimx();
+		int dimY = other.dimy();
+		int dimYAligned = dimAlign(dimY);
+		int dimX = other.dimx();
 		
-		matrix->resize(dimy, dimx, nnzPerRow);
+		matrix->resize(dimY, dimX, nnzPerRow);
 		
-		std::vector<TValue> a(dimy * nnzPerRow);
-		std::vector<TIndex> ja(dimy * nnzPerRow);
-		std::vector<int> nnz(dimy);
-		for (int j = 0, je = dimy; j < je; j++)
+		std::vector<TValue> a(dimYAligned * nnzPerRow);
+		std::vector<TIndex> ja(dimYAligned * nnzPerRow);
+		std::vector<int> nnz(dimY);
+		for (int j = 0, je = dimY; j < je; j++)
 			for (int i = other.ia(j), ie = other.ia(j + 1); i < ie; i++, nnz[j]++)
 			{
-				a[dimy * nnz[j] + j] = other.a(i);
-				ja[dimy * nnz[j] + j] = other.ja(i);
+				a[dimYAligned * nnz[j] + j] = other.a(i);
+				ja[dimYAligned * nnz[j] + j] = other.ja(i);
 			}	
 		
 		// It is assumed safe to copy padded data from host to device matrix,
@@ -414,21 +426,18 @@ public :
 		{
 			size_t size = (ptrdiff_t)&a[a.size() - 1] -
 				(ptrdiff_t)&a[0] + sizeof(TValue);
-			CUDA_ERR_CHECK(cudaMemcpy(&matrix->a(0), &a[0], size,
-				cudaMemcpyHostToDevice));
+			CUDA_ERR_CHECK(cudaMemcpy(&matrix->a(0), &a[0], size, kind));
 		}
 		{
 			size_t size = (ptrdiff_t)&ja[ja.size() - 1] -
 				(ptrdiff_t)&ja[0] + sizeof(TIndex);
-			CUDA_ERR_CHECK(cudaMemcpy(&matrix->ja(0), &ja[0], size,
-				cudaMemcpyHostToDevice));
+			CUDA_ERR_CHECK(cudaMemcpy(&matrix->ja(0), &ja[0], size, kind));
 		}
 		
 		if (attrs.memoryType == cudaMemoryTypeDevice)
 		{
 			CUDA_ERR_CHECK(cudaMemcpy(this, matrix,
-				sizeof(Matrix::Device::Sparse::CRW<TValue, TIndex>),
-				cudaMemcpyHostToDevice));
+				sizeof(Matrix::Device::Sparse::CRW<TValue, TIndex>), kind));
 		}
 	}
 };
@@ -520,12 +529,14 @@ public :
 		// resides.
 		cudaPointerAttributes attrs;
 		CUDA_ERR_CHECK(cudaPointerGetAttributes(&attrs, this));
+		cudaMemcpyKind kind = cudaMemcpyHostToHost;
 		if (attrs.memoryType == cudaMemoryTypeDevice)
 		{		
 			matrix = reinterpret_cast<Matrix::Device::Sparse::CSR<TValue, TIndex>*>(&container[0]);
 			CUDA_ERR_CHECK(cudaMemcpy(matrix, this,
 				sizeof(Matrix::Device::Sparse::CSR<TValue, TIndex>),
 				cudaMemcpyDeviceToHost));
+			kind = cudaMemcpyHostToDevice;
 		}
 		
 		matrix->resize(other.dimy(), other.dimx(), other.nnz());
@@ -535,20 +546,17 @@ public :
 		{
 			size_t size = (ptrdiff_t)&other.a(other.nnz() - 1) -
 				(ptrdiff_t)&other.a(0) + sizeof(TValue);
-			CUDA_ERR_CHECK(cudaMemcpy(&matrix->a(0), &other.a(0), size,
-				cudaMemcpyHostToDevice));
+			CUDA_ERR_CHECK(cudaMemcpy(&matrix->a(0), &other.a(0), size, kind));
 		}
 		{
 			size_t size = (ptrdiff_t)&other.ia(other.dimy()) -
 				(ptrdiff_t)&other.ia(0) + sizeof(TIndex);
-			CUDA_ERR_CHECK(cudaMemcpy(&matrix->ia(0), &other.ia(0), size,
-				cudaMemcpyHostToDevice));
+			CUDA_ERR_CHECK(cudaMemcpy(&matrix->ia(0), &other.ia(0), size, kind));
 		}
 		{
 			size_t size = (ptrdiff_t)&other.ja(other.nnz() - 1) -
 				(ptrdiff_t)&other.ja(0) + sizeof(TIndex);
-			CUDA_ERR_CHECK(cudaMemcpy(&matrix->ja(0), &other.ja(0), size,
-				cudaMemcpyHostToDevice));
+			CUDA_ERR_CHECK(cudaMemcpy(&matrix->ja(0), &other.ja(0), size, kind));
 		}
 		
 		if (attrs.memoryType == cudaMemoryTypeDevice)
