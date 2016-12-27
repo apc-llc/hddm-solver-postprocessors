@@ -489,17 +489,23 @@ Matrix::Device::Dense<real>* Data::Device::getSurplus_t(int istate)
 
 void Data::Device::setIndex(int istate, Matrix::Host::Sparse::CSR<IndexPair, uint32_t>& matrix)
 {
+	data->index(istate).setReadOnly(false);
 	data->index(istate) = matrix;
+	data->index(istate).setReadOnly(true);
 }
 
 void Data::Device::setSurplus(int istate, Matrix::Host::Dense<real>& matrix)
 {
+	data->surplus(istate).setReadOnly(false);
 	data->surplus(istate) = matrix;
+	data->surplus(istate).setReadOnly(true);
 }
 
 void Data::Device::setSurplus_t(int istate, Matrix::Host::Dense<real>& matrix)
 {
+	data->surplus_t(istate).setReadOnly(false);
 	data->surplus_t(istate) = matrix;
+	data->surplus_t(istate).setReadOnly(true);
 }
 		
 extern "C" Data* getData(int nstates)

@@ -327,6 +327,15 @@ public :
 	__host__ __device__
 	~CRW() { }
 
+	__host__
+	inline __attribute__((always_inline)) virtual void setReadOnly(bool value)
+	{
+		a_.setReadOnly(value);
+		ja_.setReadOnly(value);
+
+		DataContainer<TValue>::setReadOnly(value);
+	}
+
 	__host__ __device__
 	inline __attribute__((always_inline)) TValue& a(int i) { return a_(i); }
 
@@ -465,6 +474,16 @@ public :
 
 	__host__ __device__
 	~CSR() { }
+
+	__host__
+	inline __attribute__((always_inline)) virtual void setReadOnly(bool value)
+	{
+		a_.setReadOnly(value);
+		ia_.setReadOnly(value);
+		ja_.setReadOnly(value);
+
+		DataContainer<TValue>::setReadOnly(value);
+	}
 
 	__host__ __device__
 	inline __attribute__((always_inline)) TValue& a(int i) { return a_(i); }

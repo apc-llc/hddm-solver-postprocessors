@@ -100,6 +100,8 @@ class DataContainer
 	DataOperationIndicator lastAccessed, lastModified;
 	
 	Lock::Device lock;
+	
+	bool readOnly;
 
 	struct Kernels
 	{
@@ -129,6 +131,14 @@ class DataContainer
 		asm volatile("ld.global.v4.f32 {%0,%1,%2,%3}, [%4];"  :
 			"=f"(ret.x), "=f"(ret.y), "=f"(ret.z), "=f"(ret.w) : __LD128_PTR(src));
 #endif // __CUDA_ARCH__
+	}
+
+	__host__ __device__
+	inline __attribute__((always_inline)) void prefetch_l2(char* addr)
+	{
+#if defined(__CUDA_ARCH__)
+		asm("prefetch.global.L2 [%0];" :: __LD128_PTR(addr));
+#endif
 	}
 
 protected :
@@ -207,6 +217,9 @@ protected :
 	DataContainer() : data(NULL), length(0)
 	{
 		dataHostPtr = AlignedAllocator::Device<T*>().allocate(1);
+#if !defined(__CUDA_ARCH__)
+		readOnly = false;
+#endif
 	}
 
 	// Disable warning that Kernels class has host-only constructor.
@@ -218,6 +231,9 @@ protected :
 		initialize(length);
 
 		dataHostPtr = AlignedAllocator::Device<T*>().allocate(1);
+#if !defined(__CUDA_ARCH__)
+		readOnly = false;
+#endif
 	}
 
 	__host__ __device__
@@ -229,33 +245,28 @@ protected :
 	}
 
 	__host__ __device__
-	inline __attribute__((always_inline)) void prefetch_l2(char* addr)
-	{
-#if defined(__CUDA_ARCH__)
-		asm("prefetch.global.L2 [%0];" :: __LD128_PTR(addr));
-#endif
-	}
-
-	__host__ __device__
 	inline __attribute__((always_inline)) const T& accessDataAt(int offset)
 	{
 #if defined(__CUDA_ARCH__)
-		if (lastAccessed.isOnHost() && lastModified.isOnHost())
+		if (!READ_ONLY)
 		{
-			lock.lock();
 			if (lastAccessed.isOnHost() && lastModified.isOnHost())
 			{
-				#pragma unroll 1
-				for (int i = 0, e = length * sizeof(T); i < e; i += 16)
+				ScopedLock::Device sl(lock);
+				if (lastAccessed.isOnHost() && lastModified.isOnHost())
 				{
-					prefetch_l2(&((char*)data)[i + 16]);
-					prefetch_l2(&((char*)(*dataHostPtr))[i + 16]);
-					ld128(&((char*)data)[i], &((char*)(*dataHostPtr))[i]);
-				}
+					// TODO map onto kernel, if device parallelism is available
+					#pragma unroll 1
+					for (int i = 0, e = length * sizeof(T); i < e; i += 16)
+					{
+						prefetch_l2(&((char*)data)[i + 16]);
+						prefetch_l2(&((char*)(*dataHostPtr))[i + 16]);
+						ld128(&((char*)data)[i], &((char*)(*dataHostPtr))[i]);
+					}
 	
-				lastAccessed.setOnDevice();
+					lastAccessed.setOnDevice();
+				}
 			}
-			lock.unlock();
 		}
 		return data[offset];
 #else
@@ -267,12 +278,15 @@ protected :
 			CUDA_ERR_CHECK(cudaMemcpy(dataHostPtr, &hostPtr, sizeof(T*),
 				cudaMemcpyHostToDevice));
 		}
-		if (lastAccessed.isOnDevice() && lastModified.isOnDevice())
+		if (!READ_ONLY)
 		{
-			CUDA_ERR_CHECK(cudaMemcpy(&dataHost[0], &data[0], length * sizeof(T),
-				cudaMemcpyDeviceToHost));
+			if (lastAccessed.isOnDevice() && lastModified.isOnDevice())
+			{
+				CUDA_ERR_CHECK(cudaMemcpy(&dataHost[0], &data[0], length * sizeof(T),
+					cudaMemcpyDeviceToHost));
 
-			lastAccessed.setOnHost();
+				lastAccessed.setOnHost();
+			}
 		}
 		return dataHost[offset];
 #endif
@@ -281,12 +295,14 @@ protected :
 	__host__ __device__
 	inline __attribute__((always_inline)) T& modifyDataAt(int offset)
 	{
+		CHECK(!READ_ONLY, "modifyDataAt cannot be called in read-only mode");
 #if defined(__CUDA_ARCH__)
 		if (lastAccessed.isOnHost() && lastModified.isOnHost())
 		{
-			lock.lock();
+			ScopedLock::Device sl(lock);
 			if (lastModified.isOnHost() && lastModified.isOnHost())
 			{
+				// TODO map onto kernel, if device parallelism is available
 				#pragma unroll 1
 				for (int i = 0, e = length * sizeof(T); i < e; i += 16)
 				{
@@ -298,7 +314,6 @@ protected :
 				lastAccessed.setOnDevice();
 				lastModified.setOnDevice();
 			}
-			lock.unlock();
 		}
 		return data[offset];
 #else
@@ -321,6 +336,45 @@ protected :
 		}
 		return dataHost[offset];
 #endif
+	}
+
+public :
+
+	__host__ __device__
+	inline __attribute__((always_inline)) bool isReadOnly() const
+	{
+		return readOnly;
+	}
+	
+	__host__
+	inline __attribute__((always_inline)) virtual void setReadOnly(bool value)
+	{
+#if !defined(__CUDA_ARCH__)
+		if (!readOnly && value)
+		{
+			if (lastModified.isOnHost())
+			{
+				CUDA_ERR_CHECK(cudaMemcpy(&data[0], &dataHost[0], length * sizeof(T),
+					cudaMemcpyHostToDevice));
+			}
+			else
+			{
+				if (dataHost.size() != length)
+				{
+					dataHost.resize(length);
+					T* hostPtr = NULL;
+					CUDA_ERR_CHECK(cudaHostGetDevicePointer(&hostPtr, &dataHost[0], 0));
+					CUDA_ERR_CHECK(cudaMemcpy(dataHostPtr, &hostPtr, sizeof(T*),
+						cudaMemcpyHostToDevice));
+				}
+
+				CUDA_ERR_CHECK(cudaMemcpy(&dataHost[0], &data[0], length * sizeof(T),
+					cudaMemcpyDeviceToHost));
+			}
+		}
+
+		readOnly = value;
+#endif // __CUDA_ARCH__
 	}
 };
 

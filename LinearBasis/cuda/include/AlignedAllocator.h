@@ -110,10 +110,7 @@ extern bool deviceMemoryHeapInitialized;
 extern __device__ kernelgen_memory_t deviceMemoryHeap;
 kernelgen_memory_t& deviceMemoryHeapHost();
 
-static __global__ void setupDeviceMemoryHeap(kernelgen_memory_t heap)
-{
-	deviceMemoryHeap = heap;
-}
+__global__ void setupDeviceMemoryHeap(kernelgen_memory_t heap);
 
 namespace
 {

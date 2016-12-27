@@ -20,20 +20,20 @@ $(INSTALL)/bin/postprocessors/LinearBasis/cuda/libpostprocessor.so: \
 	$(BUILD)/libInterpolateArrayManyStateless.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
 	$(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o $(BUILD)/SIMDVector.o \
 	$(BUILD)/priority.o $(BUILD)/supported.o $(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o \
-	$(BUILD)/AlignedAllocator.o $(BUILD)/DeviceMemoryHeap.o
+	$(BUILD)/check.o $(BUILD)/AlignedAllocator.o $(BUILD)/DeviceMemoryHeap.o
 	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/cuda && $(NVCC) $(CINC) $(NVCCOPT) -Xlinker --whole-archive $(filter %.o,$^) -Xlinker --no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -llinearbasis $(addprefix -Xcompiler=, $(OMPFLAGS)) -Xcompiler -static-libstdc++
 
 $(BUILD)/InterpolateValue.o: src/InterpolateValue.cu include/Interpolate.h
-	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateValue -DDIM=dim $(CINC) $(NVCCOPT) -c $< -o $@
+	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateValue -DDIM=dim -DREAD_ONLY=readOnly $(CINC) $(NVCCOPT) -c $< -o $@
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.cu include/Interpolate.h
-	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateArray -DDIM=dim $(CINC) $(NVCCOPT) -c $< -o $@
+	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateArray -DDIM=dim -DREAD_ONLY=readOnly $(CINC) $(NVCCOPT) -c $< -o $@
 
 $(BUILD)/InterpolateArrayManyStateless.o: src/InterpolateArrayManyStateless.cu include/Interpolate.h
-	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateArrayManyStateless -DDIM=dim -DCOUNT=count $(CINC) $(NVCCOPT) -c $< -o $@
+	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateArrayManyStateless -DDIM=dim -DCOUNT=count -DREAD_ONLY=readOnly $(CINC) $(NVCCOPT) -c $< -o $@
 
 $(BUILD)/InterpolateArrayManyMultistate.o: src/InterpolateArrayManyMultistate.cu include/Interpolate.h
-	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateArrayManyMultistate -DDIM=dim -DCOUNT=count $(CINC) $(NVCCOPT) -c $< -o $@
+	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateArrayManyMultistate -DDIM=dim -DCOUNT=count -DREAD_ONLY=readOnly $(CINC) $(NVCCOPT) -c $< -o $@
 
 $(BUILD)/libInterpolateValue.sh: src/InterpolateValue.cu src/AlignedAllocator.cu
 	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(filter-out -gencode%,$(NVCCOPT)) $(MAXRREGCOUNT) -shared $^ > $@
@@ -51,7 +51,7 @@ $(BUILD)/Interpolator.o: src/Interpolator.cpp include/JIT.h include/Data.h
 	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/Data.o: src/Data.cu include/Data.h
-	$(CDIR) && $(NVCC) $(CINC) $(NVCCOPT) -c $< -o $@
+	$(CDIR) && $(NVCC) $(CINC) $(NVCCOPT) -DREAD_ONLY=readOnly -c $< -o $@
 
 $(BUILD)/JIT.o: src/JIT.cpp include/InterpolateKernel.h
 	$(CDIR) && $(MPICXX) -DINTERPOLATE_ARRAY_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArray.sh\" -DINTERPOLATE_ARRAY_MANY_STATELESS_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArrayManyStateless.sh\" -DINTERPOLATE_ARRAY_MANY_MULTISTATE_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArrayManyMultistate.sh\" -DINTERPOLATE_VALUE_SH=\"$(shell pwd)/$(BUILD)/libInterpolateValue.sh\" $(CINC) $(COPT) -c $< -o $@
@@ -69,7 +69,7 @@ $(BUILD)/Device.o: src/Device.cpp
 	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/Devices.o: src/Devices.cu
-	$(CDIR) && $(NVCC) $(CINC) $(NVCCOPT) $(addprefix -Xcompiler=, $(OMPFLAGS)) -c $< -o $@
+	$(CDIR) && $(NVCC) $(CINC) $(NVCCOPT) -DREAD_ONLY=readOnly $(addprefix -Xcompiler=, $(OMPFLAGS)) -c $< -o $@
 
 $(BUILD)/DeviceProperties.o: src/DeviceProperties.cpp
 	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
@@ -79,6 +79,10 @@ $(BUILD)/AlignedAllocator.o: src/AlignedAllocator.cu include/AlignedAllocator.h
 
 $(BUILD)/DeviceMemoryHeap.o: src/DeviceMemoryHeap.cu include/AlignedAllocator.h
 	$(CDIR) && $(NVCC) $(CINC) $(NVCCOPT) -c $< -o $@
+
+$(BUILD)/check.o: src/check.cu
+	$(CDIR) && $(NVCC) $(CINC) $(NVCCOPT) -c $< -o $@
+
 
 clean:
 	rm -rf $(BUILD) $(INSTALL)/bin/postprocessors/LinearBasis/cuda/libpostprocessor.so

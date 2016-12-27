@@ -196,6 +196,7 @@ K& JIT::jitCompile(
 			cmd << dim;
 			cmd << " -DCOUNT=";
 			cmd << count;
+			cmd << " -DREAD_ONLY=true";
 			bool keepCache = false;
 			const char* keepCacheValue = getenv("KEEP_CACHE");
 			if (keepCacheValue)
