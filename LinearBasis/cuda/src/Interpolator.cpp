@@ -37,7 +37,7 @@ extern "C" void LinearBasis_CUDA_Generic_InterpolateValue(
 	const Matrix::Device::Sparse::CRW<IndexPair, uint32_t>* index, const Matrix::Device::Dense<real>* surplus, double* value_);
 	
 // Interpolate a single value.
-void Interpolator::interpolate(Device* device, Data* data,
+void Interpolator::interpolate(Device* device, const Data* data,
 	const int istate, const real* x, const int Dof_choice, real& value)
 {
 	if (jit)
@@ -59,13 +59,13 @@ void Interpolator::interpolate(Device* device, Data* data,
 		
 		LinearBasis_CUDA_RuntimeOpt_InterpolateValue[device->getID()](
 			device, data->dim, data->nno, Dof_choice, x,
-			data->device.getIndex(istate), data->device.getSurplus(istate), &value);
+			data->getDevice()->getIndex(istate), data->getDevice()->getSurplus(istate), &value);
 	}
 	else
 	{			
 		LinearBasis_CUDA_Generic_InterpolateValue(
 			device, data->dim, data->nno, Dof_choice, x,
-			data->device.getIndex(istate), data->device.getSurplus(istate), &value);
+			data->getDevice()->getIndex(istate), data->getDevice()->getSurplus(istate), &value);
 	}
 }
 
@@ -75,7 +75,7 @@ extern "C" void LinearBasis_CUDA_Generic_InterpolateArray(
 	const Matrix::Device::Sparse::CRW<IndexPair, uint32_t>* index, const Matrix::Device::Dense<real>* surplus, double* value);
 
 // Interpolate array of values.
-void Interpolator::interpolate(Device* device, Data* data,
+void Interpolator::interpolate(Device* device, const Data* data,
 	const int istate, const real* x, const int Dof_choice_start, const int Dof_choice_end, real* value)
 {
 	if (jit)
@@ -96,13 +96,13 @@ void Interpolator::interpolate(Device* device, Data* data,
 		
 		LinearBasis_CUDA_RuntimeOpt_InterpolateArray[device->getID()](
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, x,
-			data->device.getIndex(istate), data->device.getSurplus(istate), value);
+			data->getDevice()->getIndex(istate), data->getDevice()->getSurplus(istate), value);
 	}
 	else
 	{
 		LinearBasis_CUDA_Generic_InterpolateArray(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, x,
-			data->device.getIndex(istate), data->device.getSurplus(istate), value);
+			data->getDevice()->getIndex(istate), data->getDevice()->getSurplus(istate), value);
 	}
 }
 
@@ -113,7 +113,7 @@ extern "C" void LinearBasis_CUDA_Generic_InterpolateArrayManyStateless(
 
 // TODO
 // Interpolate multiple arrays of values, with single surplus state.
-void Interpolator::interpolate(Device* device, Data* data,
+void Interpolator::interpolate(Device* device, const Data* data,
 	const int istate, const real* x, const int Dof_choice_start, const int Dof_choice_end, const int count, real* value)
 {
 	if (jit)
@@ -134,13 +134,13 @@ void Interpolator::interpolate(Device* device, Data* data,
 
 		LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyStateless[device->getID()](
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, count, x,
-			data->device.getIndex(istate), data->device.getSurplus(istate), value);
+			data->getDevice()->getIndex(istate), data->getDevice()->getSurplus(istate), value);
 	}
 	else
 	{
 		LinearBasis_CUDA_Generic_InterpolateArrayManyStateless(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, count, x,
-			data->device.getIndex(istate), data->device.getSurplus(istate), value);
+			data->getDevice()->getIndex(istate), data->getDevice()->getSurplus(istate), value);
 	}
 }
 
@@ -179,7 +179,7 @@ void Interpolator::interpolate(Device* device, const Data* data,
 	{
 		LinearBasis_CUDA_Generic_InterpolateArrayManyMultistate(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
-			data->device.getIndex(0), data->device.getSurplus_t(0), value);
+			data->getDevice()->getIndex(0), data->getDevice()->getSurplus_t(0), value);
 	}
 }
 
