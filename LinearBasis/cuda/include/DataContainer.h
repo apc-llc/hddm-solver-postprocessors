@@ -123,13 +123,13 @@ class DataContainer
 	{
 #if defined(__CUDA_ARCH__)
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__) || defined(__CUDACC_RTC__)
-#define __LD128_PTR   "l"
+#define __PTR   "l"
 #else
-#define __LD128_PTR   "r"
+#define __PTR   "r"
 #endif
 		float4& ret = *(float4*)dst;
 		asm volatile("ld.global.v4.f32 {%0,%1,%2,%3}, [%4];"  :
-			"=f"(ret.x), "=f"(ret.y), "=f"(ret.z), "=f"(ret.w) : __LD128_PTR(src));
+			"=f"(ret.x), "=f"(ret.y), "=f"(ret.z), "=f"(ret.w) : __PTR(src));
 #endif // __CUDA_ARCH__
 	}
 
@@ -137,7 +137,7 @@ class DataContainer
 	inline __attribute__((always_inline)) void prefetch_l2(char* addr)
 	{
 #if defined(__CUDA_ARCH__)
-		asm("prefetch.global.L2 [%0];" :: __LD128_PTR(addr));
+		asm("prefetch.global.L2 [%0];" :: __PTR(addr));
 #endif
 	}
 
