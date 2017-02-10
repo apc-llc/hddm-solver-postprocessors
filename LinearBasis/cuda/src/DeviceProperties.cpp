@@ -22,7 +22,7 @@ namespace cuda
 	extern Devices devices;
 }
 
-vector<DeviceProperties*> DeviceProperties::getDeviceProperties()
+vector<DeviceProperties*>& DeviceProperties::getDeviceProperties()
 {
 	if (!uniqueProps.size())
 	{
@@ -38,7 +38,7 @@ vector<DeviceProperties*> DeviceProperties::getDeviceProperties()
 	return props;
 }
 
-extern "C" vector<DeviceProperties*> getDeviceProperties()
+extern "C" vector<DeviceProperties*>& getDeviceProperties()
 {
 	return DeviceProperties::getDeviceProperties();
 }

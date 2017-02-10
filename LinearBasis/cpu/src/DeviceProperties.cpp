@@ -15,7 +15,7 @@ const SIMDVector* DeviceProperties::getSIMDVector() const
 static DeviceProperties props;
 static vector<DeviceProperties*> vprops;
 
-extern "C" vector<DeviceProperties*> getDeviceProperties()
+extern "C" vector<DeviceProperties*>& getDeviceProperties()
 {
 	if (!vprops.size())
 	{
