@@ -19,7 +19,7 @@ $(INSTALL)/bin/postprocessors/LinearBasis/cuda/libpostprocessor.so: \
 	$(BUILD)/libInterpolateArrayManyStateless.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
 	$(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o $(BUILD)/SIMDVector.o \
 	$(BUILD)/priority.o $(BUILD)/supported.o $(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o
-	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/cuda && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -llinearbasis $(LINK_ACCELERATOR) $(OMPFLAGS) -static-libstdc++
+	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/cuda && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -llinearbasis $(LINK_ACCELERATOR) $(OMPFLAGS) 
 
 $(BUILD)/InterpolateValue.o: src/InterpolateValue.cu include/Interpolate.h
 	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_CUDA_Generic_InterpolateValue -DDIM=dim $(CINC) $(NVCCOPT) -c $< -o $@

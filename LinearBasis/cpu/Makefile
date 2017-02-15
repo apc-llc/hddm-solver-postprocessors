@@ -15,7 +15,7 @@ $(INSTALL)/bin/postprocessors/LinearBasis/cpu/libpostprocessor.so: \
 	$(BUILD)/libInterpolateArrayManyStateless.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
 	$(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o \
 	$(BUILD)/priority.o $(BUILD)/supported.o $(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o
-	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/cpu && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -llinearbasis -static-libstdc++
+	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/cpu && $(MPICXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -llinearbasis
 
 $(BUILD)/InterpolateValue.o: src/InterpolateValue.cpp
 	$(CDIR) && $(MPICXX) -DFUNCNAME=LinearBasis_CPU_Generic_InterpolateValue -DDIM=dim $(CINC) $(COPT) -c $< -o $@
