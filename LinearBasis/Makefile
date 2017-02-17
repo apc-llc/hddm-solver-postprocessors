@@ -6,7 +6,7 @@ CINC += -I../include -I../../include
 CDIR = mkdir -p $(shell dirname $@)
 
 TARGETS = cpu
-ifneq(,$(NVCC))
+ifneq (,$(NVCC))
 TARGETS += cuda
 endif
 
