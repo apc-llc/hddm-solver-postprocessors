@@ -5,7 +5,10 @@ include $(LOCATION)/Makefile.inc
 CINC += -I../include -I../../include
 CDIR = mkdir -p $(shell dirname $@)
 
-TARGETS = cpu cuda
+TARGETS = cpu
+ifneq(,$(NVCC))
+TARGETS += cuda
+endif
 
 .PHONY: $(TARGETS)
 
