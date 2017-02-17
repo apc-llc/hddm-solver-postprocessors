@@ -110,7 +110,7 @@ K& JIT::jitCompile(
 	MPI_ERR_CHECK(MPI_Process_get(&process));
 	if (process->isMaster())
 	{
-		cout << "Performing deferred GPU kernel compilation for dim = " << dim << " ..." << endl;
+		cerr << "Performing deferred GPU kernel compilation for dim = " << 59 << " ..." << endl;
 
 		// Deferred compilation with X vector in kernel argument is only possible,
 		// when X vector fits constant memory. Constant memory consists of 10 (or 11)
@@ -193,7 +193,7 @@ K& JIT::jitCompile(
 			cmd << " -DFUNCNAME=";
 			cmd << funcname;
 			cmd << " -DDIM=";
-			cmd << dim;
+			cmd << 59;
 			cmd << " -DCOUNT=";
 			cmd << count;
 			bool keepCache = false;
@@ -211,7 +211,7 @@ K& JIT::jitCompile(
 			cmd << " -o ";
 			cmd << tmp.filename;
 		}
-		cout << cmd.str() << endl;
+		cerr << cmd.str() << endl;
 
 		// Run compiler as a process and create a streambuf that
 		// reads its stdout and stderr.
@@ -220,7 +220,7 @@ K& JIT::jitCompile(
 
 			string line;
 			while (std::getline(proc.out(), line))
-				cout << line << endl;
+				cerr << line << endl;
 			while (std::getline(proc.err(), line))
 				cerr << line << endl;
 		}
@@ -264,9 +264,9 @@ K& JIT::jitCompile(
 
 			int length = tmp.filename.length();
 			MPI_ERR_CHECK(MPI_Isend(&length,
-				1, MPI_INT, i, ((int)(size_t)&JIT::jitCompile<K, F>) % 32767, MPI_COMM_WORLD, &requests[2 * i]));
+				1, MPI_INT, i, (int)(((size_t)&JIT::jitCompile<K, F>) % 32767), MPI_COMM_WORLD, &requests[2 * i]));
 			MPI_ERR_CHECK(MPI_Isend((void*)tmp.filename.c_str(), tmp.filename.length(),
-				MPI_BYTE, i, ((int)(size_t)&JIT::jitCompile<K, F> + 1) % 32767, MPI_COMM_WORLD, &requests[2 * i + 1]));
+				MPI_BYTE, i, (int)(((size_t)&JIT::jitCompile<K, F> + 1) % 32767), MPI_COMM_WORLD, &requests[2 * i + 1]));
 		}
 		/*for (int i = 0, e = requests.size(); i != e; i++)
 		{
@@ -286,11 +286,11 @@ K& JIT::jitCompile(
 		// Receive filename from master.
 		int length = 0;
 		MPI_ERR_CHECK(MPI_Recv(&length, 1, MPI_INT,
-			process->getRoot(), ((int)(size_t)&JIT::jitCompile<K, F>) % 32767, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
+			process->getRoot(), (int)(((size_t)&JIT::jitCompile<K, F>) % 32767), MPI_COMM_WORLD, MPI_STATUS_IGNORE));
 		vector<char> buffer;
 		buffer.resize(length);
 		MPI_ERR_CHECK(MPI_Recv(&buffer[0], length, MPI_BYTE,
-			process->getRoot(), ((int)(size_t)&JIT::jitCompile<K, F> + 1) % 32767, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
+			process->getRoot(), (int)(((size_t)&JIT::jitCompile<K, F> + 1) % 32767), MPI_COMM_WORLD, MPI_STATUS_IGNORE));
 
 		kernel.dim = dim;
 		kernel.filename = string(&buffer[0], buffer.size());
