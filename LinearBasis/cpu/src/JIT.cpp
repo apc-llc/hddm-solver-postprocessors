@@ -230,7 +230,7 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 		__sync_synchronize();
 
 		// Send filename to everyone.
-		static vector<MPI_Request> vrequests;
+		vector<MPI_Request> vrequests;
 		vrequests.resize(vrequests.size() + process->getSize() * 2);
 		MPI_Request* requests = &vrequests[vrequests.size() - 1 - process->getSize() * 2];
 		for (int i = 0, e = process->getSize(); i != e; i++)
@@ -239,9 +239,9 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 
 			int length = tmp.filename.length();
 			MPI_ERR_CHECK(MPI_Isend(&length,
-				1, MPI_INT, i, (int)(((size_t)&JIT::jitCompile<K, F>) % 32767), MPI_COMM_WORLD, &requests[2 * i]));
+				1, MPI_INT, i, (int)(((size_t)&JIT::jitCompile<K, F>) % 32767), process->getComm(), &requests[2 * i]));
 			MPI_ERR_CHECK(MPI_Isend((void*)tmp.filename.c_str(), tmp.filename.length(),
-				MPI_BYTE, i, (int)(((size_t)&JIT::jitCompile<K, F> + 1) % 32767), MPI_COMM_WORLD, &requests[2 * i + 1]));
+				MPI_BYTE, i, (int)(((size_t)&JIT::jitCompile<K, F> + 1) % 32767), process->getComm(), &requests[2 * i + 1]));
 		}
 		/*for (int i = 0, e = requests.size(); i != e; i++)
 		{
@@ -261,11 +261,11 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 		// Receive filename from master.
 		int length = 0;
 		MPI_ERR_CHECK(MPI_Recv(&length, 1, MPI_INT,
-			process->getRoot(), (int)(((size_t)&JIT::jitCompile<K, F>) % 32767), MPI_COMM_WORLD, MPI_STATUS_IGNORE));
+			process->getRoot(), (int)(((size_t)&JIT::jitCompile<K, F>) % 32767), process->getComm(), MPI_STATUS_IGNORE));
 		vector<char> buffer;
 		buffer.resize(length);
 		MPI_ERR_CHECK(MPI_Recv(&buffer[0], length, MPI_BYTE,
-			process->getRoot(), (int)(((size_t)&JIT::jitCompile<K, F> + 1) % 32767), MPI_COMM_WORLD, MPI_STATUS_IGNORE));
+			process->getRoot(), (int)(((size_t)&JIT::jitCompile<K, F> + 1) % 32767), process->getComm(), MPI_STATUS_IGNORE));
 
 		kernel.dim = dim;
 		kernel.filename = string(&buffer[0], buffer.size());

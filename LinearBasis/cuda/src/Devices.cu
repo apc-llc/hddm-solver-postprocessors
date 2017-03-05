@@ -28,7 +28,7 @@ Devices::Devices()
 	// all participating hosts.
 	int ngpus_total = ngpus;
 	MPI_ERR_CHECK(MPI_Allreduce(MPI_IN_PLACE, &ngpus_total, 1, MPI_INT,
-		MPI_SUM, MPI_COMM_WORLD));
+		MPI_SUM, process->getComm()));
 
 	if (process->isMaster())
 		cout << ngpus_total << " GPU(s) available" << endl;

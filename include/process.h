@@ -8,6 +8,7 @@ public :
 	int getRoot() const;
 	int getRank() const;
 	int getSize() const;
+	MPI_Comm getComm() const;
 
 	void abort();
 };
