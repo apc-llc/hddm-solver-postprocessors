@@ -31,6 +31,7 @@ public :
 #else
 		return 1;
 #endif
+		return 0;
 	}
 };
 

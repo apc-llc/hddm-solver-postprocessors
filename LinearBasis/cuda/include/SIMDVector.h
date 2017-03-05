@@ -34,6 +34,8 @@ public :
 				process->abort();
 			}
 		}
+
+		return 0;
 	}
 };
 
