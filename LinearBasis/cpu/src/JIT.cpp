@@ -56,8 +56,6 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
 
-			__sync_synchronize();
-	
 			return kernel;
 		}
 	}
@@ -85,8 +83,6 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 		kernel.dim = dim;
 		kernel.fileowner = false;
 		kernel.func = fallbackFunc;
-
-		__sync_synchronize();
 
 		kernels_tls->operator[](dim) = kernel;
 		PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
@@ -134,8 +130,6 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
 
-			__sync_synchronize();
-
 			kernels_tls->operator[](dim) = kernel;
 			PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 			return kernel;
@@ -163,8 +157,6 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 				kernel.fileowner = false;
 				kernel.func = fallbackFunc;
 
-				__sync_synchronize();
-
 				kernels_tls->operator[](dim) = kernel;
 				PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 				return kernel;
@@ -186,7 +178,6 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 			cmd << " -o ";
 			cmd << tmp.filename;
 		}
-		//cout << cmd.str() << endl;
 
 		// Run compiler as a process and create a streambuf that
 		// reads its stdout and stderr.
@@ -213,8 +204,6 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
 
-			__sync_synchronize();
-
 			kernels_tls->operator[](dim) = kernel;
 			PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 			return kernel;
@@ -227,28 +216,29 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 		kernel.fileowner = true;
 		kernel.funcname = funcname;
 
-		__sync_synchronize();
+		// Convert filename to char array.
+		vector<char> vfilename;
+		vfilename.resize(tmp.filename.length() + 1);
+		memcpy(&vfilename[0], tmp.filename.c_str(), vfilename.size());
 
 		// Send filename to everyone.
 		vector<MPI_Request> vrequests;
-		vrequests.resize(vrequests.size() + process->getSize() * 2);
-		MPI_Request* requests = &vrequests[vrequests.size() - 1 - process->getSize() * 2];
+		vrequests.resize(process->getSize() * 2);
+		MPI_Request* requests = &vrequests[0];
 		for (int i = 0, e = process->getSize(); i != e; i++)
 		{
 			if (i == process->getRoot()) continue;
 
-			int length = tmp.filename.length();
-			MPI_ERR_CHECK(MPI_Isend(&length,
-				1, MPI_INT, i, (int)(((size_t)&JIT::jitCompile<K, F>) % 32767), process->getComm(), &requests[2 * i]));
-			MPI_ERR_CHECK(MPI_Isend((void*)tmp.filename.c_str(), tmp.filename.length(),
-				MPI_BYTE, i, (int)(((size_t)&JIT::jitCompile<K, F> + 1) % 32767), process->getComm(), &requests[2 * i + 1]));
+			int length = vfilename.size();
+			MPI_ERR_CHECK(MPI_Isend(&length, 1, MPI_INT, i, i, process->getComm(), &requests[2 * i]));
+			MPI_ERR_CHECK(MPI_Isend(&vfilename[0], length, MPI_BYTE, i, i + e, process->getComm(), &requests[2 * i + 1]));
 		}
-		/*for (int i = 0, e = requests.size(); i != e; i++)
+		for (int i = 0, e = vrequests.size(); i != e; i++)
 		{
 			if (i == 2 * process->getRoot()) continue;
 			if (i == 2 * process->getRoot() + 1) continue;
 			MPI_ERR_CHECK(MPI_Wait(&requests[i], MPI_STATUS_IGNORE));
-		}*/
+		}
 	}
 	else
 	{
@@ -261,18 +251,16 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 		// Receive filename from master.
 		int length = 0;
 		MPI_ERR_CHECK(MPI_Recv(&length, 1, MPI_INT,
-			process->getRoot(), (int)(((size_t)&JIT::jitCompile<K, F>) % 32767), process->getComm(), MPI_STATUS_IGNORE));
-		vector<char> buffer;
-		buffer.resize(length);
-		MPI_ERR_CHECK(MPI_Recv(&buffer[0], length, MPI_BYTE,
-			process->getRoot(), (int)(((size_t)&JIT::jitCompile<K, F> + 1) % 32767), process->getComm(), MPI_STATUS_IGNORE));
+			process->getRoot(), process->getRank(), process->getComm(), MPI_STATUS_IGNORE));
+		vector<char> vfilename;
+		vfilename.resize(length);
+		MPI_ERR_CHECK(MPI_Recv(&vfilename[0], length, MPI_BYTE,
+			process->getRoot(), process->getRank() + process->getSize(), process->getComm(), MPI_STATUS_IGNORE));
 
 		kernel.dim = dim;
-		kernel.filename = string(&buffer[0], buffer.size());
+		kernel.filename = string(&vfilename[0], vfilename.size());
 		kernel.fileowner = false;
 		kernel.funcname = funcname;
-		
-		__sync_synchronize();
 	}
 
 	kernel.func = kernel.getFunc();
