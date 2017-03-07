@@ -2,8 +2,10 @@
 #include <assert.h>
 #include <stdint.h>
 #include <x86intrin.h>
-#include <utility> // pair
 #endif
+
+#include <mutex>
+#include <utility> // pair
 
 #include "LinearBasis.h"
 
@@ -49,81 +51,87 @@ extern "C" void FUNCNAME(
 #if 1
 		if (!initialized)
 		{
-			pair<int, int> zero = make_pair(0, 0);
+			static std::mutex mutex;
+			std::lock_guard<std::mutex> lock(mutex);
 
-			ind_I_.resize(count);
-			ind_J_.resize(count);
-			rowinds_.resize(count);
-		
-			for (int many = 0; many < count; many++)
+			if (!initialized)
 			{
-				vector<int>& ind_I = ind_I_[many];
-				vector<int>& ind_J = ind_J_[many];
-				vector<int>& rowinds = rowinds_[many];
+				pair<int, int> zero = make_pair(0, 0);
 
-				ind_I.resize(vdim);
-				ind_J.resize(vdim);
-				rowinds.resize(vdim);
+				ind_I_.resize(count);
+				ind_J_.resize(count);
+				rowinds_.resize(count);
+		
+				for (int many = 0; many < count; many++)
+				{
+					vector<int>& ind_I = ind_I_[many];
+					vector<int>& ind_J = ind_J_[many];
+					vector<int>& rowinds = rowinds_[many];
 
-				// Convert (i, I) indexes matrix to sparse format.
-				for (int i = 0; i < nno; i++)
-					for (int j = 0; j < dim; j++)
-					{
-						// Get pair.
-						pair<int, int> value = make_pair(index(i, j), index(i, j + vdim));
-			
-						// If both indexes are zeros, do nothing.
-						if (value == zero)
-							continue;
-			
-						// Find free position for non-zero pair.
-						bool foundPosition = false;
-						for (int irow = 0, nrows = rowinds.size() / vdim; irow < nrows; irow++)
+					ind_I.resize(vdim);
+					ind_J.resize(vdim);
+					rowinds.resize(vdim);
+
+					// Convert (i, I) indexes matrix to sparse format.
+					for (int i = 0; i < nno; i++)
+						for (int j = 0; j < dim; j++)
 						{
-							int& positionI = ind_I[irow * vdim + j];
-							int& positionJ = ind_J[irow * vdim + j];
-							if (make_pair(positionI, positionJ) == zero)
+							// Get pair.
+							pair<int, int> value = make_pair(index(i, j), index(i, j + vdim));
+			
+							// If both indexes are zeros, do nothing.
+							if (value == zero)
+								continue;
+			
+							// Find free position for non-zero pair.
+							bool foundPosition = false;
+							for (int irow = 0, nrows = rowinds.size() / vdim; irow < nrows; irow++)
 							{
-								// Check no any "i" row elements on this "irow" yet.
-								bool busyRow = false;
-								for (int jrow = 0; jrow < dim; jrow++)
+								int& positionI = ind_I[irow * vdim + j];
+								int& positionJ = ind_J[irow * vdim + j];
+								if (make_pair(positionI, positionJ) == zero)
 								{
-									int& rowind = rowinds[irow * vdim + jrow];
+									// Check no any "i" row elements on this "irow" yet.
+									bool busyRow = false;
+									for (int jrow = 0; jrow < dim; jrow++)
+									{
+										int& rowind = rowinds[irow * vdim + jrow];
 
-									if (rowind == i) busyRow = true;
-								}
-								if (busyRow) continue;
+										if (rowind == i) busyRow = true;
+									}
+									if (busyRow) continue;
 
-								int& rowind = rowinds[irow * vdim + j];
+									int& rowind = rowinds[irow * vdim + j];
 					
+									positionI = value.first;
+									positionJ = value.second;
+									rowind = i;
+
+									foundPosition = true;
+									break;
+								}
+							}
+							if (!foundPosition)
+							{
+								// Add new free row.
+								ind_I.resize(ind_I.size() + vdim);
+								ind_J.resize(ind_J.size() + vdim);
+								rowinds.resize(rowinds.size() + vdim);
+
+								int& positionI = ind_I[ind_I.size() - vdim + j];
+								int& positionJ = ind_J[ind_J.size() - vdim + j];
+
+								int& rowind = rowinds[rowinds.size() - vdim + j];
+				
 								positionI = value.first;
 								positionJ = value.second;
-								rowind = i;
-
-								foundPosition = true;
-								break;
+								rowind = i;				
 							}
 						}
-						if (!foundPosition)
-						{
-							// Add new free row.
-							ind_I.resize(ind_I.size() + vdim);
-							ind_J.resize(ind_J.size() + vdim);
-							rowinds.resize(rowinds.size() + vdim);
-
-							int& positionI = ind_I[ind_I.size() - vdim + j];
-							int& positionJ = ind_J[ind_J.size() - vdim + j];
-
-							int& rowind = rowinds[rowinds.size() - vdim + j];
-				
-							positionI = value.first;
-							positionJ = value.second;
-							rowind = i;				
-						}
-					}
-			}
+				}
 			
-			initialized = true;
+				initialized = true;
+			}
 		}
 
 		vector<int>& ind_I = ind_I_[many];
