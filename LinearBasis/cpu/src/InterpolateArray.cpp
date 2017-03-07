@@ -2,15 +2,23 @@
 #include <assert.h>
 #include <stdint.h>
 #include <x86intrin.h>
-#else
-#include "LinearBasis.h"
+#include <utility> // pair
 #endif
+
+#include "LinearBasis.h"
 
 #include "Data.h"
 
 using namespace cpu;
+using namespace std;
 
 class Device;
+
+static bool initialized = false;
+
+static vector<int> ind_I;
+static vector<int> ind_J;
+static vector<int> rowinds;
 
 extern "C" void FUNCNAME(
 	Device* device,
@@ -31,51 +39,105 @@ extern "C" void FUNCNAME(
 	if (dim % AVX_VECTOR_SIZE) vdim++;
 	vdim *= AVX_VECTOR_SIZE;
 
-	for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
-		value[Dof_choice - b] = 0;
-#ifdef HAVE_AVX
-	const __m256d double4_0_0_0_0 = _mm256_setzero_pd();
-	const __m256d double4_1_1_1_1 = _mm256_set1_pd(1.0);
-	const __m256d sign_mask = _mm256_set1_pd(-0.);
+#if 1
+	if (!initialized)
+	{
+		pair<int, int> zero = make_pair(0, 0);
 
-	__m256d x4;
-#if defined(DEFERRED)
-	if (DIM <= AVX_VECTOR_SIZE)
-		x4 = _mm256_load_pd(x);
-#endif
+		ind_I.resize(vdim);
+		ind_J.resize(vdim);
+		rowinds.resize(vdim);
+
+		// Convert (i, I) indexes matrix to sparse format.
+		for (int i = 0; i < nno; i++)
+			for (int j = 0; j < dim; j++)
+			{
+				// Get pair.
+				pair<int, int> value = make_pair(index(i, j), index(i, j + vdim));
+	
+				// If both indexes are zeros, do nothing.
+				if (value == zero)
+					continue;
+	
+				// Find free position for non-zero pair.
+				bool foundPosition = false;
+				for (int irow = 0, nrows = rowinds.size() / vdim; irow < nrows; irow++)
+				{
+					int& positionI = ind_I[irow * vdim + j];
+					int& positionJ = ind_J[irow * vdim + j];
+					if (make_pair(positionI, positionJ) == zero)
+					{
+						// Check no any "i" row elements on this "irow" yet.
+						bool busyRow = false;
+						for (int jrow = 0; jrow < dim; jrow++)
+						{
+							int& rowind = rowinds[irow * vdim + jrow];
+
+							if (rowind == i) busyRow = true;
+						}
+						if (busyRow) continue;
+
+						int& rowind = rowinds[irow * vdim + j];
+			
+						positionI = value.first;
+						positionJ = value.second;
+						rowind = i;
+
+						foundPosition = true;
+						break;
+					}
+				}
+				if (!foundPosition)
+				{
+					// Add new free row.
+					ind_I.resize(ind_I.size() + vdim);
+					ind_J.resize(ind_J.size() + vdim);
+					rowinds.resize(rowinds.size() + vdim);
+
+					int& positionI = ind_I[ind_I.size() - vdim + j];
+					int& positionJ = ind_J[ind_J.size() - vdim + j];
+
+					int& rowind = rowinds[rowinds.size() - vdim + j];
+		
+					positionI = value.first;
+					positionJ = value.second;
+					rowind = i;				
+				}
+			}
+		
+		initialized = true;
+	}
+
+	// Loop to calculate temps.
+	// Note temps vector should not be too large to keep up the caching.
+	// So, we might need to roll the nno loop as a set of small loops.
+	vector<double> temps(nno, 1.0);
+	for (int i = 0, e = rowinds.size() / vdim; i < e; i++)
+	{
+		for (int j = 0; j < dim; j++)
+		{
+			int& ind_i = ind_I[i * vdim + j];
+			int& ind_j = ind_J[i * vdim + j];
+			int& rowind = rowinds[i * vdim + j];
+
+			// XXX LinearBasis can be done in AVX.
+			double xp = LinearBasis(x[j], ind_i, ind_j);
+			xp = fmax(0.0, xp);
+		
+			// XXX This can be done scalar only.
+			temps[rowind] *= xp;
+		}			
+	}
+	
+	// Loop to calculate values.
 	for (int i = 0; i < nno; i++)
 	{
-		__m256d temp = double4_1_1_1_1;
-		for (int j = 0; j < DIM; j += AVX_VECTOR_SIZE)
-		{
-#if defined(DEFERRED)
-			if (DIM > AVX_VECTOR_SIZE)
-#endif
-			{
-				x4 = _mm256_load_pd(x + j);
-			}
-
-			__m128i i4 = _mm_load_si128(reinterpret_cast<const __m128i*>(&index(i, j)));
-			__m128i j4 = _mm_load_si128(reinterpret_cast<const __m128i*>(&index(i, j + vdim)));
-			const __m256d xp = _mm256_sub_pd(double4_1_1_1_1, _mm256_andnot_pd(sign_mask,
-				_mm256_sub_pd(_mm256_mul_pd(x4, _mm256_cvtepi32_pd(i4)), _mm256_cvtepi32_pd(j4))));
-			const __m256d d = _mm256_cmp_pd(xp, double4_0_0_0_0, _CMP_GT_OQ);
-			if (_mm256_movemask_pd(d) != (int)0xf)
-				goto zero;
-			temp = _mm256_mul_pd(temp, xp);
-		}
-		
-		{
-			const __m128d pairwise_sum = _mm_mul_pd(_mm256_castpd256_pd128(temp), _mm256_extractf128_pd(temp, 1));
-			const double temps = _mm_cvtsd_f64(_mm_mul_pd(pairwise_sum,
-				(__m128d)_mm_movehl_ps((__m128)pairwise_sum, (__m128)pairwise_sum)));
-			for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
-				value[Dof_choice - b] += temps * surplus(i, Dof_choice);
-		}
-
-		zero : continue;
-	}
+		// XXX This can be done in AVX.
+		for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
+			value[Dof_choice - b] += temps[i] * surplus(i, Dof_choice);
+	}		
 #else
+
 	for (int i = 0; i < nno; i++)
 	{
 		double temp = 1.0;
