@@ -140,9 +140,12 @@ extern "C" void FUNCNAME(
 	// Loop to calculate values.
 	for (int i = 0; i < nno; i++)
 	{
+		double temp = temps[i];
+		if (!temp) continue;
+
 		// XXX This can be done in AVX.
 		for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
-			value[Dof_choice - b] += temps[i] * surplus(i, Dof_choice);
+			value[Dof_choice - b] += temp * surplus(i, Dof_choice);
 	}		
 #else
 
