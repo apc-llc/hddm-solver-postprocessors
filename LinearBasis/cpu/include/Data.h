@@ -64,8 +64,10 @@ public:
 		void* ptr;
 		size_t size = n * sizeof(T);
 		if (size % (AVX_VECTOR_SIZE * sizeof(T)))
-			size += AVX_VECTOR_SIZE * sizeof(T) - size % (AVX_VECTOR_SIZE * sizeof(T)); 
-		int err = posix_memalign(&ptr, AVX_VECTOR_SIZE * sizeof(T), size);
+			size += AVX_VECTOR_SIZE * sizeof(T) - size % (AVX_VECTOR_SIZE * sizeof(T));
+
+		// POSIX requires minimum alignment to be sizeof(void*). 
+		int err = posix_memalign(&ptr, std::max(sizeof(void*), AVX_VECTOR_SIZE * sizeof(T)), size);
 		if (err != 0)
 		{
 			using namespace std;
