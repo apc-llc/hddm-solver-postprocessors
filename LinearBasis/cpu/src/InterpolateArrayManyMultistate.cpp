@@ -212,13 +212,10 @@ extern "C" void FUNCNAME(
 		}
 		
 		// Loop to calculate values.
-		int nnz = 0;
 		for (int i = 0; i < nno; i++)
 		{
 			double temp = temps[i];
 			if (!temp) continue;
-
-			nnz++;
 
 			const __m256d temp64 = _mm256_set1_pd(temp);
 
@@ -234,8 +231,6 @@ extern "C" void FUNCNAME(
 				_mm256_storeu_pd(&value[Dof_choice - b], value64);
 			}
 		}
-		
-		cout << nnz << " non-zero temps out of " << nno << endl;
 #else
 		// Loop to calculate temps.
 		// Note temps vector should not be too large to keep up the caching.
