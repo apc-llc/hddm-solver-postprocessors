@@ -3,7 +3,7 @@ LOCATION = ../../..
 include $(LOCATION)/Makefile.inc
 
 CINC += -I. -I../include -I../../include
-COPT += -DAVX_VECTOR_SIZE=4 -DNAMESPACE=cpu
+COPT += -DAVX_VECTOR_SIZE=8 -DNAMESPACE=cpu
 CDIR = mkdir -p $(shell dirname $@)
 
 all: $(INSTALL)/bin/postprocessors/LinearBasis/cpu/libpostprocessor.so

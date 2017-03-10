@@ -12,11 +12,6 @@
 
 #include "Data.h"
 
-#ifdef AVX_VECTOR_SIZE
-#undef AVX_VECTOR_SIZE
-#define AVX_VECTOR_SIZE 8
-#endif
-
 using namespace cpu;
 using namespace std;
 
@@ -38,8 +33,8 @@ static vector<Index> indexes;
 
 struct AVXIndex
 {
-	uint8_t i[8], j[8];
-	uint16_t rowind[8];
+	uint8_t i[AVX_VECTOR_SIZE], j[AVX_VECTOR_SIZE];
+	uint16_t rowind[AVX_VECTOR_SIZE];
 	
 	AVXIndex()
 	{
@@ -86,7 +81,7 @@ extern "C" void FUNCNAME(
 				for (int j = 0; j < dim; j++)
 				{
 					// Get pair.
-					pair<int, int> value = make_pair(index(i, j), index(i, j + 60));
+					pair<int, int> value = make_pair(index(i, j), index(i, j + vdim));
 	
 					// If both indexes are zeros, do nothing.
 					if (value == zero)
@@ -120,14 +115,14 @@ extern "C" void FUNCNAME(
 					}
 				}
 
-			avxinds.resize(indexes.size() / 8);
+			avxinds.resize(indexes.size() / AVX_VECTOR_SIZE);
 
 			for (int i = 0, iavx = 0, e = indexes.size() / vdim; i < e; i++)
 			{
-				for (int j = 0; j < dim; j += 8)
+				for (int j = 0; j < dim; j += AVX_VECTOR_SIZE)
 				{
 					AVXIndex& index = avxinds[iavx++];
-					for (int k = 0; k < 8; k++)
+					for (int k = 0; k < AVX_VECTOR_SIZE; k++)
 					{
 						index.i[k] = indexes[i * vdim + j + k].i;
 						index.j[k] = indexes[i * vdim + j + k].j;
@@ -152,7 +147,7 @@ extern "C" void FUNCNAME(
 	// Loop to calculate temps.
 	// Note temps vector should not be too large to keep up the caching.
 	vector<double, AlignedAllocator<double> > temps(nno, 1.0);
-	for (int i = 0, vdim8 = vdim / 8, e = avxinds.size() / vdim8; i < e; i++)
+	for (int i = 0, vdim8 = vdim / AVX_VECTOR_SIZE, e = avxinds.size() / vdim8; i < e; i++)
 	{
 		for (int j = 0; j < vdim8; j++)
 		{
@@ -168,7 +163,7 @@ extern "C" void FUNCNAME(
 			const __m128i j32lo = _mm_unpacklo_epi16(j16, int4_0_0_0_0);
 			const __m128i j32hi = _mm_unpackhi_epi16(j16, int4_0_0_0_0);
 
-			const __m256d x64lo = _mm256_load_pd(&x[j * 8]);
+			const __m256d x64lo = _mm256_load_pd(&x[j * AVX_VECTOR_SIZE]);
 
 			__m256d xp64lo = _mm256_sub_pd(double4_1_1_1_1, _mm256_andnot_pd(sign_mask,
 				_mm256_sub_pd(_mm256_mul_pd(x64lo, _mm256_cvtepi32_pd(i32lo)), _mm256_cvtepi32_pd(j32lo))));
@@ -176,7 +171,7 @@ extern "C" void FUNCNAME(
 			const __m256d mask64lo = _mm256_cmp_pd(xp64lo, double4_0_0_0_0, _CMP_GT_OQ);
 			xp64lo = _mm256_blendv_pd(double4_0_0_0_0, xp64lo, mask64lo);
 
-			const __m256d x64hi = _mm256_load_pd(&x[j * 8 + 4]);
+			const __m256d x64hi = _mm256_load_pd(&x[j * AVX_VECTOR_SIZE + sizeof(x64lo) / sizeof(double)]);
 
 			__m256d xp64hi = _mm256_sub_pd(double4_1_1_1_1, _mm256_andnot_pd(sign_mask,
 				_mm256_sub_pd(_mm256_mul_pd(x64hi, _mm256_cvtepi32_pd(i32hi)), _mm256_cvtepi32_pd(j32hi))));
@@ -184,10 +179,10 @@ extern "C" void FUNCNAME(
 			const __m256d mask64hi = _mm256_cmp_pd(xp64hi, double4_0_0_0_0, _CMP_GT_OQ);
 			xp64hi = _mm256_blendv_pd(double4_0_0_0_0, xp64hi, mask64hi);
 
-			double xp[8] __attribute__((aligned(16)));
+			double xp[AVX_VECTOR_SIZE] __attribute__((aligned(AVX_VECTOR_SIZE * sizeof(double))));
 			_mm256_store_pd(&xp[0], xp64lo);
-			_mm256_store_pd(&xp[4], xp64hi);
-			for (int k = 0; k < 8; k++)
+			_mm256_store_pd(&xp[0 + sizeof(xp64lo) / sizeof(double)], xp64hi);
+			for (int k = 0; k < AVX_VECTOR_SIZE; k++)
 			{
 				uint16_t& rowind = index.rowind[k];
 		
@@ -205,7 +200,8 @@ extern "C" void FUNCNAME(
 
 		const __m256d temp64 = _mm256_set1_pd(temp);
 
-		for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice += 4)
+		for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e;
+			Dof_choice += sizeof(temp64) / sizeof(double))
 		{
 			const __m256d surplus64 = _mm256_load_pd(&surplus(i, Dof_choice));
 			__m256d value64 = _mm256_load_pd(&value[Dof_choice - b]);
@@ -220,7 +216,7 @@ extern "C" void FUNCNAME(
 	// Loop to calculate temps.
 	// Note temps vector should not be too large to keep up the caching.
 	vector<double> temps(nno, 1.0);
-	for (int i = 0, vdim8 = vdim / 8, e = avxinds.size() / vdim8; i < e; i++)
+	for (int i = 0, vdim8 = vdim / AVX_VECTOR_SIZE, e = avxinds.size() / vdim8; i < e; i++)
 	{
 		for (int j = 0; j < vdim8; j++)
 		{
@@ -232,7 +228,7 @@ extern "C" void FUNCNAME(
 				uint8_t& ind_j = index.j[k];
 				uint16_t& rowind = index.rowind[k];
 
-				double xp = LinearBasis(x[j * 8 + k], ind_i, ind_j);
+				double xp = LinearBasis(x[j * AVX_VECTOR_SIZE + k], ind_i, ind_j);
 
 				xp = fmax(0.0, xp);
 		
