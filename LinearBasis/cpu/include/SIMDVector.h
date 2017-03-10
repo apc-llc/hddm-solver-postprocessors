@@ -17,8 +17,8 @@ public :
 #ifdef HAVE_AVX
 		switch (szelement)
 		{
-		case 4 : return 8;
-		case 8 : return 4;
+		case 4 : return 16;
+		case 8 : return 8;
 		default :
 			{
 				MPI_Process* process;
