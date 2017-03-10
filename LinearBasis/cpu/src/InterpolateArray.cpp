@@ -130,10 +130,7 @@ extern "C" void FUNCNAME(
 					}
 				}
 			}
-			
-			cout << "Compressed " << nno << " sparse rows into " <<
-				(indexes.size() / vdim) << " dense rows" << endl;
-		
+					
 			initialized = true;
 		}
 	}
@@ -209,7 +206,7 @@ extern "C" void FUNCNAME(
 			// XXX Can be FMA here, if AVX2 is available
 			value64 = _mm256_add_pd(value64, _mm256_mul_pd(temp64, surplus64));
 
-			_mm256_storeu_pd(&value[Dof_choice - b], value64);
+			_mm256_store_pd(&value[Dof_choice - b], value64);
 		}
 	}		
 #else

@@ -46,11 +46,13 @@ struct AVXIndex
 
 static vector<vector<AVXIndex, AlignedAllocator<AVXIndex> > > avxinds_;
 
+static vector<Matrix<double> > surplus_;
+
 extern "C" void FUNCNAME(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
-	const Matrix<int>* index_, const Matrix<double>* surplus_, double** value_)
+	const Matrix<int>* index_, const Matrix<double>* surplus__, double** value_)
 {
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
 	// boundary to keep up the required alignment.
@@ -62,7 +64,6 @@ extern "C" void FUNCNAME(
 	{
 		const double* x = x_[many];
 		const Matrix<int>& index = index_[many];
-		const Matrix<double>& surplus = surplus_[many];
 		double* value = value_[many];
 
 #ifdef HAVE_AVX
@@ -83,12 +84,15 @@ extern "C" void FUNCNAME(
 
 				indexes_.resize(count);
 				avxinds_.resize(count);
+				surplus_.resize(count);
 		
 				for (int many = 0; many < count; many++)
 				{
 					vector<Index>& indexes = indexes_[many];
+					Matrix<double>& surplus = surplus_[many];
 					
 					indexes.resize(vdim);
+					surplus.resize(nno, surplus__[many].dimx());
 
 					// Convert (i, I) indexes matrix to sparse format.
 					for (int i = 0; i < nno; i++)
@@ -125,9 +129,67 @@ extern "C" void FUNCNAME(
 				
 								index.i = value.first;
 								index.j = value.second;
-								index.rowind = i;				
+								index.rowind = i;
 							}
 						}
+
+#if 0
+					cout << "Before reordering: " << endl;
+					for (int i = 0, order = 0, e = indexes.size() / vdim; i < e; i++)
+					{
+						cout << "row " << i << " : ";
+						for (int j = 0; j < dim; j++)
+						{
+							Index& index = indexes[i * vdim + j];
+
+							cout << "{[" << index.i << "," << index.j << "]," << index.rowind << "} ";
+						}
+						cout << endl;
+					}
+					
+					// Reorder indexes and surpluses.
+					map<int, int> mapping;
+					for (int i = 0, order = 0, e = indexes.size() / vdim; i < e; i++)
+						for (int j = 0; j < dim; j++)
+						{
+							Index& index = indexes[i * vdim + j];
+
+							if ((index.i == 0) && (index.j == 0)) continue;
+							
+							if (mapping.find(index.rowind) == mapping.end())
+							{
+								mapping[index.rowind] = order;
+								index.rowind = order;
+								order++;
+							}
+							else
+								index.rowind = mapping[index.rowind];
+						}
+					for (int oldind = 0; oldind < nno; oldind++)
+					{
+						int newind = oldind;
+						if (mapping.find(oldind) != mapping.end())
+							newind = mapping[oldind];
+						
+						memcpy(&surplus(newind, 0), &(surplus__[many](oldind, 0)), surplus.dimx() * sizeof(double));
+					}
+
+					cout << endl << "After reordering: " << endl;
+					for (int i = 0, order = 0, e = indexes.size() / vdim; i < e; i++)
+					{
+						cout << "row " << i << " : ";
+						for (int j = 0; j < dim; j++)
+						{
+							Index& index = indexes[i * vdim + j];
+
+							cout << "{[" << index.i << "," << index.j << "]," << index.rowind << "} ";
+						}
+						cout << endl;
+					}
+#else
+					for (int i = 0; i < nno; i++)
+						memcpy(&surplus(i, 0), &(surplus__[many](i, 0)), surplus.dimx() * sizeof(double));
+#endif
 
 					vector<AVXIndex, AlignedAllocator<AVXIndex> >& avxinds = avxinds_[many];
 
@@ -146,14 +208,13 @@ extern "C" void FUNCNAME(
 							}
 						}
 					}
-					
-					cout << "Compressed " << nno << " sparse rows into " <<
-						(indexes.size() / vdim) << " dense rows" << endl;
 				}
 			
 				initialized = true;
 			}
 		}
+
+		const Matrix<double>& surplus = surplus_[many];
 
 		vector<AVXIndex, AlignedAllocator<AVXIndex> >& avxinds = avxinds_[many];
 
@@ -198,7 +259,7 @@ extern "C" void FUNCNAME(
 				const __m256d mask64hi = _mm256_cmp_pd(xp64hi, double4_0_0_0_0, _CMP_GT_OQ);
 				xp64hi = _mm256_blendv_pd(double4_0_0_0_0, xp64hi, mask64hi);
 
-				double xp[AVX_VECTOR_SIZE] __attribute__((aligned(16)));
+				double xp[AVX_VECTOR_SIZE] __attribute__((aligned(AVX_VECTOR_SIZE * sizeof(double))));
 				_mm256_store_pd(&xp[0], xp64lo);
 				_mm256_store_pd(&xp[0 + sizeof(xp64lo) / sizeof(double)], xp64hi);
 				for (int k = 0; k < AVX_VECTOR_SIZE; k++)
@@ -210,6 +271,13 @@ extern "C" void FUNCNAME(
 				}
 			}			
 		}
+
+#if 0
+		cout << "temps : ";
+		for (int i = 0; i < nno; i++)
+			cout << "{" << temps[i] << "," << i << "} ";
+		cout << endl;
+#endif
 		
 		// Loop to calculate values.
 		for (int i = 0; i < nno; i++)
@@ -228,7 +296,7 @@ extern "C" void FUNCNAME(
 				// XXX Can be FMA here, if AVX2 is available
 				value64 = _mm256_add_pd(value64, _mm256_mul_pd(temp64, surplus64));
 
-				_mm256_storeu_pd(&value[Dof_choice - b], value64);
+				_mm256_store_pd(&value[Dof_choice - b], value64);
 			}
 		}
 #else
@@ -263,7 +331,7 @@ extern "C" void FUNCNAME(
 			if (!temp) continue;
 
 			for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
-				value[Dof_choice - b] += temps[i] * surplus(i, Dof_choice);
+				value[Dof_choice - b] += temp * surplus(i, Dof_choice);
 		}		
 #endif
 	}
