@@ -117,7 +117,7 @@ public :
 		return data[x];
 	}
 	
-	inline __attribute__((always_inline)) int length() { return data.size(); }
+	inline __attribute__((always_inline)) int length() const { return data.size(); }
 	
 	inline __attribute__((always_inline)) void resize(int length) { data.resize(length); }
 };
@@ -160,9 +160,9 @@ public :
 		return data[index];
 	}
 
-	inline __attribute__((always_inline)) int dimy() { return dimY; }
+	inline __attribute__((always_inline)) int dimy() const { return dimY; }
 
-	inline __attribute__((always_inline)) int dimx() { return dimX; }
+	inline __attribute__((always_inline)) int dimx() const { return dimX; }
 		
 	inline __attribute__((always_inline)) void resize(int dimY_, int dimX_)
 	{
