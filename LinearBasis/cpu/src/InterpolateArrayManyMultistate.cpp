@@ -132,7 +132,7 @@ extern "C" void FUNCNAME(
 								index.rowind = i;
 							}
 						}
-
+					
 #if 0
 					cout << "Before reordering: " << endl;
 					for (int i = 0, order = 0, e = indexes.size() / vdim; i < e; i++)
@@ -146,6 +146,7 @@ extern "C" void FUNCNAME(
 						}
 						cout << endl;
 					}
+#endif
 					
 					// Reorder indexes and surpluses.
 					map<int, int> mapping;
@@ -165,15 +166,21 @@ extern "C" void FUNCNAME(
 							else
 								index.rowind = mapping[index.rowind];
 						}
-					for (int oldind = 0; oldind < nno; oldind++)
+					
+					// Do not forget to reorder surpluses for unseen indexes.
+					for (int i = 0, last = mapping.size(); i < nno; i++)
+						if (mapping.find(i) == mapping.end())
+							mapping[i] = last++;
+
+					for (map<int, int>::iterator i = mapping.begin(), e = mapping.end(); i != e; i++)
 					{
-						int newind = oldind;
-						if (mapping.find(oldind) != mapping.end())
-							newind = mapping[oldind];
+						int oldind = i->first;
+						int newind = i->second;
 						
 						memcpy(&surplus(newind, 0), &(surplus__[many](oldind, 0)), surplus.dimx() * sizeof(double));
 					}
 
+#if 0
 					cout << endl << "After reordering: " << endl;
 					for (int i = 0, order = 0, e = indexes.size() / vdim; i < e; i++)
 					{
@@ -186,9 +193,6 @@ extern "C" void FUNCNAME(
 						}
 						cout << endl;
 					}
-#else
-					for (int i = 0; i < nno; i++)
-						memcpy(&surplus(i, 0), &(surplus__[many](i, 0)), surplus.dimx() * sizeof(double));
 #endif
 
 					vector<AVXIndex, AlignedAllocator<AVXIndex> >& avxinds = avxinds_[many];
@@ -272,13 +276,6 @@ extern "C" void FUNCNAME(
 			}			
 		}
 
-#if 0
-		cout << "temps : ";
-		for (int i = 0; i < nno; i++)
-			cout << "{" << temps[i] << "," << i << "} ";
-		cout << endl;
-#endif
-		
 		// Loop to calculate values.
 		for (int i = 0; i < nno; i++)
 		{
@@ -323,7 +320,7 @@ extern "C" void FUNCNAME(
 				}
 			}			
 		}
-		
+
 		// Loop to calculate values.
 		for (int i = 0; i < nno; i++)
 		{

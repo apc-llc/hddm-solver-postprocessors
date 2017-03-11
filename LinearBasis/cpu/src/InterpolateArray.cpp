@@ -46,6 +46,8 @@ struct AVXIndex
 
 static vector<AVXIndex, AlignedAllocator<AVXIndex> > avxinds;
 
+static Matrix<double> surplus;
+
 extern "C" void FUNCNAME(
 	Device* device,
 	const int dim, const int nno,
@@ -57,7 +59,7 @@ extern "C" void FUNCNAME(
 #endif
 
 	const Matrix<int>& index = *index_;
-	const Matrix<double>& surplus = *surplus_;
+	const Matrix<double>& surplus__ = *surplus_;
 
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
 	// boundary to keep up the required alignment.
@@ -75,6 +77,7 @@ extern "C" void FUNCNAME(
 			pair<int, int> zero = make_pair(0, 0);
 
 			indexes.resize(vdim);
+			surplus.resize(nno, surplus__.dimx());
 
 			// Convert (i, I) indexes matrix to sparse format.
 			for (int i = 0; i < nno; i++)
@@ -114,6 +117,38 @@ extern "C" void FUNCNAME(
 						index.rowind = i;				
 					}
 				}
+
+			// Reorder indexes and surpluses.
+			map<int, int> mapping;
+			for (int i = 0, order = 0, e = indexes.size() / vdim; i < e; i++)
+				for (int j = 0; j < dim; j++)
+				{
+					Index& index = indexes[i * vdim + j];
+
+					if ((index.i == 0) && (index.j == 0)) continue;
+					
+					if (mapping.find(index.rowind) == mapping.end())
+					{
+						mapping[index.rowind] = order;
+						index.rowind = order;
+						order++;
+					}
+					else
+						index.rowind = mapping[index.rowind];
+				}
+			
+			// Do not forget to reorder surpluses for unseen indexes.
+			for (int i = 0, last = mapping.size(); i < nno; i++)
+				if (mapping.find(i) == mapping.end())
+					mapping[i] = last++;
+
+			for (map<int, int>::iterator i = mapping.begin(), e = mapping.end(); i != e; i++)
+			{
+				int oldind = i->first;
+				int newind = i->second;
+				
+				memcpy(&surplus(newind, 0), &surplus__(oldind, 0), surplus.dimx() * sizeof(double));
+			}
 
 			avxinds.resize(indexes.size() / AVX_VECTOR_SIZE);
 
