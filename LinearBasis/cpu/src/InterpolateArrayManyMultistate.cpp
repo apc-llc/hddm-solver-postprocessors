@@ -5,6 +5,7 @@
 #endif
 
 #include <algorithm> // min & max
+#include <memory>
 #include <mutex>
 #include <utility> // pair
 
@@ -42,9 +43,118 @@ struct AVXIndex
 		memset(j, 0, sizeof(j));
 		memset(rowind, 0, sizeof(rowind));
 	}
+	
+	bool isEmpty()
+	{
+		AVXIndex empty;
+		if (memcmp(this, &empty, sizeof(AVXIndex)) == 0)
+			return true;
+		
+		return false;
+	}
 };
 
-static vector<vector<AVXIndex, AlignedAllocator<AVXIndex> > > avxinds_;
+class AVXIndexes: private vector<char, AlignedAllocator<AVXIndex> >
+{
+	int nnoMax;
+	int dim;
+	
+	static const int szlength = 4 * sizeof(double);
+
+	__attribute__((always_inline))
+	static int nnoMaxAlign(int nnoMax_)
+	{
+		// Pad indexes rows to AVX_VECTOR_SIZE.
+		if (nnoMax_ % AVX_VECTOR_SIZE)
+			nnoMax_ += AVX_VECTOR_SIZE - nnoMax_ % AVX_VECTOR_SIZE;
+
+		return nnoMax_ / AVX_VECTOR_SIZE;
+	}
+	
+	__attribute__((always_inline))
+	int& length(int j)
+	{
+		return reinterpret_cast<int*>(
+			reinterpret_cast<char*>(&this->operator()(0, j)) - sizeof(int))[0];
+	}
+
+	__attribute__((always_inline))
+	const int& length(int j) const
+	{
+		return reinterpret_cast<const int*>(
+			reinterpret_cast<const char*>(&this->operator()(0, j)) - sizeof(int))[0];
+	}
+	
+	__attribute__((always_inline))
+	void setLength(int j, int length_)
+	{
+		length(j) = length_;
+	}
+
+public :
+
+	AVXIndexes() :
+		nnoMax(0), dim(0),
+		vector<char, AlignedAllocator<AVXIndex> >()
+	
+	{ }
+
+	AVXIndexes(int nnoMax_, int dim_) :
+		nnoMax(nnoMaxAlign(nnoMax_)), dim(dim_),
+		vector<char, AlignedAllocator<AVXIndex> >(
+			dim_ * (nnoMaxAlign(nnoMax_) * sizeof(AVXIndex) + szlength))
+
+	{ }
+	
+	void resize(int nnoMax_, int dim_)
+	{
+		nnoMax = nnoMaxAlign(nnoMax_);
+		dim = dim_;
+
+		vector<char, AlignedAllocator<AVXIndex> >::resize(
+			dim_ * (nnoMaxAlign(nnoMax_) * sizeof(AVXIndex) + szlength));
+	}
+	
+	__attribute__((always_inline))
+	AVXIndex& operator()(int i, int j)
+	{
+		return *reinterpret_cast<AVXIndex*>(
+			&vector<char, AlignedAllocator<AVXIndex> >::operator[]((j * nnoMax + i) * sizeof(AVXIndex) + (j + 1) * szlength));
+	}
+
+	__attribute__((always_inline))
+	const AVXIndex& operator()(int i, int j) const
+	{
+		return *reinterpret_cast<const AVXIndex*>(
+			&vector<char, AlignedAllocator<AVXIndex> >::operator[]((j * nnoMax + i) * sizeof(AVXIndex) + (j + 1) * szlength));
+	}
+	
+	__attribute__((always_inline))
+	int getLength(int j) const
+	{
+		return length(j);
+	}
+	
+	void calculateLengths()
+	{
+		for (int j = 0; j < dim; j++)
+		{
+			int length = 0;
+			for (int i = 0; i < nnoMax; i++)
+			{
+				AVXIndex& index = this->operator()(i, j);
+				if (index.isEmpty())
+					break;
+				
+				length++;
+			}
+			
+			setLength(j, length);
+		}
+	}
+};
+
+static vector<AVXIndexes> avxinds_;
 
 static vector<Matrix<double> > surplus_;
 
@@ -201,24 +311,25 @@ extern "C" void FUNCNAME(
 					}
 #endif
 
-					vector<AVXIndex, AlignedAllocator<AVXIndex> >& avxinds = avxinds_[many];
+					AVXIndexes& avxinds = avxinds_[many];
+					avxinds.resize(nno, dim);
 
-					avxinds.resize(indexes.size());
-
-					for (int j = 0, iavx = 0, length = indexes.size() / dim; j < dim; j++)
+					for (int j = 0, iavx = 0, length = indexes.size() / dim / AVX_VECTOR_SIZE; j < dim; j++)
 					{
-						for (int i = 0; i < length; i += AVX_VECTOR_SIZE)
+						for (int i = 0; i < length; i++)
 						{
-							AVXIndex& index = avxinds[iavx++];
+							AVXIndex& index = avxinds(i, j);
 							for (int k = 0; k < AVX_VECTOR_SIZE; k++)
 							{
-								int idx = (i + k) * dim + j;
+								int idx = (i * AVX_VECTOR_SIZE + k) * dim + j;
 								index.i[k] = indexes[idx].i;
 								index.j[k] = indexes[idx].j;
 								index.rowind[k] = indexes[idx].rowind;
 							}
 						}
 					}
+					
+					avxinds.calculateLengths();
 				}
 			
 				initialized = true;
@@ -227,7 +338,7 @@ extern "C" void FUNCNAME(
 
 		const Matrix<double>& surplus = surplus_[many];
 
-		vector<AVXIndex, AlignedAllocator<AVXIndex> >& avxinds = avxinds_[many];
+		AVXIndexes& avxinds = avxinds_[many];
 
 #ifdef HAVE_AVX
 		const __m256d double4_0_0_0_0 = _mm256_setzero_pd();
@@ -237,13 +348,13 @@ extern "C" void FUNCNAME(
 
 		// Loop to calculate temps.
 		vector<double> temps(nno, 1.0);
-		for (int j = 0, length = avxinds.size() / dim / AVX_VECTOR_SIZE; j < dim; j++)
+		for (int j = 0; j < dim; j++)
 		{
 			const __m256d x64 = _mm256_set1_pd(x[j]);
 		
-			for (int i = 0; i < length; i++)
+			for (int i = 0, e = avxinds.getLength(j); i < e; i++)
 			{
-				AVXIndex& index = avxinds[j * length + i];
+				AVXIndex& index = avxinds(i, j);
 
 				const __m128i ij8 = _mm_load_si128(reinterpret_cast<const __m128i*>(&index));
 				const __m128i i16 = _mm_unpacklo_epi8(ij8, int4_0_0_0_0);
@@ -303,13 +414,13 @@ extern "C" void FUNCNAME(
 #else
 		// Loop to calculate temps.
 		vector<double> temps(nno, 1.0);
-		for (int j = 0, length = avxinds.size() / dim / AVX_VECTOR_SIZE; j < dim; j++)
+		for (int j = 0; j < dim; j++)
 		{
 			double xx = x[j];
 		
-			for (int i = 0; i < length; i++)
+			for (int i = 0, e = avxinds.getLength(j); i < e; i++)
 			{
-				AVXIndex& index = avxinds[j * length + i];
+				AVXIndex& index = avxinds(i, j);
 
 				for (int k = 0; k < AVX_VECTOR_SIZE; k++)
 				{
