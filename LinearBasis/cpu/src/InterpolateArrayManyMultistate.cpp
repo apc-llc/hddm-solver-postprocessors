@@ -91,7 +91,7 @@ extern "C" void FUNCNAME(
 					vector<Index>& indexes = indexes_[many];
 					Matrix<double>& surplus = surplus_[many];
 					
-					indexes.resize(vdim);
+					indexes.resize(dim);
 					surplus.resize(nno, surplus__[many].dimx());
 
 					// Convert (i, I) indexes matrix to sparse format.
@@ -107,9 +107,9 @@ extern "C" void FUNCNAME(
 			
 							// Find free position for non-zero pair.
 							bool foundPosition = false;
-							for (int irow = 0, nrows = indexes.size() / vdim; irow < nrows; irow++)
+							for (int irow = 0, nrows = indexes.size() / dim; irow < nrows; irow++)
 							{
-								Index& index = indexes[irow * vdim + j];
+								Index& index = indexes[irow * dim + j];
 								if (make_pair(index.i, index.j) == zero)
 								{
 									index.i = value.first;
@@ -123,9 +123,9 @@ extern "C" void FUNCNAME(
 							if (!foundPosition)
 							{
 								// Add new free row.
-								indexes.resize(indexes.size() + vdim);
+								indexes.resize(indexes.size() + dim);
 
-								Index& index = indexes[indexes.size() - vdim + j];
+								Index& index = indexes[indexes.size() - dim + j];
 				
 								index.i = value.first;
 								index.j = value.second;
@@ -135,12 +135,12 @@ extern "C" void FUNCNAME(
 					
 #if 0
 					cout << "Before reordering: " << endl;
-					for (int i = 0, order = 0, e = indexes.size() / vdim; i < e; i++)
+					for (int i = 0, order = 0, e = indexes.size() / dim; i < e; i++)
 					{
 						cout << "row " << i << " : ";
 						for (int j = 0; j < dim; j++)
 						{
-							Index& index = indexes[i * vdim + j];
+							Index& index = indexes[i * dim + j];
 
 							cout << "{[" << index.i << "," << index.j << "]," << index.rowind << "} ";
 						}
@@ -148,12 +148,12 @@ extern "C" void FUNCNAME(
 					}
 #endif
 					
-					// Reorder indexes and surpluses.
+					// Reorder indexes.
 					map<int, int> mapping;
-					for (int i = 0, order = 0, e = indexes.size() / vdim; i < e; i++)
-						for (int j = 0; j < dim; j++)
+					for (int j = 0, order = 0; j < dim; j++)
+						for (int i = 0, e = indexes.size() / dim; i < e; i++)
 						{
-							Index& index = indexes[i * vdim + j];
+							Index& index = indexes[i * dim + j];
 
 							if ((index.i == 0) && (index.j == 0)) continue;
 							
@@ -167,11 +167,17 @@ extern "C" void FUNCNAME(
 								index.rowind = mapping[index.rowind];
 						}
 					
-					// Do not forget to reorder surpluses for unseen indexes.
+					// Pad indexes rows to AVX_VECTOR_SIZE.
+					if ((indexes.size() / dim) % AVX_VECTOR_SIZE)
+						indexes.resize(indexes.size() +
+							dim * (AVX_VECTOR_SIZE - (indexes.size() / dim) % AVX_VECTOR_SIZE));
+					
+					// Do not forget to reorder unseen indexes.
 					for (int i = 0, last = mapping.size(); i < nno; i++)
 						if (mapping.find(i) == mapping.end())
 							mapping[i] = last++;
 
+					// Reorder surpluses.
 					for (map<int, int>::iterator i = mapping.begin(), e = mapping.end(); i != e; i++)
 					{
 						int oldind = i->first;
@@ -182,12 +188,12 @@ extern "C" void FUNCNAME(
 
 #if 0
 					cout << endl << "After reordering: " << endl;
-					for (int i = 0, order = 0, e = indexes.size() / vdim; i < e; i++)
+					for (int i = 0, order = 0, e = indexes.size() / dim; i < e; i++)
 					{
 						cout << "row " << i << " : ";
 						for (int j = 0; j < dim; j++)
 						{
-							Index& index = indexes[i * vdim + j];
+							Index& index = indexes[i * dim + j];
 
 							cout << "{[" << index.i << "," << index.j << "]," << index.rowind << "} ";
 						}
@@ -197,18 +203,19 @@ extern "C" void FUNCNAME(
 
 					vector<AVXIndex, AlignedAllocator<AVXIndex> >& avxinds = avxinds_[many];
 
-					avxinds.resize(indexes.size() / AVX_VECTOR_SIZE);
+					avxinds.resize(indexes.size());
 
-					for (int i = 0, iavx = 0, e = indexes.size() / vdim; i < e; i++)
+					for (int j = 0, iavx = 0, length = indexes.size() / dim; j < dim; j++)
 					{
-						for (int j = 0; j < dim; j += AVX_VECTOR_SIZE)
+						for (int i = 0; i < length; i += AVX_VECTOR_SIZE)
 						{
 							AVXIndex& index = avxinds[iavx++];
 							for (int k = 0; k < AVX_VECTOR_SIZE; k++)
 							{
-								index.i[k] = indexes[i * vdim + j + k].i;
-								index.j[k] = indexes[i * vdim + j + k].j;
-								index.rowind[k] = indexes[i * vdim + j + k].rowind;
+								int idx = (i + k) * dim + j;
+								index.i[k] = indexes[idx].i;
+								index.j[k] = indexes[idx].j;
+								index.rowind[k] = indexes[idx].rowind;
 							}
 						}
 					}
@@ -229,15 +236,16 @@ extern "C" void FUNCNAME(
 		const __m128i int4_0_0_0_0 = _mm_setzero_si128();
 
 		// Loop to calculate temps.
-		// Note temps vector should not be too large to keep up the caching.
-		vector<double, AlignedAllocator<double> > temps(nno, 1.0);
-		for (int i = 0, vdim8 = vdim / AVX_VECTOR_SIZE, e = avxinds.size() / vdim8; i < e; i++)
+		vector<double> temps(nno, 1.0);
+		for (int j = 0, length = avxinds.size() / dim / AVX_VECTOR_SIZE; j < dim; j++)
 		{
-			for (int j = 0; j < vdim8; j++)
+			const __m256d x64 = _mm256_set1_pd(x[j]);
+		
+			for (int i = 0; i < length; i++)
 			{
-				AVXIndex& index = avxinds[i * vdim8 + j];
+				AVXIndex& index = avxinds[j * length + i];
 
-				const __m128i ij8 = _mm_load_si128(reinterpret_cast<const __m128i*>(&avxinds[i * vdim8 + j]));
+				const __m128i ij8 = _mm_load_si128(reinterpret_cast<const __m128i*>(&index));
 				const __m128i i16 = _mm_unpacklo_epi8(ij8, int4_0_0_0_0);
 				const __m128i j16 = _mm_unpackhi_epi8(ij8, int4_0_0_0_0);
 
@@ -247,18 +255,14 @@ extern "C" void FUNCNAME(
 				const __m128i j32lo = _mm_unpacklo_epi16(j16, int4_0_0_0_0);
 				const __m128i j32hi = _mm_unpackhi_epi16(j16, int4_0_0_0_0);
 
-				const __m256d x64lo = _mm256_load_pd(&x[j * AVX_VECTOR_SIZE]);
-
 				__m256d xp64lo = _mm256_sub_pd(double4_1_1_1_1, _mm256_andnot_pd(sign_mask,
-					_mm256_sub_pd(_mm256_mul_pd(x64lo, _mm256_cvtepi32_pd(i32lo)), _mm256_cvtepi32_pd(j32lo))));
+					_mm256_sub_pd(_mm256_mul_pd(x64, _mm256_cvtepi32_pd(i32lo)), _mm256_cvtepi32_pd(j32lo))));
 
 				const __m256d mask64lo = _mm256_cmp_pd(xp64lo, double4_0_0_0_0, _CMP_GT_OQ);
 				xp64lo = _mm256_blendv_pd(double4_0_0_0_0, xp64lo, mask64lo);
 
-				const __m256d x64hi = _mm256_load_pd(&x[j * AVX_VECTOR_SIZE + sizeof(x64lo) / sizeof(double)]);
-
 				__m256d xp64hi = _mm256_sub_pd(double4_1_1_1_1, _mm256_andnot_pd(sign_mask,
-					_mm256_sub_pd(_mm256_mul_pd(x64hi, _mm256_cvtepi32_pd(i32hi)), _mm256_cvtepi32_pd(j32hi))));
+					_mm256_sub_pd(_mm256_mul_pd(x64, _mm256_cvtepi32_pd(i32hi)), _mm256_cvtepi32_pd(j32hi))));
 
 				const __m256d mask64hi = _mm256_cmp_pd(xp64hi, double4_0_0_0_0, _CMP_GT_OQ);
 				xp64hi = _mm256_blendv_pd(double4_0_0_0_0, xp64hi, mask64hi);
@@ -298,13 +302,14 @@ extern "C" void FUNCNAME(
 		}
 #else
 		// Loop to calculate temps.
-		// Note temps vector should not be too large to keep up the caching.
 		vector<double> temps(nno, 1.0);
-		for (int i = 0, vdim8 = vdim / AVX_VECTOR_SIZE, e = avxinds.size() / vdim8; i < e; i++)
+		for (int j = 0, length = avxinds.size() / dim / AVX_VECTOR_SIZE; j < dim; j++)
 		{
-			for (int j = 0; j < vdim8; j++)
+			double xx = x[j];
+		
+			for (int i = 0; i < length; i++)
 			{
-				AVXIndex& index = avxinds[i * vdim8 + j];
+				AVXIndex& index = avxinds[j * length + i];
 
 				for (int k = 0; k < AVX_VECTOR_SIZE; k++)
 				{
@@ -312,7 +317,7 @@ extern "C" void FUNCNAME(
 					uint8_t& ind_j = index.j[k];
 					uint16_t& rowind = index.rowind[k];
 
-					double xp = LinearBasis(x[j * AVX_VECTOR_SIZE + k], ind_i, ind_j);
+					double xp = LinearBasis(xx, ind_i, ind_j);
 
 					xp = fmax(0.0, xp);
 			
