@@ -23,9 +23,9 @@ static bool initialized = false;
 struct Index
 {
 	int i, j;
-	int rowind, oldind;
+	int rowind;
 
-	Index() : i(0), j(0), rowind(0), oldind(0) { }
+	Index() : i(0), j(0), rowind(0) { }
 	
 	Index(int i_, int j_, int rowind_) : i(i_), j(j_), rowind(rowind_) { }
 };
@@ -33,24 +33,27 @@ struct Index
 struct AVXIndex
 {
 	uint8_t i[AVX_VECTOR_SIZE], j[AVX_VECTOR_SIZE];
-	uint16_t rowind[AVX_VECTOR_SIZE];
-	uint16_t oldind[AVX_VECTOR_SIZE];
 	
 	AVXIndex()
 	{
 		memset(i, 0, sizeof(i));
 		memset(j, 0, sizeof(j));
-		memset(rowind, 0, sizeof(rowind));
-		memset(oldind, 0, sizeof(oldind));
 	}
 	
-	bool isEmpty()
+	__attribute__((always_inline))
+	bool isEmpty() const
 	{
 		AVXIndex empty;
 		if (memcmp(this, &empty, sizeof(AVXIndex)) == 0)
 			return true;
 		
 		return false;
+	}
+
+	__attribute__((always_inline))
+	bool isEmpty(int k) const
+	{
+		return (i[k] == 0) && (j[k] == 0);
 	}
 };
 
@@ -280,7 +283,6 @@ extern "C" void FUNCNAME(
 							for (int i = 0, e = indexes.size() / dim; i < e; i++)
 							{
 								Index& index = indexes[i * dim + j];
-								index.oldind = index.rowind;
 
 								if ((index.i == 0) && (index.j == 0)) continue;
 							
@@ -317,8 +319,6 @@ extern "C" void FUNCNAME(
 									int idx = (i * AVX_VECTOR_SIZE + k) * dim + j;
 									index.i[k] = indexes[idx].i;
 									index.j[k] = indexes[idx].j;
-									index.rowind[k] = indexes[idx].rowind;
-									index.oldind[k] = indexes[idx].oldind;
 								}
 							}
 						}
@@ -359,55 +359,79 @@ extern "C" void FUNCNAME(
 		
 		vector<map<int, int> >& trans__ = trans_[many];
 
-#if 0
+		int nfreqs = avxinds__.size();
+		int nnoAligned = nno;
+		if (nno % AVX_VECTOR_SIZE)
+			nnoAligned += AVX_VECTOR_SIZE - nno % AVX_VECTOR_SIZE;
+		vector<vector<double, AlignedAllocator<double> > > temps_(nfreqs, vector<double, AlignedAllocator<double> >(nnoAligned, 1.0));
+
+#ifdef HAVE_AVX
 		const __m256d double4_0_0_0_0 = _mm256_setzero_pd();
 		const __m256d double4_1_1_1_1 = _mm256_set1_pd(1.0);
 		const __m256d sign_mask = _mm256_set1_pd(-0.);
 		const __m128i int4_0_0_0_0 = _mm_setzero_si128();
 
-		// Loop to calculate temps.
-		vector<double> temps(nno, 1.0);
-		for (int j = 0; j < dim; j++)
+		// Loop through all frequences.
+		for (int ifreq = 0; ifreq < nfreqs; ifreq++)
 		{
-			const __m256d x64 = _mm256_set1_pd(x[j]);
-		
-			for (int i = 0, e = avxinds.getLength(j); i < e; i++)
+			const AVXIndexes& avxinds = avxinds__[ifreq];
+			vector<double, AlignedAllocator<double> >& temps = temps_[ifreq];
+
+			// Loop to calculate temps.
+			for (int j = 0, itemp = 0; j < dim; j++)
 			{
-				AVXIndex& index = avxinds(i, j);
-
-				const __m128i ij8 = _mm_load_si128(reinterpret_cast<const __m128i*>(&index));
-				const __m128i i16 = _mm_unpacklo_epi8(ij8, int4_0_0_0_0);
-				const __m128i j16 = _mm_unpackhi_epi8(ij8, int4_0_0_0_0);
-
-				const __m128i i32lo = _mm_unpacklo_epi16(i16, int4_0_0_0_0);
-				const __m128i i32hi = _mm_unpackhi_epi16(i16, int4_0_0_0_0);
-
-				const __m128i j32lo = _mm_unpacklo_epi16(j16, int4_0_0_0_0);
-				const __m128i j32hi = _mm_unpackhi_epi16(j16, int4_0_0_0_0);
-
-				__m256d xp64lo = _mm256_sub_pd(double4_1_1_1_1, _mm256_andnot_pd(sign_mask,
-					_mm256_sub_pd(_mm256_mul_pd(x64, _mm256_cvtepi32_pd(i32lo)), _mm256_cvtepi32_pd(j32lo))));
-
-				const __m256d mask64lo = _mm256_cmp_pd(xp64lo, double4_0_0_0_0, _CMP_GT_OQ);
-				xp64lo = _mm256_blendv_pd(double4_0_0_0_0, xp64lo, mask64lo);
-
-				__m256d xp64hi = _mm256_sub_pd(double4_1_1_1_1, _mm256_andnot_pd(sign_mask,
-					_mm256_sub_pd(_mm256_mul_pd(x64, _mm256_cvtepi32_pd(i32hi)), _mm256_cvtepi32_pd(j32hi))));
-
-				const __m256d mask64hi = _mm256_cmp_pd(xp64hi, double4_0_0_0_0, _CMP_GT_OQ);
-				xp64hi = _mm256_blendv_pd(double4_0_0_0_0, xp64hi, mask64hi);
-
-				double xp[AVX_VECTOR_SIZE] __attribute__((aligned(AVX_VECTOR_SIZE * sizeof(double))));
-				_mm256_store_pd(&xp[0], xp64lo);
-				_mm256_store_pd(&xp[0 + sizeof(xp64lo) / sizeof(double)], xp64hi);
-				for (int k = 0; k < AVX_VECTOR_SIZE; k++)
+				const __m256d x64 = _mm256_set1_pd(x[j]);
+		
+				for (int i = 0, e = avxinds.getLength(j); i < e; i++, itemp += AVX_VECTOR_SIZE)
 				{
-					uint16_t& rowind = index.rowind[k];
-			
-					// This can be done scalar only.
-					temps[rowind] *= xp[k];
+					const AVXIndex& index = avxinds(i, j);
+
+					const __m128i ij8 = _mm_load_si128(reinterpret_cast<const __m128i*>(&index));
+					const __m128i i16 = _mm_unpacklo_epi8(ij8, int4_0_0_0_0);
+					const __m128i j16 = _mm_unpackhi_epi8(ij8, int4_0_0_0_0);
+
+					const __m128i i32lo = _mm_unpacklo_epi16(i16, int4_0_0_0_0);
+					const __m128i i32hi = _mm_unpackhi_epi16(i16, int4_0_0_0_0);
+
+					const __m128i j32lo = _mm_unpacklo_epi16(j16, int4_0_0_0_0);
+					const __m128i j32hi = _mm_unpackhi_epi16(j16, int4_0_0_0_0);
+
+					__m256d xp64lo = _mm256_sub_pd(double4_1_1_1_1, _mm256_andnot_pd(sign_mask,
+						_mm256_sub_pd(_mm256_mul_pd(x64, _mm256_cvtepi32_pd(i32lo)), _mm256_cvtepi32_pd(j32lo))));
+
+					const __m256d mask64lo = _mm256_cmp_pd(xp64lo, double4_0_0_0_0, _CMP_GT_OQ);
+					xp64lo = _mm256_blendv_pd(double4_0_0_0_0, xp64lo, mask64lo);
+
+					__m256d xp64hi = _mm256_sub_pd(double4_1_1_1_1, _mm256_andnot_pd(sign_mask,
+						_mm256_sub_pd(_mm256_mul_pd(x64, _mm256_cvtepi32_pd(i32hi)), _mm256_cvtepi32_pd(j32hi))));
+
+					const __m256d mask64hi = _mm256_cmp_pd(xp64hi, double4_0_0_0_0, _CMP_GT_OQ);
+					xp64hi = _mm256_blendv_pd(double4_0_0_0_0, xp64hi, mask64hi);
+
+					const __m256d temp64lo = _mm256_loadu_pd(&temps[itemp]);
+					_mm256_storeu_pd(&temps[itemp], _mm256_mul_pd(temp64lo, xp64lo));
+
+					const __m256d temp64hi = _mm256_loadu_pd(&temps[itemp + sizeof(xp64lo) / sizeof(double)]);
+					_mm256_storeu_pd(&temps[itemp + sizeof(xp64lo) / sizeof(double)], _mm256_mul_pd(temp64hi, xp64hi));
+				}			
+
+				if (avxinds.getLength(j))
+				{
+					const AVXIndex& index = avxinds(avxinds.getLength(j) - 1, j);
+					for (int k = AVX_VECTOR_SIZE - 1; k >= 0; k--)
+						if (index.isEmpty(k)) itemp--;
 				}
-			}			
+			}
+		}
+
+		// Join temps from all frequencies.
+		vector<double, AlignedAllocator<double> >& temps = temps_[0];
+		for (int ifreq = 1; ifreq < nfreqs; ifreq++)
+		{
+			vector<double, AlignedAllocator<double> >& temps__ = temps_[ifreq];
+			map<int, int>& trans = trans__[ifreq];
+			for (int i = 0; i < nno; i++)
+				temps[i] *= temps__[trans[i]];
 		}
 
 		// Loop to calculate values.
@@ -431,15 +455,14 @@ extern "C" void FUNCNAME(
 			}
 		}
 #else
-		int nfreqs = avxinds__.size();
-		vector<vector<double> > temps_(nfreqs, vector<double>(nno, 1.0));
+		// Loop through all frequences.
 		for (int ifreq = 0; ifreq < nfreqs; ifreq++)
 		{
 			const AVXIndexes& avxinds = avxinds__[ifreq];
-			vector<double>& temps = temps_[ifreq];
+			vector<double, AlignedAllocator<double> >& temps = temps_[ifreq];
 
 			// Loop to calculate temps.
-			for (int j = 0; j < dim; j++)
+			for (int j = 0, itemp = 0; j < dim; j++)
 			{
 				double xx = x[j];
 		
@@ -447,37 +470,39 @@ extern "C" void FUNCNAME(
 				{
 					const AVXIndex& index = avxinds(i, j);
 
-					for (int k = 0; k < AVX_VECTOR_SIZE; k++)
+					for (int k = 0; k < AVX_VECTOR_SIZE; k++, itemp++)
 					{
 						const uint8_t& ind_i = index.i[k];
 						const uint8_t& ind_j = index.j[k];
-						const uint16_t& rowind = index.rowind[k];
-						const uint16_t& oldind = index.oldind[k];
 
 						double xp = LinearBasis(xx, ind_i, ind_j);
 
 						xp = fmax(0.0, xp);
 			
-						temps[rowind] = xp;
+						temps[itemp] = xp;
 					}
 				}			
+
+				if (avxinds.getLength(j))
+				{
+					const AVXIndex& index = avxinds(avxinds.getLength(j) - 1, j);
+					for (int k = AVX_VECTOR_SIZE - 1; k >= 0; k--)
+						if (index.isEmpty(k)) itemp--;
+				}
 			}
 		}
 
-		// Join temps from all frequencies.
-		vector<double>& temps = temps_[0];
-		for (int ifreq = 1; ifreq < nfreqs; ifreq++)
-		{
-			vector<double>& temps__ = temps_[ifreq];
-			map<int, int>& trans = trans__[ifreq];
-			for (int i = 0; i < nno; i++)
-				temps[i] *= temps__[trans[i]];
-		}
-
 		// Loop to calculate values.
+		vector<double, AlignedAllocator<double> >& temps = temps_[0];
 		for (int i = 0; i < nno; i++)
 		{
 			double temp = temps[i];
+
+			if (!temp) continue;
+
+			for (int ifreq = 1; ifreq < nfreqs; ifreq++)
+				temp *= temps_[ifreq][trans__[ifreq][i]];
+			
 			if (!temp) continue;
 
 			for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
