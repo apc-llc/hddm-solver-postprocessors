@@ -23,25 +23,25 @@ static bool initialized = false;
 struct Index
 {
 	int i, j;
-	int rowind;
+	int rowind, oldind;
 
-	Index() : i(0), j(0), rowind(0) { }
+	Index() : i(0), j(0), rowind(0), oldind(0) { }
 	
 	Index(int i_, int j_, int rowind_) : i(i_), j(j_), rowind(rowind_) { }
 };
-
-static vector<vector<Index> > indexes_;
 
 struct AVXIndex
 {
 	uint8_t i[AVX_VECTOR_SIZE], j[AVX_VECTOR_SIZE];
 	uint16_t rowind[AVX_VECTOR_SIZE];
+	uint16_t oldind[AVX_VECTOR_SIZE];
 	
 	AVXIndex()
 	{
 		memset(i, 0, sizeof(i));
 		memset(j, 0, sizeof(j));
 		memset(rowind, 0, sizeof(rowind));
+		memset(oldind, 0, sizeof(oldind));
 	}
 	
 	bool isEmpty()
@@ -154,9 +154,11 @@ public :
 	}
 };
 
-static vector<AVXIndexes> avxinds_;
+static vector<vector<AVXIndexes> > avxinds_;
 
 static vector<Matrix<double> > surplus_;
+
+static vector<vector<map<int, int> > > trans_;
 
 extern "C" void FUNCNAME(
 	Device* device,
@@ -192,19 +194,14 @@ extern "C" void FUNCNAME(
 			{
 				pair<int, int> zero = make_pair(0, 0);
 
-				indexes_.resize(count);
 				avxinds_.resize(count);
 				surplus_.resize(count);
+				trans_.resize(count);
 		
 				for (int many = 0; many < count; many++)
 				{
-					vector<Index>& indexes = indexes_[many];
-					Matrix<double>& surplus = surplus_[many];
-					
-					indexes.resize(dim);
-					surplus.resize(nno, surplus__[many].dimx());
-
-					// Convert (i, I) indexes matrix to sparse format.
+					// Calculate maximum frequency across row indexes.
+					map<int, int> freqs;
 					for (int i = 0; i < nno; i++)
 						for (int j = 0; j < dim; j++)
 						{
@@ -214,133 +211,278 @@ extern "C" void FUNCNAME(
 							// If both indexes are zeros, do nothing.
 							if (value == zero)
 								continue;
-			
-							// Find free position for non-zero pair.
-							bool foundPosition = false;
-							for (int irow = 0, nrows = indexes.size() / dim; irow < nrows; irow++)
+							
+							freqs[i]++;
+						}
+					int maxFreq = 0;
+					for (map<int, int>::iterator i = freqs.begin(), e = freqs.end(); i != e; i++)
+						maxFreq = max(maxFreq, i->second);
+
+					vector<AVXIndexes>& avxinds__ = avxinds_[many];
+					avxinds__.resize(maxFreq);
+
+					vector<map<int, int> >& trans__ = trans_[many];
+					trans__.resize(maxFreq);
+					
+					for (int freq = 0; freq < maxFreq; freq++)
+					{
+						vector<Index> indexes;
+						indexes.resize(dim);
+
+						// Convert (i, I) indexes matrix to sparse format.
+						vector<int> freqs(nno);
+						for (int i = 0; i < nno; i++)
+							for (int j = 0; j < dim; j++)
 							{
-								Index& index = indexes[irow * dim + j];
-								if (make_pair(index.i, index.j) == zero)
+								// Get pair.
+								pair<int, int> value = make_pair(index(i, j), index(i, j + vdim));
+			
+								// If both indexes are zeros, do nothing.
+								if (value == zero)
+									continue;
+
+								freqs[i]++;
+
+								if (freqs[i] != freq + 1)
+									continue;
+			
+								// Find free position for non-zero pair.
+								bool foundPosition = false;
+								for (int irow = 0, nrows = indexes.size() / dim; irow < nrows; irow++)
 								{
+									Index& index = indexes[irow * dim + j];
+									if (make_pair(index.i, index.j) == zero)
+									{
+										index.i = value.first;
+										index.j = value.second;
+										index.rowind = i;
+
+										foundPosition = true;
+										break;
+									}
+								}
+								if (!foundPosition)
+								{
+									// Add new free row.
+									indexes.resize(indexes.size() + dim);
+
+									Index& index = indexes[indexes.size() - dim + j];
+				
 									index.i = value.first;
 									index.j = value.second;
 									index.rowind = i;
-
-									foundPosition = true;
-									break;
 								}
 							}
-							if (!foundPosition)
-							{
-								// Add new free row.
-								indexes.resize(indexes.size() + dim);
-
-								Index& index = indexes[indexes.size() - dim + j];
-				
-								index.i = value.first;
-								index.j = value.second;
-								index.rowind = i;
-							}
-						}
 					
 #if 0
-					cout << "Before reordering: " << endl;
-					for (int i = 0, order = 0, e = indexes.size() / dim; i < e; i++)
-					{
-						cout << "row " << i << " : ";
-						for (int j = 0; j < dim; j++)
+						cout << "Before reordering: " << endl;
+						for (int i = 0, order = 0, e = indexes.size() / dim; i < e; i++)
 						{
-							Index& index = indexes[i * dim + j];
+							cout << "row " << i << " : ";
+							for (int j = 0; j < dim; j++)
+							{
+								Index& index = indexes[i * dim + j];
 
-							cout << "{[" << index.i << "," << index.j << "]," << index.rowind << "} ";
+								cout << "{[" << index.i << "," << index.j << "]," << index.rowind << "} ";
+							}
+							cout << endl;
 						}
-						cout << endl;
-					}
 #endif
 					
-					// Reorder indexes.
-					map<int, int> mapping;
-					for (int j = 0, order = 0; j < dim; j++)
-						for (int i = 0, e = indexes.size() / dim; i < e; i++)
-						{
-							Index& index = indexes[i * dim + j];
-
-							if ((index.i == 0) && (index.j == 0)) continue;
-							
-							if (mapping.find(index.rowind) == mapping.end())
+						// Reorder indexes.
+						map<int, int>& trans = trans__[freq];
+						for (int j = 0, order = 0; j < dim; j++)
+							for (int i = 0, e = indexes.size() / dim; i < e; i++)
 							{
-								mapping[index.rowind] = order;
-								index.rowind = order;
-								order++;
+								Index& index = indexes[i * dim + j];
+								index.oldind = index.rowind;
+
+								if ((index.i == 0) && (index.j == 0)) continue;
+							
+								if (trans.find(index.rowind) == trans.end())
+								{
+									trans[index.rowind] = order;
+									index.rowind = order;
+									order++;
+								}
+								else
+									index.rowind = trans[index.rowind];
 							}
-							else
-								index.rowind = mapping[index.rowind];
+					
+						// Pad indexes rows to AVX_VECTOR_SIZE.
+						if ((indexes.size() / dim) % AVX_VECTOR_SIZE)
+							indexes.resize(indexes.size() +
+								dim * (AVX_VECTOR_SIZE - (indexes.size() / dim) % AVX_VECTOR_SIZE));
+					
+						// Do not forget to reorder unseen indexes.
+						for (int i = 0, last = trans.size(); i < nno; i++)
+							if (trans.find(i) == trans.end())
+								trans[i] = last++;
+
+#if 0
+						cout << endl << "After reordering: " << endl;
+						for (int i = 0, order = 0, e = indexes.size() / dim; i < e; i++)
+						{
+							cout << "row " << i << " : ";
+							for (int j = 0; j < dim; j++)
+							{
+								Index& index = indexes[i * dim + j];
+
+								cout << "{[" << index.i << "," << index.j << "]," << index.rowind << "} ";
+							}
+							cout << endl;
+						}
+#endif
+
+						AVXIndexes& avxinds = avxinds__[freq];
+						avxinds.resize(nno, dim);
+
+						if (freq != 0) trans__[freq].clear();
+						for (int j = 0, iavx = 0, length = indexes.size() / dim / AVX_VECTOR_SIZE; j < dim; j++)
+						{
+							for (int i = 0; i < length; i++)
+							{
+								AVXIndex& index = avxinds(i, j);
+								for (int k = 0; k < AVX_VECTOR_SIZE; k++)
+								{
+									int idx = (i * AVX_VECTOR_SIZE + k) * dim + j;
+									index.i[k] = indexes[idx].i;
+									index.j[k] = indexes[idx].j;
+									index.rowind[k] = indexes[idx].rowind;
+									index.oldind[k] = indexes[idx].oldind;
+								
+									if (freq != 0)
+									{
+										const AVXIndexes& avxinds_ = avxinds__[0];
+
+										bool found = false;
+										for (int j = 0; j < dim; j++)
+										{
+											for (int i = 0, e = avxinds_.getLength(j); i < e; i++)
+											{
+												const AVXIndex& index_ = avxinds_(i, j);
+
+												for (int k = 0; k < AVX_VECTOR_SIZE; k++)
+												{
+													const uint16_t& rowind = index_.rowind[k];
+													const uint16_t& oldind = index_.oldind[k];
+
+													if (indexes[idx].oldind == oldind)
+													{
+														trans__[freq][rowind] = indexes[idx].rowind;
+														found = true;
+														cout << indexes[idx].rowind << " -> " << rowind << endl;
+														goto finish;
+													}
+												}
+											}
+										}
+									finish :
+										if (!found)
+										{
+											cerr << "Not found!" << endl;
+											exit(1);
+										}
+									}
+								}
+							}
 						}
 					
-					// Pad indexes rows to AVX_VECTOR_SIZE.
-					if ((indexes.size() / dim) % AVX_VECTOR_SIZE)
-						indexes.resize(indexes.size() +
-							dim * (AVX_VECTOR_SIZE - (indexes.size() / dim) % AVX_VECTOR_SIZE));
-					
-					// Do not forget to reorder unseen indexes.
-					for (int i = 0, last = mapping.size(); i < nno; i++)
-						if (mapping.find(i) == mapping.end())
-							mapping[i] = last++;
+						avxinds.calculateLengths();
+					}
+
+					Matrix<double>& surplus = surplus_[many];
+					surplus.resize(nno, surplus__[many].dimx());
 
 					// Reorder surpluses.
-					for (map<int, int>::iterator i = mapping.begin(), e = mapping.end(); i != e; i++)
+					for (map<int, int>::iterator i = trans__[0].begin(), e = trans__[0].end(); i != e; i++)
 					{
 						int oldind = i->first;
 						int newind = i->second;
-						
+				
 						memcpy(&surplus(newind, 0), &(surplus__[many](oldind, 0)), surplus.dimx() * sizeof(double));
 					}
 
 #if 0
-					cout << endl << "After reordering: " << endl;
-					for (int i = 0, order = 0, e = indexes.size() / dim; i < e; i++)
+					// TODO Check index correctness.
+					Matrix<double> index_check(nno, 2 * vdim);
+					for (int ifreq = 0, nfreqs = avxinds__.size(); ifreq < nfreqs; ifreq++)
 					{
-						cout << "row " << i << " : ";
+						map<int, int> transReverse;
+						for (map<int, int>::iterator i = trans__[ifreq].begin(), e = trans__[ifreq].end(); i != e; i++)
+							transReverse[i->second] = i->first;
+
+						const AVXIndexes& avxinds = avxinds__[ifreq];
+
+						// Loop to calculate temps.
 						for (int j = 0; j < dim; j++)
 						{
-							Index& index = indexes[i * dim + j];
-
-							cout << "{[" << index.i << "," << index.j << "]," << index.rowind << "} ";
-						}
-						cout << endl;
-					}
-#endif
-
-					AVXIndexes& avxinds = avxinds_[many];
-					avxinds.resize(nno, dim);
-
-					for (int j = 0, iavx = 0, length = indexes.size() / dim / AVX_VECTOR_SIZE; j < dim; j++)
-					{
-						for (int i = 0; i < length; i++)
-						{
-							AVXIndex& index = avxinds(i, j);
-							for (int k = 0; k < AVX_VECTOR_SIZE; k++)
+							for (int i = 0, e = avxinds.getLength(j); i < e; i++)
 							{
-								int idx = (i * AVX_VECTOR_SIZE + k) * dim + j;
-								index.i[k] = indexes[idx].i;
-								index.j[k] = indexes[idx].j;
-								index.rowind[k] = indexes[idx].rowind;
+								const AVXIndex& index = avxinds(i, j);
+
+								for (int k = 0; k < AVX_VECTOR_SIZE; k++)
+								{
+									const uint8_t& ind_i = index.i[k];
+									const uint8_t& ind_j = index.j[k];
+									const uint16_t& rowind = index.rowind[k];
+									
+									if ((ind_i == 0) && (ind_j == 0)) continue;
+
+									index_check(transReverse[rowind], j) = ind_i;
+									index_check(transReverse[rowind], j + vdim) = ind_j;
+								}
 							}
 						}
 					}
 					
-					avxinds.calculateLengths();
+					for (int i = 0; i < nno; i++)
+						for (int j = 0; j < dim; j++)
+							if ((index(i, j) != index_check(i, j)) ||
+								(index(i, j + vdim) != index_check(i, j + vdim)))
+								{
+									cerr << "index (" << index_check(i, j) << ", " << index_check(i, j + vdim) <<
+										") mismatches control value (" << index(i, j) << ", " << index(i, j + vdim) << ")" << endl;
+									exit(1);
+								}
+					cout << "Index has been checked succcessfully" << endl;
+#endif
+					
+					// old -> new
+					
+					// 4 -> 1
+					// 7 -> 2
+					// 8 -> 3
+					
+					// 5 -> 1
+					// 7 -> 2
+					// 6 -> 3
+					
+					// Recalculate translations between frequencies relative to the
+					// first frequency.
+					/*for (int ifreq = 1, nfreqs = avxinds__.size(); ifreq < nfreqs; ifreq++)
+					{
+						map<int, int> transInverse;
+						for (map<int, int>::iterator i = trans__[ifreq].begin(), e = trans__[ifreq].end(); i != e; i++)
+							transInverse[i->second] = i->first;
+						map<int, int> transRelative;
+						for (int i = 0; i < nno; i++)
+							transRelative[i] = trans__[0][transInverse[i]];
+						trans__[ifreq] = transRelative;
+					}*/
 				}
-			
+							
 				initialized = true;
 			}
 		}
 
 		const Matrix<double>& surplus = surplus_[many];
 
-		AVXIndexes& avxinds = avxinds_[many];
+		const vector<AVXIndexes>& avxinds__ = avxinds_[many];
+		
+		vector<map<int, int> >& trans__ = trans_[many];
 
-#ifdef HAVE_AVX
+#if 0
 		const __m256d double4_0_0_0_0 = _mm256_setzero_pd();
 		const __m256d double4_1_1_1_1 = _mm256_set1_pd(1.0);
 		const __m256d sign_mask = _mm256_set1_pd(-0.);
@@ -412,29 +554,47 @@ extern "C" void FUNCNAME(
 			}
 		}
 #else
-		// Loop to calculate temps.
-		vector<double> temps(nno, 1.0);
-		for (int j = 0; j < dim; j++)
+		int nfreqs = avxinds__.size();
+		vector<vector<double> > temps_(nfreqs, vector<double>(nno, 1.0));
+		for (int ifreq = 0; ifreq < nfreqs; ifreq++)
 		{
-			double xx = x[j];
-		
-			for (int i = 0, e = avxinds.getLength(j); i < e; i++)
+			const AVXIndexes& avxinds = avxinds__[ifreq];
+			vector<double>& temps = temps_[ifreq];
+
+			// Loop to calculate temps.
+			for (int j = 0; j < dim; j++)
 			{
-				AVXIndex& index = avxinds(i, j);
-
-				for (int k = 0; k < AVX_VECTOR_SIZE; k++)
+				double xx = x[j];
+		
+				for (int i = 0, e = avxinds.getLength(j); i < e; i++)
 				{
-					uint8_t& ind_i = index.i[k];
-					uint8_t& ind_j = index.j[k];
-					uint16_t& rowind = index.rowind[k];
+					const AVXIndex& index = avxinds(i, j);
 
-					double xp = LinearBasis(xx, ind_i, ind_j);
+					for (int k = 0; k < AVX_VECTOR_SIZE; k++)
+					{
+						const uint8_t& ind_i = index.i[k];
+						const uint8_t& ind_j = index.j[k];
+						const uint16_t& rowind = index.rowind[k];
+						const uint16_t& oldind = index.oldind[k];
 
-					xp = fmax(0.0, xp);
+						double xp = LinearBasis(xx, ind_i, ind_j);
+
+						xp = fmax(0.0, xp);
 			
-					temps[rowind] *= xp;
-				}
-			}			
+						temps[rowind] = xp;
+					}
+				}			
+			}
+		}
+
+		// Join temps from all frequencies.
+		vector<double>& temps = temps_[0];
+		for (int ifreq = 1; ifreq < nfreqs; ifreq++)
+		{
+			vector<double>& temps__ = temps_[ifreq];
+			map<int, int>& trans = trans__[ifreq];
+			for (int i = 0; i < nno; i++)
+				temps[i] *= temps__[trans[i]];
 		}
 
 		// Loop to calculate values.
@@ -445,7 +605,7 @@ extern "C" void FUNCNAME(
 
 			for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
 				value[Dof_choice - b] += temp * surplus(i, Dof_choice);
-		}		
+		}
 #endif
 	}
 }
