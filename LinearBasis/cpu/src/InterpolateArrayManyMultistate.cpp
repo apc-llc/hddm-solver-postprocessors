@@ -274,21 +274,6 @@ extern "C" void FUNCNAME(
 								}
 							}
 					
-#if 0
-						cout << "Before reordering: " << endl;
-						for (int i = 0, order = 0, e = indexes.size() / dim; i < e; i++)
-						{
-							cout << "row " << i << " : ";
-							for (int j = 0; j < dim; j++)
-							{
-								Index& index = indexes[i * dim + j];
-
-								cout << "{[" << index.i << "," << index.j << "]," << index.rowind << "} ";
-							}
-							cout << endl;
-						}
-#endif
-					
 						// Reorder indexes.
 						map<int, int>& trans = trans__[freq];
 						for (int j = 0, order = 0; j < dim; j++)
@@ -319,25 +304,9 @@ extern "C" void FUNCNAME(
 							if (trans.find(i) == trans.end())
 								trans[i] = last++;
 
-#if 0
-						cout << endl << "After reordering: " << endl;
-						for (int i = 0, order = 0, e = indexes.size() / dim; i < e; i++)
-						{
-							cout << "row " << i << " : ";
-							for (int j = 0; j < dim; j++)
-							{
-								Index& index = indexes[i * dim + j];
-
-								cout << "{[" << index.i << "," << index.j << "]," << index.rowind << "} ";
-							}
-							cout << endl;
-						}
-#endif
-
 						AVXIndexes& avxinds = avxinds__[freq];
 						avxinds.resize(nno, dim);
 
-						if (freq != 0) trans__[freq].clear();
 						for (int j = 0, iavx = 0, length = indexes.size() / dim / AVX_VECTOR_SIZE; j < dim; j++)
 						{
 							for (int i = 0; i < length; i++)
@@ -350,40 +319,6 @@ extern "C" void FUNCNAME(
 									index.j[k] = indexes[idx].j;
 									index.rowind[k] = indexes[idx].rowind;
 									index.oldind[k] = indexes[idx].oldind;
-								
-									if (freq != 0)
-									{
-										const AVXIndexes& avxinds_ = avxinds__[0];
-
-										bool found = false;
-										for (int j = 0; j < dim; j++)
-										{
-											for (int i = 0, e = avxinds_.getLength(j); i < e; i++)
-											{
-												const AVXIndex& index_ = avxinds_(i, j);
-
-												for (int k = 0; k < AVX_VECTOR_SIZE; k++)
-												{
-													const uint16_t& rowind = index_.rowind[k];
-													const uint16_t& oldind = index_.oldind[k];
-
-													if (indexes[idx].oldind == oldind)
-													{
-														trans__[freq][rowind] = indexes[idx].rowind;
-														found = true;
-														cout << indexes[idx].rowind << " -> " << rowind << endl;
-														goto finish;
-													}
-												}
-											}
-										}
-									finish :
-										if (!found)
-										{
-											cerr << "Not found!" << endl;
-											exit(1);
-										}
-									}
 								}
 							}
 						}
@@ -402,74 +337,16 @@ extern "C" void FUNCNAME(
 				
 						memcpy(&surplus(newind, 0), &(surplus__[many](oldind, 0)), surplus.dimx() * sizeof(double));
 					}
-
-#if 0
-					// TODO Check index correctness.
-					Matrix<double> index_check(nno, 2 * vdim);
-					for (int ifreq = 0, nfreqs = avxinds__.size(); ifreq < nfreqs; ifreq++)
-					{
-						map<int, int> transReverse;
-						for (map<int, int>::iterator i = trans__[ifreq].begin(), e = trans__[ifreq].end(); i != e; i++)
-							transReverse[i->second] = i->first;
-
-						const AVXIndexes& avxinds = avxinds__[ifreq];
-
-						// Loop to calculate temps.
-						for (int j = 0; j < dim; j++)
-						{
-							for (int i = 0, e = avxinds.getLength(j); i < e; i++)
-							{
-								const AVXIndex& index = avxinds(i, j);
-
-								for (int k = 0; k < AVX_VECTOR_SIZE; k++)
-								{
-									const uint8_t& ind_i = index.i[k];
-									const uint8_t& ind_j = index.j[k];
-									const uint16_t& rowind = index.rowind[k];
-									
-									if ((ind_i == 0) && (ind_j == 0)) continue;
-
-									index_check(transReverse[rowind], j) = ind_i;
-									index_check(transReverse[rowind], j + vdim) = ind_j;
-								}
-							}
-						}
-					}
-					
-					for (int i = 0; i < nno; i++)
-						for (int j = 0; j < dim; j++)
-							if ((index(i, j) != index_check(i, j)) ||
-								(index(i, j + vdim) != index_check(i, j + vdim)))
-								{
-									cerr << "index (" << index_check(i, j) << ", " << index_check(i, j + vdim) <<
-										") mismatches control value (" << index(i, j) << ", " << index(i, j + vdim) << ")" << endl;
-									exit(1);
-								}
-					cout << "Index has been checked succcessfully" << endl;
-#endif
-					
-					// old -> new
-					
-					// 4 -> 1
-					// 7 -> 2
-					// 8 -> 3
-					
-					// 5 -> 1
-					// 7 -> 2
-					// 6 -> 3
 					
 					// Recalculate translations between frequencies relative to the
 					// first frequency.
-					/*for (int ifreq = 1, nfreqs = avxinds__.size(); ifreq < nfreqs; ifreq++)
+					for (int ifreq = 1, nfreqs = avxinds__.size(); ifreq < nfreqs; ifreq++)
 					{
-						map<int, int> transInverse;
-						for (map<int, int>::iterator i = trans__[ifreq].begin(), e = trans__[ifreq].end(); i != e; i++)
-							transInverse[i->second] = i->first;
 						map<int, int> transRelative;
 						for (int i = 0; i < nno; i++)
-							transRelative[i] = trans__[0][transInverse[i]];
+							transRelative[trans__[0][i]] = trans__[ifreq][i];
 						trans__[ifreq] = transRelative;
-					}*/
+					}
 				}
 							
 				initialized = true;
