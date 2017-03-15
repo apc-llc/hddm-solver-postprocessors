@@ -146,9 +146,6 @@ extern "C" void FUNCNAME(
 							}
 						}
 					}
-					
-					cout << "Compressed " << nno << " sparse rows into " <<
-						(indexes.size() / vdim) << " dense rows" << endl;
 				}
 			
 				initialized = true;
