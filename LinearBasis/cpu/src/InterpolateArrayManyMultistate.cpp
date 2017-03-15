@@ -17,40 +17,11 @@ using namespace std;
 
 class Device;
 
-static bool initialized = false;
-
-struct Index
-{
-	int i, j;
-	int rowind;
-
-	Index() : i(0), j(0), rowind(0) { }
-	
-	Index(int i_, int j_, int rowind_) : i(i_), j(j_), rowind(rowind_) { }
-};
-
-static vector<vector<Index> > indexes_;
-
-struct AVXIndex
-{
-	uint8_t i[AVX_VECTOR_SIZE], j[AVX_VECTOR_SIZE];
-	uint16_t rowind[AVX_VECTOR_SIZE];
-	
-	AVXIndex()
-	{
-		memset(i, 0, sizeof(i));
-		memset(j, 0, sizeof(j));
-		memset(rowind, 0, sizeof(rowind));
-	}
-};
-
-static vector<vector<AVXIndex, AlignedAllocator<AVXIndex> > > avxinds_;
-
 extern "C" void FUNCNAME(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
-	const Matrix<int>* index_, const Matrix<double>* surplus_, double** value_)
+	const AVXIndexMatrix* avxinds_, const Matrix<double>* surplus_, double** value_)
 {
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
 	// boundary to keep up the required alignment.
@@ -61,7 +32,7 @@ extern "C" void FUNCNAME(
 	for (int many = 0; many < count; many++)
 	{
 		const double* x = x_[many];
-		const Matrix<int>& index = index_[many];
+		const AVXIndexMatrix& avxinds = avxinds_[many];
 		const Matrix<double>& surplus = surplus_[many];
 		double* value = value_[many];
 
@@ -71,88 +42,6 @@ extern "C" void FUNCNAME(
 
 		for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
 			value[Dof_choice - b] = 0;
-
-		if (!initialized)
-		{
-			static std::mutex mutex;
-			std::lock_guard<std::mutex> lock(mutex);
-
-			if (!initialized)
-			{
-				pair<int, int> zero = make_pair(0, 0);
-
-				indexes_.resize(count);
-				avxinds_.resize(count);
-		
-				for (int many = 0; many < count; many++)
-				{
-					vector<Index>& indexes = indexes_[many];
-					
-					indexes.resize(vdim);
-
-					// Convert (i, I) indexes matrix to sparse format.
-					for (int i = 0; i < nno; i++)
-						for (int j = 0; j < dim; j++)
-						{
-							// Get pair.
-							pair<int, int> value = make_pair(index(i, j), index(i, j + vdim));
-			
-							// If both indexes are zeros, do nothing.
-							if (value == zero)
-								continue;
-			
-							// Find free position for non-zero pair.
-							bool foundPosition = false;
-							for (int irow = 0, nrows = indexes.size() / vdim; irow < nrows; irow++)
-							{
-								Index& index = indexes[irow * vdim + j];
-								if (make_pair(index.i, index.j) == zero)
-								{
-									index.i = value.first;
-									index.j = value.second;
-									index.rowind = i;
-
-									foundPosition = true;
-									break;
-								}
-							}
-							if (!foundPosition)
-							{
-								// Add new free row.
-								indexes.resize(indexes.size() + vdim);
-
-								Index& index = indexes[indexes.size() - vdim + j];
-				
-								index.i = value.first;
-								index.j = value.second;
-								index.rowind = i;				
-							}
-						}
-
-					vector<AVXIndex, AlignedAllocator<AVXIndex> >& avxinds = avxinds_[many];
-
-					avxinds.resize(indexes.size() / AVX_VECTOR_SIZE);
-
-					for (int i = 0, iavx = 0, e = indexes.size() / vdim; i < e; i++)
-					{
-						for (int j = 0; j < dim; j += AVX_VECTOR_SIZE)
-						{
-							AVXIndex& index = avxinds[iavx++];
-							for (int k = 0; k < AVX_VECTOR_SIZE; k++)
-							{
-								index.i[k] = indexes[i * vdim + j + k].i;
-								index.j[k] = indexes[i * vdim + j + k].j;
-								index.rowind[k] = indexes[i * vdim + j + k].rowind;
-							}
-						}
-					}
-				}
-			
-				initialized = true;
-			}
-		}
-
-		vector<AVXIndex, AlignedAllocator<AVXIndex> >& avxinds = avxinds_[many];
 
 #ifdef HAVE_AVX
 		const __m256d double4_0_0_0_0 = _mm256_setzero_pd();
@@ -167,9 +56,9 @@ extern "C" void FUNCNAME(
 		{
 			for (int j = 0; j < vdim8; j++)
 			{
-				AVXIndex& index = avxinds[i * vdim8 + j];
+				const AVXIndex& index = avxinds[i * vdim8 + j];
 
-				const __m128i ij8 = _mm_load_si128(reinterpret_cast<const __m128i*>(&avxinds[i * vdim8 + j]));
+				const __m128i ij8 = _mm_load_si128(reinterpret_cast<const __m128i*>(&index));
 				const __m128i i16 = _mm_unpacklo_epi8(ij8, int4_0_0_0_0);
 				const __m128i j16 = _mm_unpackhi_epi8(ij8, int4_0_0_0_0);
 
@@ -200,7 +89,7 @@ extern "C" void FUNCNAME(
 				_mm256_store_pd(&xp[0 + sizeof(xp64lo) / sizeof(double)], xp64hi);
 				for (int k = 0; k < AVX_VECTOR_SIZE; k++)
 				{
-					uint16_t& rowind = index.rowind[k];
+					const uint16_t& rowind = index.rowind[k];
 			
 					// This can be done scalar only.
 					temps[rowind] *= xp[k];
@@ -236,13 +125,13 @@ extern "C" void FUNCNAME(
 		{
 			for (int j = 0; j < vdim8; j++)
 			{
-				AVXIndex& index = avxinds[i * vdim8 + j];
+				const AVXIndex& index = avxinds[i * vdim8 + j];
 
 				for (int k = 0; k < AVX_VECTOR_SIZE; k++)
 				{
-					uint8_t& ind_i = index.i[k];
-					uint8_t& ind_j = index.j[k];
-					uint16_t& rowind = index.rowind[k];
+					const uint8_t& ind_i = index.i[k];
+					const uint8_t& ind_j = index.j[k];
+					const uint16_t& rowind = index.rowind[k];
 
 					double xp = LinearBasis(x[j * AVX_VECTOR_SIZE + k], ind_i, ind_j);
 

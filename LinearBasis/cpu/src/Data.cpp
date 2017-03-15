@@ -188,6 +188,16 @@ static void read_surplus(ifstream& infile, int nno, int TotalDof, Matrix<double>
 	//cout << (100 - (double)surplus_nonzeros / (nno * TotalDof) * 100) << "% surplus sparsity" << endl;
 }
 
+struct Index
+{
+	int i, j;
+	int rowind;
+
+	Index() : i(0), j(0), rowind(0) { }
+	
+	Index(int i_, int j_, int rowind_) : i(i_), j(j_), rowind(rowind_) { }
+};
+
 void Data::load(const char* filename, int istate)
 {
 	MPI_Process* process;
@@ -243,14 +253,13 @@ void Data::load(const char* filename, int istate)
 	if (dim % AVX_VECTOR_SIZE) vdim++;
 	int nsd = 2 * vdim * AVX_VECTOR_SIZE;
 
-	index[istate].resize(nno, nsd);
-	index[istate].fill(0);
+	Matrix<int> index;
+	index.resize(nno, nsd);
+	index.fill(0);
+
 	surplus[istate].resize(nno, TotalDof);
 	surplus[istate].fill(0.0);
 
-	// For better caching we use transposed surplus.
-	surplus_t[istate].resize(TotalDof, nno);
-	surplus_t[istate].fill(0.0);
 	if (!compressed)
 	{
 		int j = 0;
@@ -264,7 +273,7 @@ void Data::load(const char* filename, int istate)
 				{
 					int value; infile >> value;
 					value = 2 << (value - 2);
-					index[istate](j, i) = value;
+					index(j, i) = value;
 				}
 			}
 			for (int i = 0; i < dim; )
@@ -275,15 +284,14 @@ void Data::load(const char* filename, int istate)
 					value--;
 					// Precompute "j" to merge two cases into one:
 					// (((i) == 0) ? (1) : (1 - fabs((x) * (i) - (j)))).
-					if (!index[istate](j, i)) value = 0;
-					index[istate](j, i + vdim * AVX_VECTOR_SIZE) = value;
+					if (!index(j, i)) value = 0;
+					index(j, i + vdim * AVX_VECTOR_SIZE) = value;
 				}
 			}
 			for (int i = 0; i < TotalDof; i++)
 			{
 				double value; infile >> value;
 				surplus[istate](j, i) = value;
-				surplus_t[istate](i, j) = value;
 			}
 			j++;
 		}
@@ -303,13 +311,13 @@ void Data::load(const char* filename, int istate)
 		switch (szt)
 		{
 		case 1 :
-			read_index<unsigned char>(infile, nno, dim, vdim, index[istate]);
+			read_index<unsigned char>(infile, nno, dim, vdim, index);
 			break;
 		case 2 :
-			read_index<unsigned short>(infile, nno, dim, vdim, index[istate]);
+			read_index<unsigned short>(infile, nno, dim, vdim, index);
 			break;
 		case 4 :
-			read_index<unsigned int>(infile, nno, dim, vdim, index[istate]);
+			read_index<unsigned int>(infile, nno, dim, vdim, index);
 			break;
 		}
 
@@ -338,6 +346,65 @@ void Data::load(const char* filename, int istate)
 	}
 	
 	infile.close();
+
+	vdim *= AVX_VECTOR_SIZE;
+
+	// Convert (i, I) indexes matrix to sparse format.
+	vector<Index> indexes(vdim);
+	pair<int, int> zero = make_pair(0, 0);
+	for (int i = 0; i < nno; i++)
+		for (int j = 0; j < dim; j++)
+		{
+			// Get pair.
+			pair<int, int> value = make_pair(index(i, j), index(i, j + vdim));
+
+			// If both indexes are zeros, do nothing.
+			if (value == zero)
+				continue;
+
+			// Find free position for non-zero pair.
+			bool foundPosition = false;
+			for (int irow = 0, nrows = indexes.size() / vdim; irow < nrows; irow++)
+			{
+				Index& index = indexes[irow * vdim + j];
+				if (make_pair(index.i, index.j) == zero)
+				{
+					index.i = value.first;
+					index.j = value.second;
+					index.rowind = i;
+
+					foundPosition = true;
+					break;
+				}
+			}
+			if (!foundPosition)
+			{
+				// Add new free row.
+				indexes.resize(indexes.size() + vdim);
+
+				Index& index = indexes[indexes.size() - vdim + j];
+
+				index.i = value.first;
+				index.j = value.second;
+				index.rowind = i;				
+			}
+		}
+
+	avxinds[istate].resize(indexes.size() / AVX_VECTOR_SIZE);
+
+	for (int i = 0, iavx = 0, e = indexes.size() / vdim; i < e; i++)
+	{
+		for (int j = 0; j < dim; j += AVX_VECTOR_SIZE)
+		{
+			AVXIndex& index = reinterpret_cast<AVXIndex&>(avxinds[istate][iavx++]);
+			for (int k = 0; k < AVX_VECTOR_SIZE; k++)
+			{
+				index.i[k] = indexes[i * vdim + j + k].i;
+				index.j[k] = indexes[i * vdim + j + k].j;
+				index.rowind[k] = indexes[i * vdim + j + k].rowind;
+			}
+		}
+	}
 	
 	loadedStates[istate] = true;
 }
@@ -349,9 +416,8 @@ void Data::clear()
 
 Data::Data(int nstates_) : nstates(nstates_)
 {
-	index.resize(nstates);
+	avxinds.resize(nstates);
 	surplus.resize(nstates);
-	surplus_t.resize(nstates);
 	loadedStates.resize(nstates);
 	fill(loadedStates.begin(), loadedStates.end(), false);
 }

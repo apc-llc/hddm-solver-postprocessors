@@ -179,13 +179,28 @@ public :
 	}
 };
 
+struct AVXIndex
+{
+	uint8_t i[AVX_VECTOR_SIZE], j[AVX_VECTOR_SIZE];
+	uint16_t rowind[AVX_VECTOR_SIZE];
+	
+	AVXIndex()
+	{
+		memset(i, 0, sizeof(i));
+		memset(j, 0, sizeof(j));
+		memset(rowind, 0, sizeof(rowind));
+	}
+};
+
+typedef std::vector<AVXIndex, AlignedAllocator<AVXIndex> > AVXIndexMatrix;
+
 class Interpolator;
 
 class Data
 {
 	int nstates, dim, vdim, nno, TotalDof, Level;
-	std::vector<Matrix<int> > index;
-	std::vector<Matrix<real> > surplus, surplus_t;
+	std::vector<AVXIndexMatrix> avxinds;
+	std::vector<Matrix<real> > surplus;
 	std::vector<bool> loadedStates;
 	
 	friend class Interpolator;

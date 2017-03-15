@@ -22,7 +22,7 @@ extern "C" void LinearBasis_CPU_Generic_InterpolateValue(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice, const double* x,
-	const Matrix<int>* index, const Matrix<double>* surplus, double* value_);
+	const AVXIndexMatrix* avxinds, const Matrix<double>* surplus, double* value_);
 	
 // Interpolate a single value.
 void Interpolator::interpolate(Device* device, Data* data,
@@ -34,7 +34,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 			Device* device,
 			const int dim, const int nno,
 			const int Dof_choice, const double* x,
-			const Matrix<int>* index, const Matrix<double>* surplus, double* value_);
+			const AVXIndexMatrix* avxinds, const Matrix<double>* surplus, double* value_);
 
 		static Func LinearBasis_CPU_RuntimeOpt_InterpolateValue;
 
@@ -47,20 +47,20 @@ void Interpolator::interpolate(Device* device, Data* data,
 		
 		LinearBasis_CPU_RuntimeOpt_InterpolateValue(
 			device, data->dim, data->nno, Dof_choice, x,
-			&data->index[istate], &data->surplus[istate], &value);
+			&data->avxinds[istate], &data->surplus[istate], &value);
 	}
 	else
 	{			
 		LinearBasis_CPU_Generic_InterpolateValue(
 			device, data->dim, data->nno, Dof_choice, x,
-			&data->index[istate], &data->surplus[istate], &value);
+			&data->avxinds[istate], &data->surplus[istate], &value);
 	}
 }
 
 extern "C" void LinearBasis_CPU_Generic_InterpolateArray(
 	Device* device, const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const double* x,
-	const Matrix<int>* index, const Matrix<double>* surplus, double* value);
+	const AVXIndexMatrix* avxinds, const Matrix<double>* surplus, double* value);
 
 // Interpolate array of values.
 void Interpolator::interpolate(Device* device, Data* data,
@@ -71,7 +71,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 		typedef void (*Func)(
 			Device* device, const int dim, const int nno,
 			const int Dof_choice_start, const int Dof_choice_end, const double* x,
-			const Matrix<int>* index, const Matrix<double>* surplus, double* value);
+			const AVXIndexMatrix* avxinds, const Matrix<double>* surplus, double* value);
 
 		static Func LinearBasis_CPU_RuntimeOpt_InterpolateArray;
 
@@ -84,20 +84,20 @@ void Interpolator::interpolate(Device* device, Data* data,
 		
 		LinearBasis_CPU_RuntimeOpt_InterpolateArray(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, x,
-			&data->index[istate], &data->surplus[istate], value);
+			&data->avxinds[istate], &data->surplus[istate], value);
 	}
 	else
 	{
 		LinearBasis_CPU_Generic_InterpolateArray(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, x,
-			&data->index[istate], &data->surplus[istate], value);
+			&data->avxinds[istate], &data->surplus[istate], value);
 	}
 }
 
 extern "C" void LinearBasis_CPU_Generic_InterpolateArrayManyStateless(
 	Device* device, const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* x_,
-	const Matrix<int>* index, const Matrix<double>* surplus, double* value);
+	const AVXIndexMatrix* avxinds, const Matrix<double>* surplus, double* value);
 
 // TODO
 // Interpolate multiple arrays of values, with single surplus state.
@@ -109,7 +109,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 		typedef void (*Func)(
 			Device* device, const int dim, const int nno,
 			const int Dof_choice_start, const int Dof_choice_end, const int count, const double* x_,
-			const Matrix<int>* index, const Matrix<double>* surplus, double* value);
+			const AVXIndexMatrix* avxinds, const Matrix<double>* surplus, double* value);
 
 		static Func LinearBasis_CPU_RuntimeOpt_InterpolateArrayManyStateless;
 
@@ -122,20 +122,20 @@ void Interpolator::interpolate(Device* device, Data* data,
 
 		LinearBasis_CPU_RuntimeOpt_InterpolateArrayManyStateless(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, count, x,
-			&data->index[istate], &data->surplus[istate], value);
+			&data->avxinds[istate], &data->surplus[istate], value);
 	}
 	else
 	{
 		LinearBasis_CPU_Generic_InterpolateArrayManyStateless(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, count, x,
-			&data->index[istate], &data->surplus[istate], value);
+			&data->avxinds[istate], &data->surplus[istate], value);
 	}
 }
 
 extern "C" void LinearBasis_CPU_Generic_InterpolateArrayManyMultistate(
 	Device* device, const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
-	const Matrix<int>* index, const Matrix<double>* surplus, double** value);
+	const AVXIndexMatrix* avxinds, const Matrix<double>* surplus, double** value);
 
 // Interpolate multiple arrays of values, with multiple surplus states.
 void Interpolator::interpolate(Device* device, Data* data,
@@ -146,7 +146,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 		typedef void (*Func)(
 			Device* device, const int dim, const int nno,
 			const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
-			const Matrix<int>* index, const Matrix<double>* surplus, double** value);
+			const AVXIndexMatrix* avxinds, const Matrix<double>* surplus, double** value);
 
 		static Func LinearBasis_CPU_RuntimeOpt_InterpolateArrayManyMultistate;
 
@@ -159,13 +159,13 @@ void Interpolator::interpolate(Device* device, Data* data,
 
 		LinearBasis_CPU_RuntimeOpt_InterpolateArrayManyMultistate(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
-			&data->index[0], &data->surplus[0], value);
+			&data->avxinds[0], &data->surplus[0], value);
 	}
 	else
 	{
 		LinearBasis_CPU_Generic_InterpolateArrayManyMultistate(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
-			&data->index[0], &data->surplus[0], value);
+			&data->avxinds[0], &data->surplus[0], value);
 	}
 }
 
