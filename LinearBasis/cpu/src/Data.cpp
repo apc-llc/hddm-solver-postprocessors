@@ -356,6 +356,10 @@ Data::Data(int nstates_) : nstates(nstates_)
 	fill(loadedStates.begin(), loadedStates.end(), false);
 }
 
+Data::~Data()
+{
+}
+
 extern "C" Data* getData(int nstates)
 {
 	return new Data(nstates);
