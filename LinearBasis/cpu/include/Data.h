@@ -213,6 +213,8 @@ public :
 	virtual void clear();
 
 	Data(int nstates);
+	
+	virtual ~Data();
 };
 
 } // namespace cpu

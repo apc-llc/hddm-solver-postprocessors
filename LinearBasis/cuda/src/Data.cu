@@ -378,6 +378,10 @@ Data::Data(int nstates_) : nstates(nstates_), host(nstates), device(nstates)
 	fill(loadedStates.begin(), loadedStates.end(), false);
 }
 
+Data::~Data()
+{
+}
+
 Data::Host::Host(int nstates)
 {
 	data.reset(new DataHost(nstates));
