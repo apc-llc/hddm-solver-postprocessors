@@ -6,9 +6,6 @@ CINC += -I../include -I../../include
 CDIR = mkdir -p $(shell dirname $@)
 
 TARGETS = cpu
-ifneq (,$(NVCC))
-TARGETS += cuda
-endif
 
 .PHONY: $(TARGETS)
 
@@ -28,6 +25,5 @@ cuda: $(INSTALL)/lib/liblinearbasis.a
 
 clean:
 	rm -rf $(BUILD) && \
-	cd cpu && $(MAKE) clean && cd .. && \
-	cd cuda && $(MAKE) clean && cd ..
+	cd cpu && $(MAKE) clean && cd ..
 
