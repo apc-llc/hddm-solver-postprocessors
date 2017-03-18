@@ -10,24 +10,10 @@ namespace cpu {
 
 class Device;
 
-typedef void (*InterpolateValueFunc)(
-	Device* device,
-	const int dim, const int nno,
-	const int Dof_choice, const real* x,
-	const AVXIndexMatrix* avxinds, const Matrix<real>* surplus,
-	real* value);
-
 typedef void (*InterpolateArrayFunc)(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const real* x,
-	const AVXIndexMatrix* avxinds, const Matrix<real>* surplus,
-	real* value);
-
-typedef void (*InterpolateArrayManyStatelessFunc)(
-	Device* device,
-	const int dim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const int count, const real* x,
 	const AVXIndexMatrix* avxinds, const Matrix<real>* surplus,
 	real* value);
 
@@ -38,25 +24,23 @@ typedef void (*InterpolateArrayManyMultistateFunc)(
 	const AVXIndexMatrix* avxinds, const Matrix<real>* surplus,
 	real** value);
 
-typedef InterpolateKernel<InterpolateValueFunc> InterpolateValueKernel;
 typedef InterpolateKernel<InterpolateArrayFunc> InterpolateArrayKernel;
-typedef InterpolateKernel<InterpolateArrayManyStatelessFunc> InterpolateArrayManyStatelessKernel;
 typedef InterpolateKernel<InterpolateArrayManyMultistateFunc> InterpolateArrayManyMultistateKernel;
 
 class JIT
 {
 public :
-	static InterpolateValueKernel& jitCompile(
-		int dim, const std::string& funcnameTemplate, InterpolateValueFunc fallbackFunc);
 	static InterpolateArrayKernel& jitCompile(
-		int dim, const std::string& funcnameTemplate, InterpolateArrayFunc fallbackFunc);
-	static InterpolateArrayManyStatelessKernel& jitCompile(
-		int dim, int count, const std::string& funcnameTemplate, InterpolateArrayManyStatelessFunc fallbackFunc);
+		int dim, int nno, int Dof_choice_start, int Dof_choice_end,
+		const std::string& funcnameTemplate, InterpolateArrayFunc fallbackFunc);
 	static InterpolateArrayManyMultistateKernel& jitCompile(
-		int dim, int count, const std::string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc);
+		int dim, int count, int nno, int Dof_choice_start, int Dof_choice_end,
+		const std::string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc);
 
 	template<typename K, typename F>
-	static K& jitCompile(int dim, int count, const std::string& funcnameTemplate, F fallbackFunc);
+	static K& jitCompile(
+		int dim, int count, int nno, int Dof_choice_start, int Dof_choice_end,
+		const std::string& funcnameTemplate, F fallbackFunc);
 };
 
 } // namespace cpu

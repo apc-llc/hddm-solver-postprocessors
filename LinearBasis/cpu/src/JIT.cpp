@@ -2,8 +2,9 @@
 
 #include "JIT.h"
 
-#include <iostream>
+#include <functional>
 #include <fstream>
+#include <iostream>
 #include <map>
 #include <pthread.h>
 #include <pstreams/pstream.h>
@@ -18,32 +19,97 @@ using namespace cpu;
 using namespace std;
 
 template<>
-const string InterpolateValueKernel::sh = INTERPOLATE_VALUE_SH;
-template<>
 const string InterpolateArrayKernel::sh = INTERPOLATE_ARRAY_SH;
-template<>
-const string InterpolateArrayManyStatelessKernel::sh = INTERPOLATE_ARRAY_MANY_STATELESS_SH;
 template<>
 const string InterpolateArrayManyMultistateKernel::sh = INTERPOLATE_ARRAY_MANY_MULTISTATE_SH;
 
-template<typename K, typename F>
-K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbackFunc)
+struct KSignature
 {
-	map<int, K>* kernels_tls = NULL;
+	int dim;
+	int count;
+	int nno;
+	int Dof_choice_start;
+	int Dof_choice_end;
+	
+	KSignature() : 
+	
+	dim(0), count(0), nno(0),
+	Dof_choice_start(0), Dof_choice_end(0)
+	
+	{ }
+	
+	KSignature(int dim_, int count_, int nno_,
+		int Dof_choice_start_, int Dof_choice_end_) :
+	
+	dim(dim_), count(count_), nno(nno_),
+	Dof_choice_start(Dof_choice_start_), Dof_choice_end(Dof_choice_end_)
+	
+	{ }
+	
+	bool operator()(const KSignature& a, const KSignature& b) const;
+};
+
+namespace std {
+
+template<>
+struct hash<KSignature>
+{
+	template <class T>
+	static inline void hash_combine(size_t& seed, const T& v)
+	{
+		hash<T> hasher;
+		seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+	}
+
+	typedef KSignature argument_type;
+	typedef std::size_t result_type;
+	result_type operator()(argument_type const& k) const
+	{
+		size_t seed = 0;
+		hash_combine(seed, k.dim);
+		hash_combine(seed, k.count);
+		hash_combine(seed, k.nno);
+		hash_combine(seed, k.Dof_choice_start);
+		hash_combine(seed, k.Dof_choice_end);
+		return seed;
+	}
+};
+
+} // namespace std
+
+bool KSignature::operator()(const KSignature& a, const KSignature& b) const
+{
+	return hash<KSignature>{}(a) < hash<KSignature>{}(b);
+}
+
+template<typename K, typename F>
+K& JIT::jitCompile(int dim, int count, int nno, int Dof_choice_start, int Dof_choice_end,
+	const string& funcnameTemplate, F fallbackFunc)
+{
+	int vdim = dim / AVX_VECTOR_SIZE;
+	if (dim % AVX_VECTOR_SIZE) vdim++;
+	vdim *= AVX_VECTOR_SIZE;
+	int vdim8 = vdim / AVX_VECTOR_SIZE;
+
+	map<KSignature, K, KSignature>* kernels_tls_ = NULL;
 
 	// Already in TLS cache?
 	{
 		static __thread bool kernels_init = false;
-		static __thread char kernels_a[sizeof(map<int, K>)];
-		kernels_tls = (map<int, K>*)kernels_a;
+		static __thread char kernels_a[sizeof(map<KSignature, K, KSignature>)];
+		kernels_tls_ = (map<KSignature, K, KSignature>*)kernels_a;
 
 		if (!kernels_init)
 		{
-			kernels_tls = new (kernels_a) map<int, K>();
+			kernels_tls_ = new (kernels_a) map<KSignature, K, KSignature>();
 			kernels_init = true;
 		}
+	}
 
-		K& kernel = kernels_tls->operator[](dim);
+	map<KSignature, K, KSignature>& kernels_tls = *kernels_tls_;
+
+	{
+		K& kernel = kernels_tls[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)];
 
 		// Already successfully compiled?
 		if (kernel.filename != "")
@@ -61,18 +127,18 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 	}
 
 	// Already in process cache?
-	static map<int, K> kernels;
+	static map<KSignature, K, KSignature> kernels;
 
 	static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 	PTHREAD_ERR_CHECK(pthread_mutex_lock(&mutex));
 
-	K& kernel = kernels[dim];
+	K& kernel = kernels[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)];
 
 	// Already successfully compiled?
 	if (kernel.filename != "")
 	{
-		kernels_tls->operator[](dim) = kernel;
+		kernels_tls[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)] = kernel;
 		PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 		return kernel;
 	}
@@ -84,7 +150,7 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 		kernel.fileowner = false;
 		kernel.func = fallbackFunc;
 
-		kernels_tls->operator[](dim) = kernel;
+		kernels_tls[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)] = kernel;
 		PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 		return kernel;
 	}
@@ -130,7 +196,7 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
 
-			kernels_tls->operator[](dim) = kernel;
+			kernels_tls[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)] = kernel;
 			PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 			return kernel;
 		}
@@ -157,7 +223,7 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 				kernel.fileowner = false;
 				kernel.func = fallbackFunc;
 
-				kernels_tls->operator[](dim) = kernel;
+				kernels_tls[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)] = kernel;
 				PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 				return kernel;
 			}
@@ -174,6 +240,14 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 			cmd << dim;
 			cmd << " -DCOUNT=";
 			cmd << count;
+			cmd << " -DNNO=";
+			cmd << nno;
+			cmd << " -DVDIM8=";
+			cmd << vdim8;
+			cmd << " -DDOF_CHOICE_START=";
+			cmd << Dof_choice_start;
+			cmd << " -DDOF_CHOICE_END=";
+			cmd << Dof_choice_end;
 	
 			cmd << " -o ";
 			cmd << tmp.filename;
@@ -204,7 +278,7 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
 
-			kernels_tls->operator[](dim) = kernel;
+			kernels_tls[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)] = kernel;
 			PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 			return kernel;
 		}
@@ -264,37 +338,25 @@ K& JIT::jitCompile(int dim, int count, const string& funcnameTemplate, F fallbac
 	}
 
 	kernel.func = kernel.getFunc();
-	kernels_tls->operator[](dim) = kernel;
+	kernels_tls[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)] = kernel;
 	PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 	return kernel;
 }
 
-InterpolateValueKernel& JIT::jitCompile(
-	int dim, const string& funcnameTemplate, InterpolateValueFunc fallbackFunc)
-{
-	return JIT::jitCompile<InterpolateValueKernel, InterpolateValueFunc>(
-		dim, 1, funcnameTemplate, fallbackFunc);
-}
-
 InterpolateArrayKernel& JIT::jitCompile(
-	int dim, const string& funcnameTemplate, InterpolateArrayFunc fallbackFunc)
+	int dim, int nno, int Dof_choice_start, int Dof_choice_end,
+	const string& funcnameTemplate, InterpolateArrayFunc fallbackFunc)
 {
 	return JIT::jitCompile<InterpolateArrayKernel, InterpolateArrayFunc>(
-		dim, 1, funcnameTemplate, fallbackFunc);
-}
-
-InterpolateArrayManyStatelessKernel& JIT::jitCompile(
-	int dim, int count, const string& funcnameTemplate, InterpolateArrayManyStatelessFunc fallbackFunc)
-{
-	return JIT::jitCompile<InterpolateArrayManyStatelessKernel, InterpolateArrayManyStatelessFunc>(
-		dim, count, funcnameTemplate, fallbackFunc);
+		dim, 1, nno, Dof_choice_start, Dof_choice_end, funcnameTemplate, fallbackFunc);
 }
 
 InterpolateArrayManyMultistateKernel& JIT::jitCompile(
-	int dim, int count, const string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc)
+	int dim, int count, int nno, int Dof_choice_start, int Dof_choice_end,
+	const string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc)
 {
 	return JIT::jitCompile<InterpolateArrayManyMultistateKernel, InterpolateArrayManyMultistateFunc>(
-		dim, count, funcnameTemplate, fallbackFunc);
+		dim, count, nno, Dof_choice_start, Dof_choice_end, funcnameTemplate, fallbackFunc);
 }
 
 #endif // HAVE_RUNTIME_OPTIMIZATION

@@ -27,9 +27,10 @@ extern "C" void FUNCNAME(
 	// boundary to keep up the required alignment.
 	int vdim = dim / AVX_VECTOR_SIZE;
 	if (dim % AVX_VECTOR_SIZE) vdim++;
+	int vdim8 = vdim;
 	vdim *= AVX_VECTOR_SIZE;
 
-	for (int many = 0; many < count; many++)
+	for (int many = 0; many < COUNT; many++)
 	{
 		const double* x = x_[many];
 		const AVXIndexMatrix& avxinds = avxinds_[many];
@@ -40,7 +41,7 @@ extern "C" void FUNCNAME(
 		assert(((size_t)x % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "x vector must be sufficiently memory-aligned");
 #endif
 
-		for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
+		for (int b = DOF_CHOICE_START, Dof_choice = b, e = DOF_CHOICE_END; Dof_choice <= e; Dof_choice++)
 			value[Dof_choice - b] = 0;
 
 #ifdef HAVE_AVX
@@ -51,12 +52,12 @@ extern "C" void FUNCNAME(
 
 		// Loop to calculate temps.
 		// Note temps vector should not be too large to keep up the caching.
-		vector<double, AlignedAllocator<double> > temps(nno, 1.0);
-		for (int i = 0, vdim8 = vdim / AVX_VECTOR_SIZE, e = avxinds.size() / vdim8; i < e; i++)
+		vector<double, AlignedAllocator<double> > temps(NNO, 1.0);
+		for (int i = 0, e = avxinds.size() / VDIM8; i < e; i++)
 		{
-			for (int j = 0; j < vdim8; j++)
+			for (int j = 0; j < VDIM8; j++)
 			{
-				const AVXIndex& index = avxinds[i * vdim8 + j];
+				const AVXIndex& index = avxinds[i * VDIM8 + j];
 
 				const __m128i ij8 = _mm_load_si128(reinterpret_cast<const __m128i*>(&index));
 				const __m128i i16 = _mm_unpacklo_epi8(ij8, int4_0_0_0_0);
@@ -98,14 +99,14 @@ extern "C" void FUNCNAME(
 		}
 		
 		// Loop to calculate values.
-		for (int i = 0; i < nno; i++)
+		for (int i = 0; i < NNO; i++)
 		{
 			double temp = temps[i];
 			if (!temp) continue;
 
 			const __m256d temp64 = _mm256_set1_pd(temp);
 
-			for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e;
+			for (int b = DOF_CHOICE_START, Dof_choice = b, e = DOF_CHOICE_END; Dof_choice <= e;
 				Dof_choice += sizeof(temp64) / sizeof(double))
 			{
 				const __m256d surplus64 = _mm256_load_pd(&surplus(i, Dof_choice));
@@ -120,12 +121,12 @@ extern "C" void FUNCNAME(
 #else
 		// Loop to calculate temps.
 		// Note temps vector should not be too large to keep up the caching.
-		vector<double> temps(nno, 1.0);
-		for (int i = 0, vdim8 = vdim / AVX_VECTOR_SIZE, e = avxinds.size() / vdim8; i < e; i++)
+		vector<double> temps(NNO, 1.0);
+		for (int i = 0, e = avxinds.size() / VDIM8; i < e; i++)
 		{
-			for (int j = 0; j < vdim8; j++)
+			for (int j = 0; j < VDIM8; j++)
 			{
-				const AVXIndex& index = avxinds[i * vdim8 + j];
+				const AVXIndex& index = avxinds[i * VDIM8 + j];
 
 				for (int k = 0; k < AVX_VECTOR_SIZE; k++)
 				{
@@ -143,12 +144,12 @@ extern "C" void FUNCNAME(
 		}
 		
 		// Loop to calculate values.
-		for (int i = 0; i < nno; i++)
+		for (int i = 0; i < NNO; i++)
 		{
 			double temp = temps[i];
 			if (!temp) continue;
 
-			for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
+			for (int b = DOF_CHOICE_START, Dof_choice = b, e = DOF_CHOICE_END; Dof_choice <= e; Dof_choice++)
 				value[Dof_choice - b] += temps[i] * surplus(i, Dof_choice);
 		}		
 #endif
