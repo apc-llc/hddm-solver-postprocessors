@@ -5,7 +5,7 @@ include $(LOCATION)/Makefile.inc
 CINC += -I../include -I../../include
 CDIR = mkdir -p $(shell dirname $@)
 
-TARGETS = cpu
+TARGETS = avx512
 ifneq (,$(NVCC))
 TARGETS += cuda
 endif
@@ -28,6 +28,6 @@ cuda: $(INSTALL)/lib/liblinearbasis.a
 
 clean:
 	rm -rf $(BUILD) && \
-	cd cpu && $(MAKE) clean && cd .. && \
+	cd avx512 && $(MAKE) clean && cd .. && \
 	cd cuda && $(MAKE) clean && cd ..
 
