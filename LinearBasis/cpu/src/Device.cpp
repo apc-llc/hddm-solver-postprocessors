@@ -1,6 +1,6 @@
 #include "Device.h"
 
-using namespace cpu;
+using namespace NAMESPACE;
 
 Device::Device() : available(1) { }
 

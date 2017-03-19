@@ -1,7 +1,7 @@
 #include "Devices.h"
 #include "interpolator.h"
 
-using namespace cpu;
+using namespace NAMESPACE;
 
 Devices::Devices()
 {

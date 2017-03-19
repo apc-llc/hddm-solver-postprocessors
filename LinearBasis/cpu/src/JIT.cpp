@@ -15,7 +15,7 @@
 #include <vector>
 #include <unistd.h>
 
-using namespace cpu;
+using namespace NAMESPACE;
 using namespace std;
 
 template<>

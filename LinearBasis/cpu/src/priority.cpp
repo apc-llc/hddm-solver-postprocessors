@@ -1,6 +1,6 @@
 #include "interpolator.h"
 
-using namespace cpu;
+using namespace NAMESPACE;
 
 extern "C" int getPriority()
 {

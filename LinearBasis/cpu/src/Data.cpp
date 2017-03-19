@@ -8,7 +8,7 @@
 #include <mpi.h>
 #include <utility> // pair
 
-using namespace cpu;
+using namespace NAMESPACE;
 using namespace std;
 
 int Data::getNno() const { return nno; }

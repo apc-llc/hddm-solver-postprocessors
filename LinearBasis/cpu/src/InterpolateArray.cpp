@@ -7,7 +7,7 @@
 #include "LinearBasis.h"
 #include "Data.h"
 
-using namespace cpu;
+using namespace NAMESPACE;
 using namespace std;
 
 class Device;

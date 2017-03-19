@@ -2,7 +2,7 @@
 
 #include <vector>
 
-using namespace cpu;
+using namespace NAMESPACE;
 using namespace std;
 
 static SIMDVector simdVector;

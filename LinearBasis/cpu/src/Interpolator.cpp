@@ -5,7 +5,7 @@
 #include "interpolator.h"
 #include "JIT.h"
 
-using namespace cpu;
+using namespace NAMESPACE;
 using namespace std;
 
 const Parameters& Interpolator::getParameters() const { return params; }
