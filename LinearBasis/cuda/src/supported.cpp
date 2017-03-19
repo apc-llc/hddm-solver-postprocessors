@@ -1,8 +1,8 @@
 #include "Devices.h"
 
-using namespace cuda;
+using namespace NAMESPACE;
 
-namespace cuda
+namespace NAMESPACE
 {
 	extern Devices devices;
 }

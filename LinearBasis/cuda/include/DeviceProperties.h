@@ -5,7 +5,7 @@
 
 #include <vector>
 
-namespace cuda {
+namespace NAMESPACE {
 
 class DeviceProperties
 {
@@ -20,7 +20,7 @@ public :
 	static std::vector<DeviceProperties*>& getDeviceProperties();
 };
 
-} // namespace cuda
+} // namespace NAMESPACE
 
 #endif // DEVICE_PROPERTIES_H
 

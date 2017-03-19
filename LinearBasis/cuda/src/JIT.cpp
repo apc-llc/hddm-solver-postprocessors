@@ -14,7 +14,7 @@
 #include <vector>
 #include <unistd.h>
 
-using namespace cuda;
+using namespace NAMESPACE;
 using namespace std;
 
 template<>
@@ -26,7 +26,7 @@ const string InterpolateArrayManyStatelessKernel::sh = INTERPOLATE_ARRAY_MANY_ST
 template<>
 const string InterpolateArrayManyMultistateKernel::sh = INTERPOLATE_ARRAY_MANY_MULTISTATE_SH;
 
-namespace cuda {
+namespace NAMESPACE {
 
 class Device
 {
@@ -35,7 +35,7 @@ public :
 	int getCC() const;
 };
 
-} // namespace cuda
+} // namespace NAMESPACE
 
 template<typename K, typename F>
 K& JIT::jitCompile(

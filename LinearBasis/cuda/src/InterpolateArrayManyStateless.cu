@@ -14,7 +14,7 @@
 
 #define STR(funcname) #funcname
 
-using namespace cuda;
+using namespace NAMESPACE;
 
 extern "C" void FUNCNAME(
 	Device* device,

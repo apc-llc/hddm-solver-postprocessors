@@ -4,7 +4,7 @@
 #include "Data.h"
 #include "Device.h"
 
-using namespace cuda;
+using namespace NAMESPACE;
 
 // CUDA 8.0 introduces sm_60_atomic_functions.h with atomicAdd(double*, double)
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600

@@ -6,7 +6,7 @@
 #include <string>
 #include <unistd.h>
 
-namespace cuda {
+namespace NAMESPACE {
 
 class JIT;
 
@@ -102,5 +102,5 @@ public :
 	friend class JIT;
 };
 
-} // namespace cuda
+} // namespace NAMESPACE
 	

@@ -1,7 +1,7 @@
 #ifndef DEVICE_H
 #define DEVICE_H
 
-namespace cuda {
+namespace NAMESPACE {
 
 class Devices;
 
@@ -29,7 +29,7 @@ public :
 	friend class Devices;
 };
 
-} // namespace cuda
+} // namespace NAMESPACE
 
 #endif // DEVICE_H
 

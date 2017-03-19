@@ -4,7 +4,7 @@
 #include <iostream>
 #include <memory>
 
-using namespace cuda;
+using namespace NAMESPACE;
 using namespace std;
 
 DeviceProperties::DeviceProperties(const Device* device) : simdVector(device) { }
@@ -17,7 +17,7 @@ const SIMDVector* DeviceProperties::getSIMDVector() const
 static vector<unique_ptr<DeviceProperties> > uniqueProps;
 static vector<DeviceProperties*> props;
 
-namespace cuda
+namespace NAMESPACE
 {
 	extern Devices devices;
 }

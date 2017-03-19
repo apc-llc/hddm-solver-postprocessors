@@ -1,6 +1,6 @@
 #include "interpolator.h"
 
-using namespace cuda;
+using namespace NAMESPACE;
 
 extern "C" int getPriority()
 {

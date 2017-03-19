@@ -1,6 +1,6 @@
 #include "Device.h"
 
-using namespace cuda;
+using namespace NAMESPACE;
 
 long long Device::getID() const { return id; }
 int Device::getWarpSize() const { return warpSize; }

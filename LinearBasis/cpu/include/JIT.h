@@ -6,7 +6,7 @@
 #include "Data.h"
 #include "InterpolateKernel.h"
 
-namespace cpu {
+namespace NAMESPACE {
 
 class Device;
 
@@ -43,7 +43,7 @@ public :
 		const std::string& funcnameTemplate, F fallbackFunc);
 };
 
-} // namespace cpu
+} // namespace NAMESPACE
 
 #endif // HAVE_RUNTIME_OPTIMIZATION
 

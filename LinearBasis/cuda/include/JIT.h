@@ -6,7 +6,7 @@
 #include "Data.h"
 #include "InterpolateKernel.h"
 
-namespace cuda {
+namespace NAMESPACE {
 
 class Device;
 
@@ -67,7 +67,7 @@ public :
 
 #endif // HAVE_RUNTIME_OPTIMIZATION
 
-} // namespace cuda
+} // namespace NAMESPACE
 
 #endif // JIT_H
 

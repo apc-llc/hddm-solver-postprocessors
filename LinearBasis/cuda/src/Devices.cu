@@ -3,7 +3,7 @@
 
 #include <iostream>
 
-using namespace cuda;
+using namespace NAMESPACE;
 using namespace std;
 
 Devices::Devices()
@@ -86,7 +86,7 @@ void Devices::release(Device* device)
 	device->available++;
 }
 
-namespace cuda
+namespace NAMESPACE
 {
 	Devices devices;
 }

@@ -5,7 +5,7 @@
 
 #include "Device.h"
 
-namespace cpu {
+namespace NAMESPACE {
 
 class Devices
 {
@@ -22,7 +22,7 @@ public :
 	void release(Device* device);
 };
 
-} // namespace cpu
+} // namespace NAMESPACE
 
 #endif // DEVICES_H
 

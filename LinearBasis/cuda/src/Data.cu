@@ -6,7 +6,7 @@
 #include <iostream>
 #include <mpi.h>
 
-using namespace cuda;
+using namespace NAMESPACE;
 using namespace std;
 
 int Data::getNno() const { return nno; }

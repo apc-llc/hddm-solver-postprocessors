@@ -7,7 +7,7 @@
 
 #include <iostream>
 
-namespace cuda {
+namespace NAMESPACE {
 
 class SIMDVector
 {
@@ -39,7 +39,7 @@ public :
 	}
 };
 
-} // namespace cuda
+} // namespace NAMESPACE
 
 #endif // SIMDVECTOR_H
 

@@ -6,7 +6,7 @@
 #include "interpolator.h"
 #include "JIT.h"
 
-namespace cuda {
+namespace NAMESPACE {
 
 class Device
 {
@@ -15,9 +15,9 @@ public :
 	long long getID() const;
 };
 
-} // namespace cuda
+} // namespace NAMESPACE
 
-using namespace cuda;
+using namespace NAMESPACE;
 using namespace std;
 
 const Parameters& Interpolator::getParameters() const { return params; }

@@ -6,7 +6,7 @@
 
 #include <iostream>
 
-namespace cpu {
+namespace NAMESPACE {
 
 class SIMDVector
 {
@@ -35,7 +35,7 @@ public :
 	}
 };
 
-} // namespace cpu
+} // namespace NAMESPACE
 
 #endif // SIMDVECTOR_H
 

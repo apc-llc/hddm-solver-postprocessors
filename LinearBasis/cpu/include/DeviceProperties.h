@@ -3,7 +3,7 @@
 
 #include "SIMDVector.h"
 
-namespace cpu {
+namespace NAMESPACE {
 
 class DeviceProperties
 {
@@ -12,7 +12,7 @@ public :
 	virtual const SIMDVector* getSIMDVector() const;
 };
 
-} // namespace cpu
+} // namespace NAMESPACE
 
 #endif // DEVICE_PROPERTIES_H
 

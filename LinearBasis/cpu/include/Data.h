@@ -12,7 +12,7 @@
 #include "check.h"
 #include "process.h"
 
-namespace cpu {
+namespace NAMESPACE {
 
 // Custom allocator, using code by Sergei Danielian
 // https://github.com/gahcep/Allocators
@@ -338,7 +338,7 @@ public :
 	virtual ~Data();
 };
 
-} // namespace cpu
+} // namespace NAMESPACE
 
 #endif // DATA_H
 

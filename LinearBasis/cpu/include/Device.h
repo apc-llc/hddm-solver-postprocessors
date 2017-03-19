@@ -1,7 +1,7 @@
 #ifndef DEVICE_H
 #define DEVICE_H
 
-namespace cpu {
+namespace NAMESPACE {
 
 class Devices;
 
@@ -21,7 +21,7 @@ public :
 	friend class Devices;
 };
 
-} // namespace cpu
+} // namespace NAMESPACE
 
 #endif // DEVICE_H
 

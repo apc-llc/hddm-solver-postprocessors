@@ -12,7 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 
-using namespace cuda;
+using namespace NAMESPACE;
 using namespace std;
 
 // For compatibility with Fortran, all parameters are declared

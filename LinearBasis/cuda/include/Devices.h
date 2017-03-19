@@ -5,7 +5,7 @@
 
 #include "Device.h"
 
-namespace cuda {
+namespace NAMESPACE {
 
 class DeviceProperties;
 
@@ -28,7 +28,7 @@ public :
 	friend class DeviceProperties;
 };
 
-} // namespace cuda
+} // namespace NAMESPACE
 
 #endif // DEVICES_H
 

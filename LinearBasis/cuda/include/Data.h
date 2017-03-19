@@ -17,7 +17,7 @@
 #include <cuda_runtime_api.h>
 #endif
 
-namespace cuda {
+namespace NAMESPACE {
 
 // Custom host memory allocator, using code by Sergei Danielian
 // https://github.com/gahcep/Allocators
@@ -718,7 +718,7 @@ public :
 	virtual ~Data();
 };
 
-} // namespace cuda
+} // namespace NAMESPACE
 
 #endif // DATA_H
 
