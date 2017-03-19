@@ -179,13 +179,149 @@ public :
 	}
 };
 
+struct AVXIndex
+{
+	uint8_t i[AVX_VECTOR_SIZE], j[AVX_VECTOR_SIZE];
+	
+	AVXIndex()
+	{
+		memset(i, 0, sizeof(i));
+		memset(j, 0, sizeof(j));
+	}
+	
+	__attribute__((always_inline))
+	bool isEmpty() const
+	{
+		AVXIndex empty;
+		if (memcmp(this, &empty, sizeof(AVXIndex)) == 0)
+			return true;
+		
+		return false;
+	}
+
+	__attribute__((always_inline))
+	bool isEmpty(int k) const
+	{
+		return (i[k] == 0) && (j[k] == 0);
+	}
+};
+
+// Compressed index matrix packed into AVX-sized chunks.
+// Specialized from vector in order to place the length value
+// right before its corresponding row data (for caching).
+class AVXIndexes: private std::vector<char, AlignedAllocator<AVXIndex> >
+{
+	int nnoMax;
+	int dim;
+	
+	static const int szlength = 4 * sizeof(double);
+
+	__attribute__((always_inline))
+	static int nnoMaxAlign(int nnoMax_)
+	{
+		// Pad indexes rows to AVX_VECTOR_SIZE.
+		if (nnoMax_ % AVX_VECTOR_SIZE)
+			nnoMax_ += AVX_VECTOR_SIZE - nnoMax_ % AVX_VECTOR_SIZE;
+
+		return nnoMax_ / AVX_VECTOR_SIZE;
+	}
+	
+	__attribute__((always_inline))
+	int& length(int j)
+	{
+		return reinterpret_cast<int*>(
+			reinterpret_cast<char*>(&this->operator()(0, j)) - sizeof(int))[0];
+	}
+
+	__attribute__((always_inline))
+	const int& length(int j) const
+	{
+		return reinterpret_cast<const int*>(
+			reinterpret_cast<const char*>(&this->operator()(0, j)) - sizeof(int))[0];
+	}
+	
+	__attribute__((always_inline))
+	void setLength(int j, int length_)
+	{
+		length(j) = length_;
+	}
+
+public :
+
+	AVXIndexes() :
+		nnoMax(0), dim(0),
+		std::vector<char, AlignedAllocator<AVXIndex> >()
+	
+	{ }
+
+	AVXIndexes(int nnoMax_, int dim_) :
+		nnoMax(nnoMaxAlign(nnoMax_)), dim(dim_),
+		std::vector<char, AlignedAllocator<AVXIndex> >(
+			dim_ * (nnoMaxAlign(nnoMax_) * sizeof(AVXIndex) + szlength))
+
+	{ }
+	
+	void resize(int nnoMax_, int dim_)
+	{
+		nnoMax = nnoMaxAlign(nnoMax_);
+		dim = dim_;
+
+		vector<char, AlignedAllocator<AVXIndex> >::resize(
+			dim_ * (nnoMaxAlign(nnoMax_) * sizeof(AVXIndex) + szlength));
+	}
+	
+	__attribute__((always_inline))
+	AVXIndex& operator()(int i, int j)
+	{
+		return *reinterpret_cast<AVXIndex*>(
+			&std::vector<char, AlignedAllocator<AVXIndex> >::operator[]((j * nnoMax + i) * sizeof(AVXIndex) + (j + 1) * szlength));
+	}
+
+	__attribute__((always_inline))
+	const AVXIndex& operator()(int i, int j) const
+	{
+		return *reinterpret_cast<const AVXIndex*>(
+			&std::vector<char, AlignedAllocator<AVXIndex> >::operator[]((j * nnoMax + i) * sizeof(AVXIndex) + (j + 1) * szlength));
+	}
+	
+	__attribute__((always_inline))
+	int getLength(int j) const
+	{
+		return length(j);
+	}
+	
+	void calculateLengths()
+	{
+		for (int j = 0; j < dim; j++)
+		{
+			int length = 0;
+			for (int i = 0; i < nnoMax; i++)
+			{
+				AVXIndex& index = this->operator()(i, j);
+				if (index.isEmpty())
+					break;
+				
+				length++;
+			}
+			
+			setLength(j, length);
+		}
+	}
+};
+
+typedef std::vector<AVXIndexes> AVXIndexMatrix;
+
+// Index transition matrix between row indexes of different frequencies.
+typedef std::vector<std::vector<uint32_t> > TransMatrix;
+
 class Interpolator;
 
 class Data
 {
 	int nstates, dim, vdim, nno, TotalDof, Level;
-	std::vector<Matrix<int> > index;
-	std::vector<Matrix<real> > surplus, surplus_t;
+	std::vector<AVXIndexMatrix> avxinds;
+	std::vector<TransMatrix> trans;
+	std::vector<Matrix<real> > surplus;
 	std::vector<bool> loadedStates;
 	
 	friend class Interpolator;

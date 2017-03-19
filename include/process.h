@@ -9,7 +9,8 @@ public :
 	int getRank() const;
 	int getSize() const;
 	MPI_Comm getComm() const;
-
+	void setComm(MPI_Comm comm);
+	
 	void abort();
 };
 
