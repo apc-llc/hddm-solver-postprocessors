@@ -4,6 +4,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <mpi.h>
 #include <utility> // pair
 
