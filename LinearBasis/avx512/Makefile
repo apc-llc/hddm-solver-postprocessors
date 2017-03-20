@@ -5,18 +5,20 @@ LOCATION = ../../..
 include $(LOCATION)/Makefile.inc
 
 CINC += -I. -I../include -I../../include
-COPT_FILTERED := $(filter-out -ffast-math, $(COPT))
-COPT = $(COPT_FILTERED) -DAVX_VECTOR_SIZE=16 -DNAMESPACE=$(NAME) -fast -axMIC-AVX512
+COPT += -DAVX_VECTOR_SIZE=16 -DNAMESPACE=$(NAME) -axMIC-AVX512 -g
+COPT_FILTERED := $(filter-out -g3, $(filter-out -ffast-math, $(COPT)))
+COPT := $(COPT_FILTERED)
 CDIR = mkdir -p $(shell dirname $@)
+CXX := icpc
 
 all: $(INSTALL)/bin/postprocessors/LinearBasis/avx512/libpostprocessor.so
 
 $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
 	$(BUILD)/InterpolateArray.o $(BUILD)/InterpolateArrayManyMultistate.o \
 	$(BUILD)/libInterpolateArray.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
-	$(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o \
+	$(BUILD)/parameters.o $(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o \
 	$(BUILD)/priority.o $(BUILD)/supported.o $(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o
-	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(CXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -llinearbasis
+	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(CXX) $(CINC) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -static-libstdc++
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.cpp
 	$(CDIR) && $(CXX) -DFUNCNAME=LinearBasis_CPU_Generic_InterpolateArray -DDIM=dim -DNNO=nno -DDOF_CHOICE_START=Dof_choice_start -DDOF_CHOICE_END=Dof_choice_end $(CINC) $(COPT) -c $< -o $@
@@ -29,6 +31,9 @@ $(BUILD)/libInterpolateArray.sh: src/InterpolateArray.cpp
 
 $(BUILD)/libInterpolateArrayManyMultistate.sh: src/InterpolateArrayManyMultistate.cpp
 	$(CDIR) && echo cd $(shell pwd) \&\& $(CXX) $(CINC) $(COPT) -shared $^  > $@
+
+$(BUILD)/parameters.o: src/parameters.cpp $(LOCATION)/include/check.h include/parameters.h include/parameters.c
+	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/Interpolator.o: src/Interpolator.cpp include/JIT.h include/Data.h
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
