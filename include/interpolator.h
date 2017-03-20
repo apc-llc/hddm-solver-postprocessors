@@ -34,6 +34,8 @@ public :
 	// Interpolate multiple arrays of values in continuous vector, with multiple surplus states.
 	virtual void interpolate(Device* device, Data* data,
 		const real** x, const int Dof_choice_start, const int Dof_choice_end, real** value);
+
+	virtual ~Interpolator();
 };
 
 } // namespace NAMESPACE
