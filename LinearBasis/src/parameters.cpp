@@ -71,6 +71,7 @@ ASSIGN(binaryio)
 		istringstream iss(line);
 		string name;
 		iss >> name;
+		if (!name.length()) continue;
 		if (name[0] == '!') continue;
 		string value;
 		if (!(iss >> value))
