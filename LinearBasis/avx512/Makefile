@@ -6,6 +6,9 @@ include $(LOCATION)/Makefile.inc
 
 CINC += -I. -I../include -I../../include
 COPT += -DAVX_VECTOR_SIZE=16 -DNAMESPACE=$(NAME) -axMIC-AVX512 -g
+ifeq (,$(DEBUG))
+COPT += -fast
+endif
 COPT_FILTERED := $(filter-out -g3, $(filter-out -ffast-math, $(COPT)))
 COPT := $(COPT_FILTERED)
 CDIR = mkdir -p $(shell dirname $@)
