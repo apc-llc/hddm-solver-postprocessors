@@ -1,8 +1,6 @@
-#ifdef HAVE_AVX
 #include <assert.h>
 #include <stdint.h>
 #include <x86intrin.h>
-#endif
 
 #include "LinearBasis.h"
 #include "Data.h"
@@ -18,9 +16,7 @@ extern "C" void FUNCNAME(
 	const int Dof_choice_start, const int Dof_choice_end, const double* x,
 	const AVXIndexMatrix* avxinds_, const TransMatrix* trans_, const Matrix<double>* surplus_, double* value)
 {
-#ifdef HAVE_AVX
 	assert(((size_t)x % (AVX_VECTOR_SIZE * sizeof(double)) == 0) && "x vector must be sufficiently memory-aligned");
-#endif
 
 	const AVXIndexMatrix& avxinds = *avxinds_;
 	const TransMatrix& trans = *trans_;
@@ -32,7 +28,6 @@ extern "C" void FUNCNAME(
 	if (dim % AVX_VECTOR_SIZE) vdim++;
 	vdim *= AVX_VECTOR_SIZE;
 
-#ifdef HAVE_AVX
 	const __m256d double4_0_0_0_0 = _mm256_setzero_pd();
 	const __m256d double4_1_1_1_1 = _mm256_set1_pd(1.0);
 	const __m256d sign_mask = _mm256_set1_pd(-0.);
@@ -121,68 +116,9 @@ extern "C" void FUNCNAME(
 		{
 			const __m256d surplus64 = _mm256_load_pd(&surplus(i, Dof_choice));
 			__m256d value64 = _mm256_load_pd(&value[Dof_choice - b]);		
-#ifdef HAVE_AVX2
 			value64 = _mm256_fmadd_pd(temp64, surplus64, value64);
-#else
-			value64 = _mm256_add_pd(_mm256_mul_pd(temp64, surplus64), value64);
-#endif
 			_mm256_store_pd(&value[Dof_choice - b], value64);
 		}
 	}
-#else
-	// Loop through all frequences.
-	for (int ifreq = 0; ifreq < nfreqs; ifreq++)
-	{
-		const AVXIndexes& avxindsFreq = avxinds[ifreq];
-		vector<double, AlignedAllocator<double> >& temps = temps_[ifreq];
-
-		// Loop to calculate temps.
-		for (int j = 0, itemp = 0; j < DIM; j++)
-		{
-			double xx = x[j];
-	
-			for (int i = 0, e = avxindsFreq.getLength(j); i < e; i++)
-			{
-				const AVXIndex& index = avxindsFreq(i, j);
-
-				for (int k = 0; k < AVX_VECTOR_SIZE; k++, itemp++)
-				{
-					const uint8_t& ind_i = index.i[k];
-					const uint8_t& ind_j = index.j[k];
-
-					double xp = LinearBasis(xx, ind_i, ind_j);
-
-					xp = fmax(0.0, xp);
-		
-					temps[itemp] = xp;
-				}
-			}			
-
-			if (avxindsFreq.getLength(j))
-			{
-				const AVXIndex& index = avxindsFreq(avxindsFreq.getLength(j) - 1, j);
-				for (int k = AVX_VECTOR_SIZE - 1; k >= 0; k--)
-					if (index.isEmpty(k)) itemp--;
-			}
-		}
-	}
-
-	// Join temps from all frequencies.
-	vector<double, AlignedAllocator<double> >& temps = temps_[0];
-	for (int i = 0; i < NNO; i++)
-		for (int ifreq = 1; ifreq < nfreqs; ifreq++)
-			temps[i] *= temps_[ifreq][trans[ifreq][i]];
-
-	// Loop to calculate values.
-	for (int i = 0; i < NNO; i++)
-	{
-		double temp = temps[i];
-
-		if (!temp) continue;
-
-		for (int b = DOF_CHOICE_START, Dof_choice = b, e = DOF_CHOICE_END; Dof_choice <= e; Dof_choice++)
-			value[Dof_choice - b] += temp * surplus(i, Dof_choice);
-	}
-#endif
 }
 

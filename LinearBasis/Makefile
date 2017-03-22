@@ -6,17 +6,25 @@ CINC += -I../include -I../../include
 CDIR = mkdir -p $(shell dirname $@)
 
 TARGETS = x86
-ifneq (,$(HAVE_AVX))
+ifneq (,$(AVX))
 TARGETS += avx
+else
+$(info AVX target is not supported by host GCC compiler)
 endif
-ifneq (,$(HAVE_AVX2))
+ifneq (,$(AVX2))
 TARGETS += avx2
+else
+$(info AVX2 target is not supported by host GCC compiler)
 endif
 ifneq (,$(which icpc))
 TARGETS += avx512
+else
+$(info AVX512 target is not built because Intel compiler is not found)
 endif
 ifneq (,$(NVCC))
 TARGETS += cuda
+else
+$(info CUDA target is not built because NVIDIA CUDA compiler is not found)
 endif
 
 .PHONY: $(TARGETS)
@@ -24,6 +32,12 @@ endif
 all: $(TARGETS)
 
 x86:
+	cd $@ && $(MAKE) -j$(NJOBS)
+
+avx:
+	cd $@ && $(MAKE) -j$(NJOBS)
+
+avx2:
 	cd $@ && $(MAKE) -j$(NJOBS)
 
 avx512:
