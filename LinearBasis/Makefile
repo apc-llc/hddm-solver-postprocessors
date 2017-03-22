@@ -5,7 +5,10 @@ include $(LOCATION)/Makefile.inc
 CINC += -I../include -I../../include
 CDIR = mkdir -p $(shell dirname $@)
 
-TARGETS = avx512
+TARGETS = x86
+ifneq (,$(which icpc))
+TARGETS += avx512
+endif
 ifneq (,$(NVCC))
 TARGETS += cuda
 endif
@@ -14,20 +17,18 @@ endif
 
 all: $(TARGETS)
 
-$(INSTALL)/lib/liblinearbasis.a: $(BUILD)/parameters.o
-	$(CDIR) && ar rcs $@ $^
-
-$(BUILD)/parameters.o: src/parameters.cpp $(LOCATION)/include/check.h include/parameters.h include/parameters.c
-	$(CDIR) && $(MPICXX) $(CINC) $(COPT) -c $< -o $@
-
-cpu: $(INSTALL)/lib/liblinearbasis.a
+x86:
 	cd $@ && $(MAKE) -j$(NJOBS)
 
-cuda: $(INSTALL)/lib/liblinearbasis.a
+avx512:
+	cd $@ && $(MAKE) -j$(NJOBS)
+
+cuda:
 	cd $@ && $(MAKE) -j$(NJOBS)
 
 clean:
 	rm -rf $(BUILD) && \
+	cd x86 && $(MAKE) clean && cd .. && \
 	cd avx512 && $(MAKE) clean && cd .. && \
 	cd cuda && $(MAKE) clean && cd ..
 

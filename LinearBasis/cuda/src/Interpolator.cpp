@@ -193,6 +193,10 @@ Interpolator* Interpolator::getInstance()
 	return interp.get();
 }
 
+Interpolator::~Interpolator()
+{
+}
+
 extern "C" Interpolator* getInterpolator()
 {
 	return Interpolator::getInstance();
