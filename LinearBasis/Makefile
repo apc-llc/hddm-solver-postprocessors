@@ -16,7 +16,7 @@ TARGETS += avx2
 else
 $(info AVX2 target is not supported by host GCC compiler)
 endif
-ifneq (,$(which icpc))
+ifneq (,$(shell which icpc))
 TARGETS += avx512
 else
 $(info AVX512 target is not built because Intel compiler is not found)

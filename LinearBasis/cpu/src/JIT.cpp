@@ -108,8 +108,10 @@ K& JIT::jitCompile(int dim, int count, int nno, int Dof_choice_start, int Dof_ch
 
 	map<KSignature, K, KSignature>& kernels_tls = *kernels_tls_;
 
+	KSignature signature(dim, count, nno, Dof_choice_start, Dof_choice_end);
+
 	{
-		K& kernel = kernels_tls[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)];
+		K& kernel = kernels_tls[signature];
 
 		// Already successfully compiled?
 		if (kernel.filename != "")
@@ -133,12 +135,12 @@ K& JIT::jitCompile(int dim, int count, int nno, int Dof_choice_start, int Dof_ch
 
 	PTHREAD_ERR_CHECK(pthread_mutex_lock(&mutex));
 
-	K& kernel = kernels[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)];
+	K& kernel = kernels[signature];
 
 	// Already successfully compiled?
 	if (kernel.filename != "")
 	{
-		kernels_tls[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)] = kernel;
+		kernels_tls[signature] = kernel;
 		PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 		return kernel;
 	}
@@ -150,7 +152,7 @@ K& JIT::jitCompile(int dim, int count, int nno, int Dof_choice_start, int Dof_ch
 		kernel.fileowner = false;
 		kernel.func = fallbackFunc;
 
-		kernels_tls[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)] = kernel;
+		kernels_tls[signature] = kernel;
 		PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 		return kernel;
 	}
@@ -196,7 +198,7 @@ K& JIT::jitCompile(int dim, int count, int nno, int Dof_choice_start, int Dof_ch
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
 
-			kernels_tls[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)] = kernel;
+			kernels_tls[signature] = kernel;
 			PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 			return kernel;
 		}
@@ -204,7 +206,7 @@ K& JIT::jitCompile(int dim, int count, int nno, int Dof_choice_start, int Dof_ch
 		// Generate function name for specific number of arguments.
 		stringstream sfuncname;
 		sfuncname << funcnameTemplate;
-		sfuncname << dim;
+		sfuncname << hash<KSignature>{}(signature);
 		string funcname = sfuncname.str();
 
 		// Read the compile command template.
@@ -223,7 +225,7 @@ K& JIT::jitCompile(int dim, int count, int nno, int Dof_choice_start, int Dof_ch
 				kernel.fileowner = false;
 				kernel.func = fallbackFunc;
 
-				kernels_tls[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)] = kernel;
+				kernels_tls[signature] = kernel;
 				PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 				return kernel;
 			}
@@ -278,7 +280,7 @@ K& JIT::jitCompile(int dim, int count, int nno, int Dof_choice_start, int Dof_ch
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
 
-			kernels_tls[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)] = kernel;
+			kernels_tls[signature] = kernel;
 			PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 			return kernel;
 		}
@@ -338,7 +340,7 @@ K& JIT::jitCompile(int dim, int count, int nno, int Dof_choice_start, int Dof_ch
 	}
 
 	kernel.func = kernel.getFunc();
-	kernels_tls[KSignature(dim, count, nno, Dof_choice_start, Dof_choice_end)] = kernel;
+	kernels_tls[signature] = kernel;
 	PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 	return kernel;
 }

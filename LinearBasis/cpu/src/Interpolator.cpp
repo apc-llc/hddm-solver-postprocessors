@@ -5,6 +5,9 @@
 #include "interpolator.h"
 #include "JIT.h"
 
+#define str(x) #x
+#define stringize(x) str(x)
+
 using namespace NAMESPACE;
 using namespace std;
 
@@ -18,7 +21,7 @@ params(targetSuffix, configFile)
 	jit = params.enableRuntimeOptimization;
 }
 
-extern "C" void LinearBasis_CPU_Generic_InterpolateArray(
+extern "C" void INTERPOLATE_ARRAY(
 	Device* device, const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const double* x,
 	const AVXIndexMatrix* avxinds, const TransMatrix* trans, const Matrix<double>* surplus, double* value);
@@ -34,29 +37,29 @@ void Interpolator::interpolate(Device* device, Data* data,
 			const int Dof_choice_start, const int Dof_choice_end, const double* x,
 			const AVXIndexMatrix* avxinds, const TransMatrix* trans, const Matrix<double>* surplus, double* value);
 
-		static Func LinearBasis_CPU_RuntimeOpt_InterpolateArray;
+		static Func INTERPOLATE_ARRAY_RUNTIME_OPT;
 
-		if (!LinearBasis_CPU_RuntimeOpt_InterpolateArray)
+		if (!INTERPOLATE_ARRAY_RUNTIME_OPT)
 		{
-			LinearBasis_CPU_RuntimeOpt_InterpolateArray =
+			INTERPOLATE_ARRAY_RUNTIME_OPT =
 				JIT::jitCompile(data->dim, data->nno, Dof_choice_start, Dof_choice_end,
-				"LinearBasis_CPU_RuntimeOpt_InterpolateArray_",
-				(Func)LinearBasis_CPU_Generic_InterpolateArray).getFunc();
+				stringize(INTERPOLATE_ARRAY_RUNTIME_OPT) "_",
+				(Func)INTERPOLATE_ARRAY).getFunc();
 		}
 		
-		LinearBasis_CPU_RuntimeOpt_InterpolateArray(
+		INTERPOLATE_ARRAY_RUNTIME_OPT(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, x,
 			&data->avxinds[istate], &data->trans[istate], &data->surplus[istate], value);
 	}
 	else
 	{
-		LinearBasis_CPU_Generic_InterpolateArray(
+		INTERPOLATE_ARRAY(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, x,
 			&data->avxinds[istate], &data->trans[istate], &data->surplus[istate], value);
 	}
 }
 
-extern "C" void LinearBasis_CPU_Generic_InterpolateArrayManyMultistate(
+extern "C" void INTERPOLATE_ARRAY_MANY_MULTISTATE(
 	Device* device, const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
 	const AVXIndexMatrix* avxinds, const TransMatrix* trans, const Matrix<double>* surplus, double** value);
@@ -65,30 +68,30 @@ extern "C" void LinearBasis_CPU_Generic_InterpolateArrayManyMultistate(
 void Interpolator::interpolate(Device* device, Data* data,
 	const real** x, const int Dof_choice_start, const int Dof_choice_end, real** value)
 {
+	typedef void (*Func)(
+		Device* device, const int dim, const int nno,
+		const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
+		const AVXIndexMatrix* avxinds, const TransMatrix* trans, const Matrix<double>* surplus, double** value);
+
+	static Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT;
+
 	if (jit)
 	{
-		typedef void (*Func)(
-			Device* device, const int dim, const int nno,
-			const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
-			const AVXIndexMatrix* avxinds, const TransMatrix* trans, const Matrix<double>* surplus, double** value);
-
-		static Func LinearBasis_CPU_RuntimeOpt_InterpolateArrayManyMultistate;
-
-		if (!LinearBasis_CPU_RuntimeOpt_InterpolateArrayManyMultistate)
+		if (!INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT)
 		{
-			LinearBasis_CPU_RuntimeOpt_InterpolateArrayManyMultistate =
+			INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
 				JIT::jitCompile(data->dim, data->nstates, data->nno, Dof_choice_start, Dof_choice_end,
-				"LinearBasis_CPU_RuntimeOpt_InterpolateArrayManyMultistate_",
-				(Func)LinearBasis_CPU_Generic_InterpolateArrayManyMultistate).getFunc();
+				stringize(INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT) "_",
+				(Func)INTERPOLATE_ARRAY_MANY_MULTISTATE).getFunc();
 		}
 
-		LinearBasis_CPU_RuntimeOpt_InterpolateArrayManyMultistate(
+		INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
 			&data->avxinds[0], &data->trans[0], &data->surplus[0], value);
 	}
 	else
 	{
-		LinearBasis_CPU_Generic_InterpolateArrayManyMultistate(
+		INTERPOLATE_ARRAY_MANY_MULTISTATE(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
 			&data->avxinds[0], &data->trans[0], &data->surplus[0], value);
 	}
