@@ -10,9 +10,55 @@ extern "C" void FUNCNAME(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
-	const AVXIndexMatrix* avxinds_, const TransMatrix* trans_, const Matrix<double>* surplus_, double** value_)
+	const int* nfreqs_, const XPS* xps_, const Chains* chains_, const Matrix<double>* surplus_, double** value_)
 {
 	for (int many = 0; many < COUNT; many++)
+	{
+		const double* x = x_[many];
+		const int& nfreqs = nfreqs_[many];
+		const XPS& xps = xps_[many];
+		const Chains& chains = chains_[many];
+		const Matrix<double>& surplus = surplus_[many];
+		double* value = value_[many];
+
+		for (int b = DOF_CHOICE_START, Dof_choice = b, e = DOF_CHOICE_END; Dof_choice <= e; Dof_choice++)
+			value[Dof_choice - b] = 0;
+
+		// Loop through all frequences.
+		vector<double> temps(NNO, 1.0);
+		for (int ifreq = 0; ifreq < nfreqs; ifreq++)
+		{
+			const vector<Index<uint16_t> >& xpsFreq = xps[ifreq];
+			
+			vector<double> xpv(xpsFreq.size(), 1.0);
+			for (int i = 0, e = xpv.size(); i < e; i++)
+			{
+				const Index<uint16_t>& index = xpsFreq[i];
+				const uint32_t& j = index.index;
+				double xp = LinearBasis(x[j], index.i, index.j);
+				xpv[i] = fmax(0.0, xp);
+			}
+
+			for (int i = 0; i < NNO; i++)
+				temps[i] *= xpv[chains[ifreq * nno + i]];
+		}
+
+		// Loop to calculate values.
+		for (int i = 0; i < NNO; i++)
+		{
+			double temp = temps[i];
+
+			if (!temp) continue;
+
+			for (int b = DOF_CHOICE_START, Dof_choice = b, e = DOF_CHOICE_END; Dof_choice <= e; Dof_choice++)
+			{
+				double t = temp * surplus(i, Dof_choice);
+				value[Dof_choice - b] += t;
+			}
+		}
+	}
+
+	/*for (int many = 0; many < COUNT; many++)
 	{
 		const double* x = x_[many];
 		const AVXIndexMatrix& avxinds = avxinds_[many];
@@ -87,6 +133,6 @@ extern "C" void FUNCNAME(
 			for (int b = DOF_CHOICE_START, Dof_choice = b, e = DOF_CHOICE_END; Dof_choice <= e; Dof_choice++)
 				value[Dof_choice - b] += temp * surplus(i, Dof_choice);
 		}
-	}
+	}*/
 }
 

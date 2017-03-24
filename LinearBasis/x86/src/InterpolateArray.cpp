@@ -10,9 +10,9 @@ extern "C" void FUNCNAME(
 	Device* device,
 	const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const double* x,
-	const AVXIndexMatrix* avxinds_, const TransMatrix* trans_, const Matrix<double>* surplus_, double* value)
+	const int nfreqs, const XPS* xps_, const Chains* chains_, const Matrix<double>* surplus_, double* value)
 {
-	const AVXIndexMatrix& avxinds = *avxinds_;
+	/*const AVXIndexMatrix& avxinds = *avxinds_;
 	const TransMatrix& trans = *trans_;
 	const Matrix<double>& surplus = *surplus_;
 	
@@ -79,6 +79,6 @@ extern "C" void FUNCNAME(
 
 		for (int b = DOF_CHOICE_START, Dof_choice = b, e = DOF_CHOICE_END; Dof_choice <= e; Dof_choice++)
 			value[Dof_choice - b] += temp * surplus(i, Dof_choice);
-	}
+	}*/
 }
 

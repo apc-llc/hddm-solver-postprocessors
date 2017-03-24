@@ -24,7 +24,7 @@ params(targetSuffix, configFile)
 extern "C" void INTERPOLATE_ARRAY(
 	Device* device, const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const double* x,
-	const AVXIndexMatrix* avxinds, const TransMatrix* trans, const Matrix<double>* surplus, double* value);
+	const int nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double* value);
 
 // Interpolate array of values.
 void Interpolator::interpolate(Device* device, Data* data,
@@ -35,7 +35,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 		typedef void (*Func)(
 			Device* device, const int dim, const int nno,
 			const int Dof_choice_start, const int Dof_choice_end, const double* x,
-			const AVXIndexMatrix* avxinds, const TransMatrix* trans, const Matrix<double>* surplus, double* value);
+			const int nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double* value);
 
 		static Func INTERPOLATE_ARRAY_RUNTIME_OPT;
 
@@ -49,20 +49,20 @@ void Interpolator::interpolate(Device* device, Data* data,
 		
 		INTERPOLATE_ARRAY_RUNTIME_OPT(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, x,
-			&data->avxinds[istate], &data->trans[istate], &data->surplus[istate], value);
+			data->nfreqs[istate], &data->xps[istate], &data->chains[istate], &data->surplus[istate], value);
 	}
 	else
 	{
 		INTERPOLATE_ARRAY(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, x,
-			&data->avxinds[istate], &data->trans[istate], &data->surplus[istate], value);
+			data->nfreqs[istate], &data->xps[istate], &data->chains[istate], &data->surplus[istate], value);
 	}
 }
 
 extern "C" void INTERPOLATE_ARRAY_MANY_MULTISTATE(
 	Device* device, const int dim, const int nno,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
-	const AVXIndexMatrix* avxinds, const TransMatrix* trans, const Matrix<double>* surplus, double** value);
+	const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
 
 // Interpolate multiple arrays of values, with multiple surplus states.
 void Interpolator::interpolate(Device* device, Data* data,
@@ -71,7 +71,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 	typedef void (*Func)(
 		Device* device, const int dim, const int nno,
 		const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
-		const AVXIndexMatrix* avxinds, const TransMatrix* trans, const Matrix<double>* surplus, double** value);
+		const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
 
 	static Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT;
 
@@ -87,13 +87,13 @@ void Interpolator::interpolate(Device* device, Data* data,
 
 		INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
-			&data->avxinds[0], &data->trans[0], &data->surplus[0], value);
+			&data->nfreqs[0], &data->xps[0], &data->chains[0], &data->surplus[0], value);
 	}
 	else
 	{
 		INTERPOLATE_ARRAY_MANY_MULTISTATE(
 			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
-			&data->avxinds[0], &data->trans[0], &data->surplus[0], value);
+			&data->nfreqs[0], &data->xps[0], &data->chains[0], &data->surplus[0], value);
 	}
 }
 

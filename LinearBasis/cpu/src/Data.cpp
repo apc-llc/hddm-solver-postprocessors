@@ -190,14 +190,134 @@ static void read_surplus(ifstream& infile, int nno, int TotalDof, Matrix<double>
 	//cout << (100 - (double)surplus_nonzeros / (nno * TotalDof) * 100) << "% surplus sparsity" << endl;
 }
 
-struct Index
+struct AVXIndex
 {
-	int i, j;
-	int rowind;
-
-	Index() : i(0), j(0), rowind(0) { }
+	uint8_t i[AVX_VECTOR_SIZE], j[AVX_VECTOR_SIZE];
 	
-	Index(int i_, int j_, int rowind_) : i(i_), j(j_), rowind(rowind_) { }
+	AVXIndex()
+	{
+		memset(i, 0, sizeof(i));
+		memset(j, 0, sizeof(j));
+	}
+	
+	__attribute__((always_inline))
+	bool isEmpty() const
+	{
+		AVXIndex empty;
+		if (memcmp(this, &empty, sizeof(AVXIndex)) == 0)
+			return true;
+		
+		return false;
+	}
+
+	__attribute__((always_inline))
+	bool isEmpty(int k) const
+	{
+		return (i[k] == 0) && (j[k] == 0);
+	}
+};
+
+// Compressed index matrix packed into AVX-sized chunks.
+// Specialized from vector in order to place the length value
+// right before its corresponding row data (for caching).
+class AVXIndexes: private std::vector<char, AlignedAllocator<AVXIndex> >
+{
+	int nnoMax;
+	int dim;
+	
+	static const int szlength = 4 * sizeof(double);
+
+	__attribute__((always_inline))
+	static int nnoMaxAlign(int nnoMax_)
+	{
+		// Pad indexes rows to AVX_VECTOR_SIZE.
+		if (nnoMax_ % AVX_VECTOR_SIZE)
+			nnoMax_ += AVX_VECTOR_SIZE - nnoMax_ % AVX_VECTOR_SIZE;
+
+		return nnoMax_ / AVX_VECTOR_SIZE;
+	}
+	
+	__attribute__((always_inline))
+	int& length(int j)
+	{
+		return reinterpret_cast<int*>(
+			reinterpret_cast<char*>(&this->operator()(0, j)) - sizeof(int))[0];
+	}
+
+	__attribute__((always_inline))
+	const int& length(int j) const
+	{
+		return reinterpret_cast<const int*>(
+			reinterpret_cast<const char*>(&this->operator()(0, j)) - sizeof(int))[0];
+	}
+	
+	__attribute__((always_inline))
+	void setLength(int j, int length_)
+	{
+		length(j) = length_;
+	}
+
+public :
+
+	AVXIndexes() :
+		nnoMax(0), dim(0),
+		std::vector<char, AlignedAllocator<AVXIndex> >()
+	
+	{ }
+
+	AVXIndexes(int nnoMax_, int dim_) :
+		nnoMax(nnoMaxAlign(nnoMax_)), dim(dim_),
+		std::vector<char, AlignedAllocator<AVXIndex> >(
+			dim_ * (nnoMaxAlign(nnoMax_) * sizeof(AVXIndex) + szlength))
+
+	{ }
+	
+	void resize(int nnoMax_, int dim_)
+	{
+		nnoMax = nnoMaxAlign(nnoMax_);
+		dim = dim_;
+
+		vector<char, AlignedAllocator<AVXIndex> >::resize(
+			dim_ * (nnoMaxAlign(nnoMax_) * sizeof(AVXIndex) + szlength));
+	}
+	
+	__attribute__((always_inline))
+	AVXIndex& operator()(int i, int j)
+	{
+		return *reinterpret_cast<AVXIndex*>(
+			&std::vector<char, AlignedAllocator<AVXIndex> >::operator[]((j * nnoMax + i) * sizeof(AVXIndex) + (j + 1) * szlength));
+	}
+
+	__attribute__((always_inline))
+	const AVXIndex& operator()(int i, int j) const
+	{
+		return *reinterpret_cast<const AVXIndex*>(
+			&std::vector<char, AlignedAllocator<AVXIndex> >::operator[]((j * nnoMax + i) * sizeof(AVXIndex) + (j + 1) * szlength));
+	}
+	
+	__attribute__((always_inline))
+	int getLength(int j) const
+	{
+		return length(j);
+	}
+	
+	void calculateLengths()
+	{
+		for (int j = 0; j < dim; j++)
+		{
+			int length = 0;
+			for (int i = 0; i < nnoMax; i++)
+			{
+				AVXIndex& index = this->operator()(i, j);
+				if (index.isEmpty())
+					break;
+				
+				length++;
+			}
+			
+			setLength(j, length);
+		}
+	}
 };
 
 void Data::load(const char* filename, int istate)
@@ -353,8 +473,18 @@ void Data::load(const char* filename, int istate)
 
 	vdim *= AVX_VECTOR_SIZE;
 
+	struct State
+	{
+		int nfreqs;
+		vector<vector<Index<uint16_t> > >& xps;
+		vector<uint32_t>& chains;
+		
+		State(vector<vector<Index<uint16_t> > >& xps_, vector<uint32_t>& chains_) : xps(xps_), chains(chains_) { }
+	}
+	state(xps[istate], chains[istate]);
+
 	// Calculate maximum frequency across row indexes.
-	int maxFreq = 0;
+	state.nfreqs = 0;
 	{
 		map<int, int> freqs;
 		for (int i = 0; i < nno; i++)
@@ -371,19 +501,19 @@ void Data::load(const char* filename, int istate)
 			}
 
 		for (map<int, int>::iterator i = freqs.begin(), e = freqs.end(); i != e; i++)
-			maxFreq = max(maxFreq, i->second);
+			state.nfreqs = max(state.nfreqs, i->second);
 	}
 
-	vector<map<uint32_t, uint32_t> > transMaps;
-	transMaps.resize(maxFreq);
-	avxinds[istate].resize(maxFreq);
-	for (int ifreq = 0; ifreq < maxFreq; ifreq++)
+	vector<map<uint32_t, uint32_t> > transMaps(state.nfreqs);
+	vector<AVXIndexes> avxinds(state.nfreqs);
+
+	for (int ifreq = 0; ifreq < state.nfreqs; ifreq++)
 	{
-		vector<Index> indexes;
+		vector<Index<uint32_t> > indexes;
 		indexes.resize(dim);
 
 		// Convert (i, I) indexes matrix to sparse format.
-		vector<int> freqs(nno);
+		vector<uint32_t> freqs(nno);
 		for (int i = 0; i < nno; i++)
 			for (int j = 0; j < dim; j++)
 			{
@@ -403,12 +533,12 @@ void Data::load(const char* filename, int istate)
 				bool foundPosition = false;
 				for (int irow = 0, nrows = indexes.size() / dim; irow < nrows; irow++)
 				{
-					Index& index = indexes[irow * dim + j];
-					if (make_pair(index.i, index.j) == zero)
+					Index<uint32_t>& index = indexes[irow * dim + j];
+					if (index.isEmpty())
 					{
 						index.i = value.first;
 						index.j = value.second;
-						index.rowind = i;
+						index.rowind() = i;
 
 						foundPosition = true;
 						break;
@@ -419,11 +549,11 @@ void Data::load(const char* filename, int istate)
 					// Add new free row.
 					indexes.resize(indexes.size() + dim);
 
-					Index& index = indexes[indexes.size() - dim + j];
+					Index<uint32_t>& index = indexes[indexes.size() - dim + j];
 
 					index.i = value.first;
 					index.j = value.second;
-					index.rowind = i;
+					index.rowind() = i;
 				}
 			}
 	
@@ -432,20 +562,20 @@ void Data::load(const char* filename, int istate)
 		for (int j = 0, order = 0; j < dim; j++)
 			for (int i = 0, e = indexes.size() / dim; i < e; i++)
 			{
-				Index& index = indexes[i * dim + j];
+				Index<uint32_t>& index = indexes[i * dim + j];
 
 				if ((index.i == 0) && (index.j == 0)) continue;
 			
-				if (transMap.find(index.rowind) == transMap.end())
+				if (transMap.find(index.rowind()) == transMap.end())
 				{
-					transMap[index.rowind] = order;
-					index.rowind = order;
+					transMap[index.rowind()] = order;
+					index.rowind() = order;
 					order++;
 				}
 				else
-					index.rowind = transMap[index.rowind];
+					index.rowind() = transMap[index.rowind()];
 			}
-	
+
 		// Pad indexes rows to AVX_VECTOR_SIZE.
 		if ((indexes.size() / dim) % AVX_VECTOR_SIZE)
 			indexes.resize(indexes.size() +
@@ -456,7 +586,7 @@ void Data::load(const char* filename, int istate)
 			if (transMap.find(i) == transMap.end())
 				transMap[i] = last++;
 
-		AVXIndexes& avxindsFreq = avxinds[istate][ifreq];
+		AVXIndexes& avxindsFreq = avxinds[ifreq];
 		avxindsFreq.resize(nno, dim);
 
 		for (int j = 0, iavx = 0, length = indexes.size() / dim / AVX_VECTOR_SIZE; j < dim; j++)
@@ -490,8 +620,7 @@ void Data::load(const char* filename, int istate)
 	
 	// Recalculate translations between frequencies relative to the
 	// first frequency.
-	int nfreqs = avxinds[istate].size();
-	for (int ifreq = 1; ifreq < nfreqs; ifreq++)
+	for (int ifreq = 1; ifreq < state.nfreqs; ifreq++)
 	{
 		map<uint32_t, uint32_t> transRelative;
 		for (int i = 0; i < nno; i++)
@@ -499,14 +628,147 @@ void Data::load(const char* filename, int istate)
 		transMaps[ifreq] = transRelative;
 	}
 	
-	trans[istate].resize(nfreqs);
-	for (int ifreq = 1; ifreq < nfreqs; ifreq++)
+	// Store maps down to vectors.
+	vector<vector<uint32_t> > trans(state.nfreqs);
+	for (int ifreq = 1; ifreq < state.nfreqs; ifreq++)
 	{
-		vector<uint32_t>& transFreq = trans[istate][ifreq];
+		vector<uint32_t>& transFreq = trans[ifreq];
 		transFreq.resize(nno);
 		for (int i = 0; i < nno; i++)
 			transFreq[i] = transMaps[ifreq][i];
 	}
+
+	int nnoAligned = nno;
+	if (nno % AVX_VECTOR_SIZE)
+		nnoAligned += AVX_VECTOR_SIZE - nno % AVX_VECTOR_SIZE;
+
+	// One extra vector size for *hi part in AVX code below.
+	nnoAligned += AVX_VECTOR_SIZE;
+
+	vector<vector<int, AlignedAllocator<int> > > temps(
+		state.nfreqs, vector<int, AlignedAllocator<int> >(nnoAligned, -1));
+
+	struct Map
+	{
+		vector<map<Index<uint16_t>, uint32_t> > xps;
+	}
+	map;
+	
+	map.xps.resize(state.nfreqs);
+
+	// Loop through all frequences.
+	for (int ifreq = 0; ifreq < state.nfreqs; ifreq++)
+	{
+		struct Freq
+		{
+			const AVXIndexes& avxinds;
+			vector<int, AlignedAllocator<int> >& temps;
+			std::map<Index<uint16_t>, uint32_t>& xps;
+			
+			Freq(const AVXIndexes& avxinds_, vector<int, AlignedAllocator<int> >& temps_, std::map<Index<uint16_t>, uint32_t>& xps_) :
+				avxinds(avxinds_), temps(temps_), xps(xps_) { }
+		}
+		freq(avxinds[ifreq], temps[ifreq], map.xps[ifreq]);
+
+		// Loop to calculate temps.
+		for (int j = 0, itemp = 0, ixp = 0; j < dim; j++)
+		{
+			for (int i = 0, e = freq.avxinds.getLength(j); i < e; i++)
+			{
+				const AVXIndex& avxind = freq.avxinds(i, j);
+
+				for (int k = 0; k < AVX_VECTOR_SIZE; k++, itemp++)
+				{
+					Index<uint16_t> ind(avxind.i[k], avxind.j[k], j);
+
+					if (ind.isEmpty()) continue;
+
+					if (freq.xps.find(ind) == freq.xps.end())
+						freq.xps[ind] = ixp++;
+
+					freq.temps[itemp] = freq.xps[ind];
+				}
+			}			
+
+			if (freq.avxinds.getLength(j))
+			{
+				const AVXIndex& index = freq.avxinds(freq.avxinds.getLength(j) - 1, j);
+				for (int k = AVX_VECTOR_SIZE - 1; k >= 0; k--)
+					if (index.isEmpty(k)) itemp--;
+			}
+		}
+		if (process->isMaster())
+			cout << freq.xps.size() << " unique xp(s) to compute for freq = " << ifreq << endl;
+	}
+	
+	// Add extra xp index denoting an empty frequency value.
+	for (int ifreq = 0; ifreq < state.nfreqs; ifreq++)
+	{
+		struct Freq
+		{
+			std::map<Index<uint16_t>, uint32_t>& xps;
+			
+			Freq(std::map<Index<uint16_t>, uint32_t>& xps_) : xps(xps_) { }
+		}
+		freq(map.xps[ifreq]);
+		
+		int32_t last = freq.xps.size();
+		freq.xps[Index<uint16_t>(0, 0, 0)] = last;
+	}
+
+	// Create all possible chains between frequencies.
+	state.chains.resize(nno * state.nfreqs);
+	for (int i = 0, idx = 0; i < nno; i++, idx++)
+	{
+		int value = temps[0][i];
+		if (value == -1)
+			value = map.xps[0][Index<uint16_t>(0, 0, 0)];
+
+		state.chains[idx] = (uint32_t)value;
+	}
+	for (int ifreq = 1; ifreq < state.nfreqs; ifreq++)
+	{
+		for (int i = 0, idx = ifreq * nno; i < nno; i++, idx++)
+		{
+			int value = temps[ifreq][trans[ifreq][i]];
+
+			if (value == -1)
+				value = map.xps[ifreq][Index<uint16_t>(0, 0, 0)];
+
+			state.chains[idx] = (uint32_t)value;
+		}
+	}
+	
+	// Convert xps from map to vector.
+	state.xps.resize(state.nfreqs);
+	for (int ifreq = 0; ifreq < state.nfreqs; ifreq++)
+	{
+		struct Freq
+		{
+			struct FreqMap
+			{
+				const std::map<Index<uint16_t>, uint32_t>& xps;
+				
+				FreqMap(const std::map<Index<uint16_t>, uint32_t>& xps_) : xps(xps_) { }
+			}
+			map;
+			
+			vector<Index<uint16_t> >& xps;
+			
+			Freq(const std::map<Index<uint16_t>, uint32_t>& xpsMap, vector<Index<uint16_t> >& xpsArray) :
+				map(xpsMap), xps(xpsArray)
+			
+			{ }
+		}
+		freq(map.xps[ifreq], state.xps[ifreq]);
+		
+		freq.xps.resize(freq.map.xps.size());
+		int ixps = 0;
+		for (std::map<Index<uint16_t>, uint32_t>::const_iterator i = freq.map.xps.begin(), e = freq.map.xps.end(); i != e; i++)
+			freq.xps[i->second] = i->first;
+	}
+	
+	nfreqs[istate] = state.nfreqs;
 	
 	loadedStates[istate] = true;
 }
@@ -518,8 +780,9 @@ void Data::clear()
 
 Data::Data(int nstates_) : nstates(nstates_)
 {
-	avxinds.resize(nstates);
-	trans.resize(nstates);
+	nfreqs.resize(nstates);
+	xps.resize(nstates);
+	chains.resize(nstates);
 	surplus.resize(nstates);
 	loadedStates.resize(nstates);
 	fill(loadedStates.begin(), loadedStates.end(), false);
