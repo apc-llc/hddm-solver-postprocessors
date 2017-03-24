@@ -476,10 +476,10 @@ void Data::load(const char* filename, int istate)
 	struct State
 	{
 		int nfreqs;
-		vector<vector<Index<uint16_t> > >& xps;
+		vector<Index<uint16_t> >& xps;
 		vector<uint32_t>& chains;
 		
-		State(vector<vector<Index<uint16_t> > >& xps_, vector<uint32_t>& chains_) : xps(xps_), chains(chains_) { }
+		State(vector<Index<uint16_t> >& xps_, vector<uint32_t>& chains_) : xps(xps_), chains(chains_) { }
 	}
 	state(xps[istate], chains[istate]);
 
@@ -650,28 +650,25 @@ void Data::load(const char* filename, int istate)
 
 	struct Map
 	{
-		vector<map<Index<uint16_t>, uint32_t> > xps;
+		map<Index<uint16_t>, uint32_t> xps;
 	}
 	map;
 	
-	map.xps.resize(state.nfreqs);
-
 	// Loop through all frequences.
-	for (int ifreq = 0; ifreq < state.nfreqs; ifreq++)
+	for (int ifreq = 0, ixp = 0; ifreq < state.nfreqs; ifreq++)
 	{
 		struct Freq
 		{
 			const AVXIndexes& avxinds;
 			vector<int, AlignedAllocator<int> >& temps;
-			std::map<Index<uint16_t>, uint32_t>& xps;
 			
-			Freq(const AVXIndexes& avxinds_, vector<int, AlignedAllocator<int> >& temps_, std::map<Index<uint16_t>, uint32_t>& xps_) :
-				avxinds(avxinds_), temps(temps_), xps(xps_) { }
+			Freq(const AVXIndexes& avxinds_, vector<int, AlignedAllocator<int> >& temps_) :
+				avxinds(avxinds_), temps(temps_) { }
 		}
-		freq(avxinds[ifreq], temps[ifreq], map.xps[ifreq]);
+		freq(avxinds[ifreq], temps[ifreq]);
 
 		// Loop to calculate temps.
-		for (int j = 0, itemp = 0, ixp = 0; j < dim; j++)
+		for (int j = 0, itemp = 0; j < dim; j++)
 		{
 			for (int i = 0, e = freq.avxinds.getLength(j); i < e; i++)
 			{
@@ -683,10 +680,10 @@ void Data::load(const char* filename, int istate)
 
 					if (ind.isEmpty()) continue;
 
-					if (freq.xps.find(ind) == freq.xps.end())
-						freq.xps[ind] = ixp++;
+					if (map.xps.find(ind) == map.xps.end())
+						map.xps[ind] = ixp++;
 
-					freq.temps[itemp] = freq.xps[ind];
+					freq.temps[itemp] = map.xps[ind];
 				}
 			}			
 
@@ -697,76 +694,43 @@ void Data::load(const char* filename, int istate)
 					if (index.isEmpty(k)) itemp--;
 			}
 		}
-		if (process->isMaster())
-			cout << freq.xps.size() << " unique xp(s) to compute for freq = " << ifreq << endl;
 	}
+	if (process->isMaster())
+		cout << map.xps.size() << " unique xp(s) to compute" << endl;
 	
 	// Add extra xp index denoting an empty frequency value.
-	for (int ifreq = 0; ifreq < state.nfreqs; ifreq++)
-	{
-		struct Freq
-		{
-			std::map<Index<uint16_t>, uint32_t>& xps;
-			
-			Freq(std::map<Index<uint16_t>, uint32_t>& xps_) : xps(xps_) { }
-		}
-		freq(map.xps[ifreq]);
-		
-		int32_t last = freq.xps.size();
-		freq.xps[Index<uint16_t>(0, 0, 0)] = last;
-	}
+	int32_t last = map.xps.size();
+	map.xps[Index<uint16_t>(0, 0, 0)] = last;
 
 	// Create all possible chains between frequencies.
 	state.chains.resize(nno * state.nfreqs);
-	for (int i = 0, idx = 0; i < nno; i++, idx++)
+	for (int i = 0, ichain = 0; i < nno; i++)
 	{
 		int value = temps[0][i];
-		if (value == -1)
-			value = map.xps[0][Index<uint16_t>(0, 0, 0)];
 
-		state.chains[idx] = (uint32_t)value;
-	}
-	for (int ifreq = 1; ifreq < state.nfreqs; ifreq++)
-	{
-		for (int i = 0, idx = ifreq * nno; i < nno; i++, idx++)
+		if (value == -1)
+			value = map.xps[Index<uint16_t>(0, 0, 0)];
+
+		state.chains[ichain++] = (uint32_t)value;
+
+		for (int ifreq = 1; ifreq < state.nfreqs; ifreq++)
 		{
 			int value = temps[ifreq][trans[ifreq][i]];
 
 			if (value == -1)
-				value = map.xps[ifreq][Index<uint16_t>(0, 0, 0)];
+				value = map.xps[Index<uint16_t>(0, 0, 0)];
 
-			state.chains[idx] = (uint32_t)value;
+			state.chains[ichain++] = (uint32_t)value;
 		}
 	}
+	if (process->isMaster())
+		cout << (state.chains.size() / state.nfreqs) << " chains of " <<
+			state.nfreqs << " xp(s) to build" << endl;
 	
 	// Convert xps from map to vector.
-	state.xps.resize(state.nfreqs);
-	for (int ifreq = 0; ifreq < state.nfreqs; ifreq++)
-	{
-		struct Freq
-		{
-			struct FreqMap
-			{
-				const std::map<Index<uint16_t>, uint32_t>& xps;
-				
-				FreqMap(const std::map<Index<uint16_t>, uint32_t>& xps_) : xps(xps_) { }
-			}
-			map;
-			
-			vector<Index<uint16_t> >& xps;
-			
-			Freq(const std::map<Index<uint16_t>, uint32_t>& xpsMap, vector<Index<uint16_t> >& xpsArray) :
-				map(xpsMap), xps(xpsArray)
-			
-			{ }
-		}
-		freq(map.xps[ifreq], state.xps[ifreq]);
-		
-		freq.xps.resize(freq.map.xps.size());
-		int ixps = 0;
-		for (std::map<Index<uint16_t>, uint32_t>::const_iterator i = freq.map.xps.begin(), e = freq.map.xps.end(); i != e; i++)
-			freq.xps[i->second] = i->first;
-	}
+	xps[istate].resize(map.xps.size());
+	for (std::map<Index<uint16_t>, uint32_t>::const_iterator i = map.xps.begin(), e = map.xps.end(); i != e; i++)
+		xps[istate][i->second] = i->first;
 	
 	nfreqs[istate] = state.nfreqs;
 	

@@ -22,19 +22,17 @@ params(targetSuffix, configFile)
 }
 
 extern "C" void INTERPOLATE_ARRAY(
-	Device* device, const int dim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const double* x,
+	Device* device, const int dim, const int nno, int DofPerNode, const double* x,
 	const int nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double* value);
 
 // Interpolate array of values.
 void Interpolator::interpolate(Device* device, Data* data,
-	const int istate, const real* x, const int Dof_choice_start, const int Dof_choice_end, real* value)
+	const int istate, const real* x, int DofPerNode, real* value)
 {
 	if (jit)
 	{
 		typedef void (*Func)(
-			Device* device, const int dim, const int nno,
-			const int Dof_choice_start, const int Dof_choice_end, const double* x,
+			Device* device, const int dim, const int nno, int DofPerNode, const double* x,
 			const int nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double* value);
 
 		static Func INTERPOLATE_ARRAY_RUNTIME_OPT;
@@ -42,35 +40,33 @@ void Interpolator::interpolate(Device* device, Data* data,
 		if (!INTERPOLATE_ARRAY_RUNTIME_OPT)
 		{
 			INTERPOLATE_ARRAY_RUNTIME_OPT =
-				JIT::jitCompile(data->dim, data->nno, Dof_choice_start, Dof_choice_end,
+				JIT::jitCompile(data->dim, data->nno, DofPerNode,
 				stringize(INTERPOLATE_ARRAY_RUNTIME_OPT) "_",
 				(Func)INTERPOLATE_ARRAY).getFunc();
 		}
 		
 		INTERPOLATE_ARRAY_RUNTIME_OPT(
-			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, x,
+			device, data->dim, data->nno, DofPerNode, x,
 			data->nfreqs[istate], &data->xps[istate], &data->chains[istate], &data->surplus[istate], value);
 	}
 	else
 	{
 		INTERPOLATE_ARRAY(
-			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, x,
+			device, data->dim, data->nno, DofPerNode, x,
 			data->nfreqs[istate], &data->xps[istate], &data->chains[istate], &data->surplus[istate], value);
 	}
 }
 
 extern "C" void INTERPOLATE_ARRAY_MANY_MULTISTATE(
-	Device* device, const int dim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
+	Device* device, const int dim, const int nno, int DofPerNode, const int count, const double* const* x_,
 	const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
 
 // Interpolate multiple arrays of values, with multiple surplus states.
 void Interpolator::interpolate(Device* device, Data* data,
-	const real** x, const int Dof_choice_start, const int Dof_choice_end, real** value)
+	const real** x, int DofPerNode, real** value)
 {
 	typedef void (*Func)(
-		Device* device, const int dim, const int nno,
-		const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
+		Device* device, const int dim, const int nno, int DofPerNode, const int count, const double* const* x_,
 		const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
 
 	static Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT;
@@ -80,19 +76,19 @@ void Interpolator::interpolate(Device* device, Data* data,
 		if (!INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT)
 		{
 			INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
-				JIT::jitCompile(data->dim, data->nstates, data->nno, Dof_choice_start, Dof_choice_end,
+				JIT::jitCompile(data->dim, data->nstates, data->nno, DofPerNode,
 				stringize(INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT) "_",
 				(Func)INTERPOLATE_ARRAY_MANY_MULTISTATE).getFunc();
 		}
 
 		INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
-			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
+			device, data->dim, data->nno, DofPerNode, data->nstates, x,
 			&data->nfreqs[0], &data->xps[0], &data->chains[0], &data->surplus[0], value);
 	}
 	else
 	{
 		INTERPOLATE_ARRAY_MANY_MULTISTATE(
-			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
+			device, data->dim, data->nno, DofPerNode, data->nstates, x,
 			&data->nfreqs[0], &data->xps[0], &data->chains[0], &data->surplus[0], value);
 	}
 }

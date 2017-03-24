@@ -18,10 +18,10 @@ $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
 	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(CXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -static-libstdc++
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.cpp
-	$(CDIR) && $(CXX) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArray -DDIM=dim -DNNO=nno -DDOF_CHOICE_START=Dof_choice_start -DDOF_CHOICE_END=Dof_choice_end $(CINC) $(COPT) -c $< -o $@
+	$(CDIR) && $(CXX) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArray -DDIM=dim -DNNO=nno -DDOF_PER_NODE=DofPerNode $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/InterpolateArrayManyMultistate.o: src/InterpolateArrayManyMultistate.cpp
-	$(CDIR) && $(CXX) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArrayManyMultistate -DDIM=dim -DCOUNT=count -DNNO=nno -DDOF_CHOICE_START=Dof_choice_start -DDOF_CHOICE_END=Dof_choice_end $(CINC) $(COPT) -c $< -o $@
+	$(CDIR) && $(CXX) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArrayManyMultistate -DDIM=dim -DCOUNT=count -DNNO=nno -DDOF_PER_NODE=DofPerNode -DDOF_CHOICE_END=Dof_choice_end $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/libInterpolateArray.sh: src/InterpolateArray.cpp
 	$(CDIR) && echo cd $(shell pwd) \&\& $(CXX) $(CINC) $(COPT) -shared $^  > $@

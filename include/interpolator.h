@@ -29,11 +29,11 @@ public :
 
 	// Interpolate array of values.
 	virtual void interpolate(Device* device, Data* data,
-		const int istate, const real* x, const int Dof_choice_start, const int Dof_choice_end, real* value);
+		const int istate, const real* x, const int DofPerNode, real* value);
 
 	// Interpolate multiple arrays of values in continuous vector, with multiple surplus states.
 	virtual void interpolate(Device* device, Data* data,
-		const real** x, const int Dof_choice_start, const int Dof_choice_end, real** value);
+		const real** x, const int DofPerNode, real** value);
 
 	virtual ~Interpolator();
 };

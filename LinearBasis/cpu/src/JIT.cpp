@@ -28,62 +28,45 @@ struct KSignature
 	int dim;
 	int count;
 	int nno;
-	int Dof_choice_start;
-	int Dof_choice_end;
+	int DofPerNode;
 	
 	KSignature() : 
 	
-	dim(0), count(0), nno(0),
-	Dof_choice_start(0), Dof_choice_end(0)
+	dim(0), count(0), nno(0), DofPerNode(0)
 	
 	{ }
 	
-	KSignature(int dim_, int count_, int nno_,
-		int Dof_choice_start_, int Dof_choice_end_) :
+	KSignature(int dim_, int count_, int nno_, int DofPerNode_) :
 	
-	dim(dim_), count(count_), nno(nno_),
-	Dof_choice_start(Dof_choice_start_), Dof_choice_end(Dof_choice_end_)
+	dim(dim_), count(count_), nno(nno_), DofPerNode(DofPerNode_)
 	
 	{ }
 	
-	bool operator()(const KSignature& a, const KSignature& b) const;
-};
-
-namespace std {
-
-template<>
-struct hash<KSignature>
-{
-	template <class T>
-	static inline void hash_combine(size_t& seed, const T& v)
+	template<class T>
+	static inline void hashCombine(size_t& seed, const T& v)
 	{
-		hash<T> hasher;
+		std::hash<T> hasher;
 		seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 	}
 
-	typedef KSignature argument_type;
-	typedef std::size_t result_type;
-	result_type operator()(argument_type const& k) const
+	size_t hash() const
 	{
 		size_t seed = 0;
-		hash_combine(seed, k.dim);
-		hash_combine(seed, k.count);
-		hash_combine(seed, k.nno);
-		hash_combine(seed, k.Dof_choice_start);
-		hash_combine(seed, k.Dof_choice_end);
+		hashCombine(seed, dim);
+		hashCombine(seed, count);
+		hashCombine(seed, nno);
+		hashCombine(seed, DofPerNode);
 		return seed;
+	}
+
+	bool operator()(const KSignature& a, const KSignature& b) const
+	{
+		return a.hash() < b.hash();
 	}
 };
 
-} // namespace std
-
-bool KSignature::operator()(const KSignature& a, const KSignature& b) const
-{
-	return hash<KSignature>{}(a) < hash<KSignature>{}(b);
-}
-
 template<typename K, typename F>
-K& JIT::jitCompile(int dim, int count, int nno, int Dof_choice_start, int Dof_choice_end,
+K& JIT::jitCompile(int dim, int count, int nno, int DofPerNode,
 	const string& funcnameTemplate, F fallbackFunc)
 {
 	int vdim = dim / AVX_VECTOR_SIZE;
@@ -108,7 +91,7 @@ K& JIT::jitCompile(int dim, int count, int nno, int Dof_choice_start, int Dof_ch
 
 	map<KSignature, K, KSignature>& kernels_tls = *kernels_tls_;
 
-	KSignature signature(dim, count, nno, Dof_choice_start, Dof_choice_end);
+	KSignature signature(dim, count, nno, DofPerNode);
 
 	{
 		K& kernel = kernels_tls[signature];
@@ -206,7 +189,7 @@ K& JIT::jitCompile(int dim, int count, int nno, int Dof_choice_start, int Dof_ch
 		// Generate function name for specific number of arguments.
 		stringstream sfuncname;
 		sfuncname << funcnameTemplate;
-		sfuncname << hash<KSignature>{}(signature);
+		sfuncname << signature.hash();
 		string funcname = sfuncname.str();
 
 		// Read the compile command template.
@@ -246,10 +229,8 @@ K& JIT::jitCompile(int dim, int count, int nno, int Dof_choice_start, int Dof_ch
 			cmd << nno;
 			cmd << " -DVDIM8=";
 			cmd << vdim8;
-			cmd << " -DDOF_CHOICE_START=";
-			cmd << Dof_choice_start;
-			cmd << " -DDOF_CHOICE_END=";
-			cmd << Dof_choice_end;
+			cmd << " -DDOF_PER_NODE=";
+			cmd << DofPerNode;
 	
 			cmd << " -o ";
 			cmd << tmp.filename;
@@ -346,19 +327,19 @@ K& JIT::jitCompile(int dim, int count, int nno, int Dof_choice_start, int Dof_ch
 }
 
 InterpolateArrayKernel& JIT::jitCompile(
-	int dim, int nno, int Dof_choice_start, int Dof_choice_end,
+	int dim, int nno, int DofPerNode,
 	const string& funcnameTemplate, InterpolateArrayFunc fallbackFunc)
 {
 	return JIT::jitCompile<InterpolateArrayKernel, InterpolateArrayFunc>(
-		dim, 1, nno, Dof_choice_start, Dof_choice_end, funcnameTemplate, fallbackFunc);
+		dim, 1, nno, DofPerNode, funcnameTemplate, fallbackFunc);
 }
 
 InterpolateArrayManyMultistateKernel& JIT::jitCompile(
-	int dim, int count, int nno, int Dof_choice_start, int Dof_choice_end,
+	int dim, int count, int nno, int DofPerNode,
 	const string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc)
 {
 	return JIT::jitCompile<InterpolateArrayManyMultistateKernel, InterpolateArrayManyMultistateFunc>(
-		dim, count, nno, Dof_choice_start, Dof_choice_end, funcnameTemplate, fallbackFunc);
+		dim, count, nno, DofPerNode, funcnameTemplate, fallbackFunc);
 }
 
 #endif // HAVE_RUNTIME_OPTIMIZATION

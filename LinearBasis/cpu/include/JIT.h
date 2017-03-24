@@ -13,14 +13,14 @@ class Device;
 typedef void (*InterpolateArrayFunc)(
 	Device* device,
 	const int dim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const real* x,
+	const int DofPerNode, const real* x,
 	const int nfreqs, const XPS* xps, const Chains* chains, const Matrix<real>* surplus,
 	real* value);
 
 typedef void (*InterpolateArrayManyMultistateFunc)(
 	Device* device,
 	const int dim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const int count, const real* const* x,
+	const int DofPerNode, const int count, const real* const* x,
 	const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<real>* surplus,
 	real** value);
 
@@ -31,15 +31,15 @@ class JIT
 {
 public :
 	static InterpolateArrayKernel& jitCompile(
-		int dim, int nno, int Dof_choice_start, int Dof_choice_end,
+		int dim, int nno, int DofPerNode,
 		const std::string& funcnameTemplate, InterpolateArrayFunc fallbackFunc);
 	static InterpolateArrayManyMultistateKernel& jitCompile(
-		int dim, int count, int nno, int Dof_choice_start, int Dof_choice_end,
+		int dim, int count, int nno, int DofPerNode,
 		const std::string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc);
 
 	template<typename K, typename F>
 	static K& jitCompile(
-		int dim, int count, int nno, int Dof_choice_start, int Dof_choice_end,
+		int dim, int count, int nno, int DofPerNode,
 		const std::string& funcnameTemplate, F fallbackFunc);
 };
 

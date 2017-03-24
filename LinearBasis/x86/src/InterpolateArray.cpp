@@ -8,77 +8,42 @@ class Device;
 
 extern "C" void FUNCNAME(
 	Device* device,
-	const int dim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const double* x,
+	const int dim, const int nno, const int DofPerNode, const double* x,
 	const int nfreqs, const XPS* xps_, const Chains* chains_, const Matrix<double>* surplus_, double* value)
 {
-	/*const AVXIndexMatrix& avxinds = *avxinds_;
-	const TransMatrix& trans = *trans_;
+	const XPS& xps = *xps_;
+	const Chains& chains = *chains_;
 	const Matrix<double>& surplus = *surplus_;
-	
-	int nfreqs = trans.size();
-	int nnoAligned = nno;
-	if (nno % AVX_VECTOR_SIZE)
-		nnoAligned += AVX_VECTOR_SIZE - nno % AVX_VECTOR_SIZE;
-		
-	// One extra vector size for *hi part in AVX code below.
-	nnoAligned += AVX_VECTOR_SIZE;
-	
-	vector<vector<double, AlignedAllocator<double> > > temps_(
-		nfreqs, vector<double, AlignedAllocator<double> >(nnoAligned, 1.0));
 
-	// Loop through all frequences.
-	for (int ifreq = 0; ifreq < nfreqs; ifreq++)
+	// Loop to calculate all unique xp values.
+	vector<double> xpv(xps.size(), 1.0);
+	for (int i = 0, e = xpv.size(); i < e; i++)
 	{
-		const AVXIndexes& avxindsFreq = avxinds[ifreq];
-		vector<double, AlignedAllocator<double> >& temps = temps_[ifreq];
-
-		// Loop to calculate temps.
-		for (int j = 0, itemp = 0; j < DIM; j++)
-		{
-			double xx = x[j];
-	
-			for (int i = 0, e = avxindsFreq.getLength(j); i < e; i++)
-			{
-				const AVXIndex& index = avxindsFreq(i, j);
-
-				for (int k = 0; k < AVX_VECTOR_SIZE; k++, itemp++)
-				{
-					const uint8_t& ind_i = index.i[k];
-					const uint8_t& ind_j = index.j[k];
-
-					double xp = LinearBasis(xx, ind_i, ind_j);
-
-					xp = fmax(0.0, xp);
-		
-					temps[itemp] = xp;
-				}
-			}			
-
-			if (avxindsFreq.getLength(j))
-			{
-				const AVXIndex& index = avxindsFreq(avxindsFreq.getLength(j) - 1, j);
-				for (int k = AVX_VECTOR_SIZE - 1; k >= 0; k--)
-					if (index.isEmpty(k)) itemp--;
-			}
-		}
+		const Index<uint16_t>& index = xps[i];
+		const uint32_t& j = index.index;
+		double xp = LinearBasis(x[j], index.i, index.j);
+		xpv[i] = fmax(0.0, xp);
 	}
 
-	// Join temps from all frequencies.
-	vector<double, AlignedAllocator<double> >& temps = temps_[0];
-	for (int i = 0; i < NNO; i++)
-		for (int ifreq = 1; ifreq < nfreqs; ifreq++)
-			temps[i] *= temps_[ifreq][trans[ifreq][i]];
+	// Zero the values array.
+	memset(value, 0, sizeof(double) * DOF_PER_NODE);
 
-	// Loop to calculate values.
-	for (int i = 0; i < NNO; i++)
+	// Loop to calculate scaled surplus product.
+	for (int i = 0, ichain = 0; i < NNO; i++, ichain += nfreqs)
 	{
-		double temp = temps[i];
+		double temp = 1.0;
+		for (int ifreq = 0; ifreq < nfreqs; ifreq++)
+		{
+			temp *= xpv[chains[ichain + ifreq]];
+			if (!temp) goto next;
+		}
 
-		if (!temp) continue;
+		for (int Dof_choice = 0; Dof_choice <= DOF_PER_NODE; Dof_choice++)
+			value[Dof_choice] += temp * surplus(i, Dof_choice);
+		
+	next :
 
-		for (int b = DOF_CHOICE_START, Dof_choice = b, e = DOF_CHOICE_END; Dof_choice <= e; Dof_choice++)
-			value[Dof_choice - b] += temp * surplus(i, Dof_choice);
-	}*/
+		continue;
+	}
 }
 
