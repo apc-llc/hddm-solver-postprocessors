@@ -46,15 +46,15 @@ extern "C" void FUNCNAME(
 			}
 
 			{
-				const __m512d temp64 = _mm512_set1_pd(temp);
+				const __m256d temp64 = _mm256_set1_pd(temp);
 
 				for (int Dof_choice = 0; Dof_choice <= DOF_PER_NODE;
 					Dof_choice += sizeof(temp64) / sizeof(double))
 				{
-					const __m512d surplus64 = _mm512_load_pd(&surplus(i, Dof_choice));
-					__m512d value64 = _mm512_load_pd(&value[Dof_choice]);
-					value64 = _mm512_fmadd_pd(temp64, surplus64, value64);
-					_mm512_store_pd(&value[Dof_choice], value64);
+					const __m256d surplus64 = _mm256_load_pd(&surplus(i, Dof_choice));
+					__m256d value64 = _mm256_load_pd(&value[Dof_choice]);		
+					value64 = _mm256_fmadd_pd(temp64, surplus64, value64);
+					_mm256_store_pd(&value[Dof_choice], value64);
 				}
 			}
 			

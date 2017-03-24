@@ -21,11 +21,6 @@ TARGETS += avx512
 else
 $(info AVX512 target is not built because Intel compiler is not found)
 endif
-ifneq (,$(NVCC))
-TARGETS += cuda
-else
-$(info CUDA target is not built because NVIDIA CUDA compiler is not found)
-endif
 
 .PHONY: $(TARGETS)
 
