@@ -22,7 +22,7 @@ $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
 	$(BUILD)/parameters.o $(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o \
 	$(BUILD)/priority.o $(BUILD)/instrset.o $(BUILD)/supported.o \
 	$(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o
-	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(CXX) $(CINC) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -static-libstdc++
+	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(MPILD) $(CINC) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.cpp
 	$(CDIR) && $(CXX) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArray -DDIM=dim -DNNO=nno -DDOF_PER_NODE=DofPerNode $(CINC) $(COPT) -c $< -o $@
@@ -40,7 +40,7 @@ $(BUILD)/parameters.o: src/parameters.cpp $(LOCATION)/include/check.h include/pa
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/Interpolator.o: src/Interpolator.cpp include/JIT.h include/Data.h
-	$(CDIR) && $(CXX) -DINTERPOLATE_ARRAY=LinearBasis_$(NAME)_Generic_InterpolateArray -DINTERPOLATE_ARRAY_RUNTIME_OPT=LinearBasis_$(NAME)_RuntimeOpt_InterpolateArray -DINTERPOLATE_ARRAY_MANY_MULTISTATE=LinearBasis_$(NAME)_Generic_InterpolateArrayManyMultistate -DINTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT=LinearBasis_$(NAME)_RuntimeOpt_InterpolateArrayManyMultistate $(CINC) $(COPT) -c $< -o $@
+	$(CDIR) && $(CXX) -DNAME=$(NAME) -DINTERPOLATE_ARRAY=LinearBasis_$(NAME)_Generic_InterpolateArray -DINTERPOLATE_ARRAY_RUNTIME_OPT=LinearBasis_$(NAME)_RuntimeOpt_InterpolateArray -DINTERPOLATE_ARRAY_MANY_MULTISTATE=LinearBasis_$(NAME)_Generic_InterpolateArrayManyMultistate -DINTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT=LinearBasis_$(NAME)_RuntimeOpt_InterpolateArrayManyMultistate $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/Data.o: src/Data.cpp include/Data.h
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@

@@ -1,5 +1,3 @@
-#ifdef HAVE_RUNTIME_OPTIMIZATION
-
 #include "JIT.h"
 
 #include <functional>
@@ -341,6 +339,3 @@ InterpolateArrayManyMultistateKernel& JIT::jitCompile(
 	return JIT::jitCompile<InterpolateArrayManyMultistateKernel, InterpolateArrayManyMultistateFunc>(
 		dim, count, nno, DofPerNode, funcnameTemplate, fallbackFunc);
 }
-
-#endif // HAVE_RUNTIME_OPTIMIZATION
-

@@ -98,7 +98,7 @@ Interpolator* Interpolator::getInstance()
 	static unique_ptr<Interpolator> interp;
 
 	if (!interp.get())
-		interp.reset(new Interpolator("CPU"));
+		interp.reset(new Interpolator(stringize(NAME)));
 	
 	return interp.get();
 }

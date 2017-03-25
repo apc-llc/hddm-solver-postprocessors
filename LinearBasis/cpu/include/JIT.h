@@ -1,8 +1,6 @@
 #ifndef JIT_H
 #define JIT_H
 
-#ifdef HAVE_RUNTIME_OPTIMIZATION
-
 #include "Data.h"
 #include "InterpolateKernel.h"
 
@@ -44,8 +42,6 @@ public :
 };
 
 } // namespace NAMESPACE
-
-#endif // HAVE_RUNTIME_OPTIMIZATION
 
 #endif // JIT_H
 
