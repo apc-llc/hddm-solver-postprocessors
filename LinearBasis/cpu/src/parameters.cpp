@@ -88,7 +88,7 @@ ASSIGN(binaryio)
 			process->abort();
 		}
 
-		if (name == "priority" + targetSuffix)
+		if (name == "priorityCPU")
 		{
 			priority = atoi(value.c_str());
 			if (process->isMaster())
