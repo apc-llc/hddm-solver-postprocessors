@@ -12,7 +12,9 @@ endif
 COPT_FILTERED := $(filter-out -g3, $(filter-out -ffast-math, $(COPT)))
 COPT := $(COPT_FILTERED)
 CDIR = mkdir -p $(shell dirname $@)
-CXX := icpc
+CXX_INTEL := icpc
+MPILD := $(subst $(CXX),$(CXX_INTEL),$(MPILD))
+CXX := $(CXX_INTEL)
 
 all: $(INSTALL)/bin/postprocessors/LinearBasis/avx512/libpostprocessor.so
 
