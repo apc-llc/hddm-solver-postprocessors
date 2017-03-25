@@ -9,13 +9,6 @@ NVCC := $(shell which nvcc 2>/dev/null)
 CINC += -I. -I../include -I../../include -DDEVICE_CONST_X_MAX_LENGTH=4096 -I$(shell dirname $(NVCC) 2>/dev/null)/../include
 
 NVCCOPT := -gencode=arch=compute_30,code=sm_30 -gencode=arch=compute_35,code=sm_35 -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_60,code=sm_60 -std=c++11
-ifeq (,$(DEBUG))
-OPT += -g -O3 -gdwarf-3 -DNDEBUG
-NVCCOPT += -use_fast_math
-else
-OPT += -g3 -O0 -gdwarf-3 -D_GLIBCXX_DEBUG -fno-eliminate-unused-debug-types -fno-inline
-NVCCOPT += -G
-endif
 
 #
 # Platform-dependent path to search for CUDA libraries.

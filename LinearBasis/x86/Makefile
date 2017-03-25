@@ -16,7 +16,7 @@ $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
 	$(BUILD)/parameters.o $(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o \
 	$(BUILD)/priority.o $(BUILD)/instrset.o $(BUILD)/supported.o \
 	$(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o
-	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(MPILD) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/
+	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(MPILD) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ $(MPILDFLAGS)
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.cpp
 	$(CDIR) && $(CXX) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArray -DDIM=dim -DNNO=nno -DDOF_PER_NODE=DofPerNode $(CINC) $(COPT) -c $< -o $@
