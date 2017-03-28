@@ -12,6 +12,8 @@ public :
 	void setComm(MPI_Comm comm);
 	
 	void abort();
+	void cout(const char* format, ...);
+	void cerr(const char* format, ...);
 };
 
 extern "C" int MPI_Process_get(MPI_Process**);

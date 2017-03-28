@@ -17,23 +17,27 @@ static bool isCompressed(const char* filename)
 {
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
+	const Parameters& params = Interpolator::getInstance()->getParameters();
 
-	ifstream infile;
-	infile.open(filename, ifstream::binary);
-
-	if (!infile.is_open())
+	FILE* infile = fopen(filename, "rb");
+	if (!infile)
 	{
-		cerr << "Error opening file: " << filename << endl;
-		process->abort();
-	}
+		process->cerr("Error opening file: %s\n", filename);
+		exit(1);
+	}  
 
 	bool compressed = false;
 	
-	char format_marker[] = "          \0";
-		
-	infile.read(format_marker, strlen(format_marker));
+	char format_marker[] = "          ";
+
+	size_t nbytes = fread(reinterpret_cast<void*>(format_marker), sizeof(char), sizeof(format_marker) - 1, infile);
+	if (nbytes != sizeof(format_marker) - 1)
+	{
+		process->cerr("Error reading file: %s\n", filename);
+		process->abort();
+	}	
 	
-	infile.close();
+	fclose(infile);
 	
 	if ((string)format_marker == "compressed")
 		compressed = true;
@@ -47,47 +51,55 @@ struct IndexPair
 };
 
 template<typename T>
-static void read_index(ifstream& infile, int nno, int dim, int vdim, Matrix<int>& index_)
+static void read_index(FILE* infile, int nno, int dim, int vdim, Matrix<int>& index_)
 {
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
 
+	size_t nbytes = 0;
+
 	char index_marker[] = "index";
-	infile.read(index_marker, strlen(index_marker));
+	nbytes = fread(index_marker, sizeof(char), sizeof(index_marker) - 1, infile);
+	if (nbytes != sizeof(index_marker) - 1)
+	{
+		if (process->isMaster())
+			process->cout("Cannot read index data\n");
+		process->abort();
+	}
 
 	unsigned int index_nonzeros = 0;
-	infile.read(reinterpret_cast<char*>(&index_nonzeros), sizeof(unsigned int));
+	nbytes = fread(reinterpret_cast<char*>(&index_nonzeros), sizeof(unsigned int), 1, infile);
 
 	vector<int> A;
 	A.resize(index_nonzeros);
 	for (int i = 0, e = A.size(); i != e; i++)
-		infile.read(reinterpret_cast<char*>(&A[i]), sizeof(IndexPair));
+		nbytes = fread(reinterpret_cast<char*>(&A[i]), sizeof(IndexPair), 1, infile);
 
 	vector<int> IA;
 	IA.resize(nno + 1);
 	{
 		T value;
-		infile.read(reinterpret_cast<char*>(&value), sizeof(T));
+		nbytes = fread(reinterpret_cast<char*>(&value), sizeof(T), 1, infile);
 		IA[0] = value;
 	}
 	for (int i = 1, e = IA.size(); i != e; i++)
 	{
 		T value;
-		infile.read(reinterpret_cast<char*>(&value), sizeof(T));
+		nbytes = fread(reinterpret_cast<char*>(&value), sizeof(T), 1, infile);
 		IA[i] = (int)value + IA[i - 1];
 	}
 
 	if (IA[0] != 0)
 	{
-		cerr << "IA[0] must be 0" << endl;
+		process->cerr("IA[0] must be 0\n");
 		process->abort();
 	}
 
 	for (int i = 1, e = IA.size(); i != e; i++)
 		if (IA[i] < IA[i - 1])
 		{
-			cerr << "IA[i] must be not less than IA[i - 1] - not true for IA[" << i << "] >= IA[" << (i - 1) <<
-				"] : " << IA[i] << " < " << IA[i - 1] << endl;
+			process->cerr("IA[i] must be not less than IA[i - 1] - not true for IA[%d] >= IA[%d] : %d < %d\n",
+				i, i - 1, IA[i], IA[i - 1]);
 			process->abort();
 		}
 	
@@ -96,7 +108,7 @@ static void read_index(ifstream& infile, int nno, int dim, int vdim, Matrix<int>
 	for (int i = 0, e = JA.size(); i != e; i++)
 	{
 		T value;
-		infile.read(reinterpret_cast<char*>(&value), sizeof(T));
+		nbytes = fread(reinterpret_cast<char*>(&value), sizeof(T), 1, infile);
 		JA[i] = (int)value;
 	}
 
@@ -104,7 +116,8 @@ static void read_index(ifstream& infile, int nno, int dim, int vdim, Matrix<int>
 	{
 		if (JA[i] >= dim)
 		{
-			cerr << "JA[i] must be within column index range - not true for JA[" << i << "] = " << JA[i] << endl;
+			process->cerr("JA[i] must be within column index range - not true for JA[%d] = %f\n",
+				i, JA[i]);
 			process->abort();
 		}
 	}
@@ -121,47 +134,55 @@ static void read_index(ifstream& infile, int nno, int dim, int vdim, Matrix<int>
 }
 
 template<typename T>
-static void read_surplus(ifstream& infile, int nno, int TotalDof, Matrix<double>& surplus_)
+static void read_surplus(FILE* infile, int nno, int TotalDof, Matrix<double>& surplus_)
 {
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
 
+	size_t nbytes = 0;
+
 	char surplus_marker[] = "surplus";
-	infile.read(surplus_marker, strlen(surplus_marker));
+	nbytes = fread(surplus_marker, sizeof(char), sizeof(surplus_marker) - 1, infile);
+	if (nbytes != sizeof(surplus_marker) - 1)
+	{
+		if (process->isMaster())
+			process->cout("Cannot read surplus data\n");
+		process->abort();
+	}
 
 	unsigned int surplus_nonzeros = 0;
-	infile.read(reinterpret_cast<char*>(&surplus_nonzeros), sizeof(unsigned int));
+	nbytes = fread(reinterpret_cast<char*>(&surplus_nonzeros), sizeof(unsigned int), 1, infile);
 
 	vector<double> A;
 	A.resize(surplus_nonzeros);
 	for (int i = 0, e = A.size(); i != e; i++)
-		infile.read(reinterpret_cast<char*>(&A[i]), sizeof(double));
+		nbytes = fread(reinterpret_cast<char*>(&A[i]), sizeof(double), 1, infile);
 
 	vector<int> IA;
 	IA.resize(nno + 1);
 	{
 		T value;
-		infile.read(reinterpret_cast<char*>(&value), sizeof(T));
+		nbytes = fread(reinterpret_cast<char*>(&value), sizeof(T), 1, infile);
 		IA[0] = value;
 	}
 	for (int i = 1, e = IA.size(); i != e; i++)
 	{
 		T value;
-		infile.read(reinterpret_cast<char*>(&value), sizeof(T));
+		nbytes = fread(reinterpret_cast<char*>(&value), sizeof(T), 1, infile);
 		IA[i] = (int)value + IA[i - 1];
 	}
 
 	if (IA[0] != 0)
 	{
-		cerr << "IA[0] must be 0" << endl;
+		process->cerr("IA[0] must be 0\n");
 		process->abort();
 	}
 
 	for (int i = 1, e = IA.size(); i != e; i++)
 		if (IA[i] < IA[i - 1])
 		{
-			cerr << "IA[i] must be not less than IA[i - 1] - not true for IA[" << i << "] >= IA[" << (i - 1) <<
-				"] : " << IA[i] << " < " << IA[i - 1] << endl;
+			process->cerr("IA[i] must be not less than IA[i - 1] - not true for IA[%d] >= IA[%d] : %f < %f\n",
+				i, i - 1, IA[i], IA[i - 1]);
 			process->abort();
 		}
 	
@@ -170,7 +191,7 @@ static void read_surplus(ifstream& infile, int nno, int TotalDof, Matrix<double>
 	for (int i = 0, e = JA.size(); i != e; i++)
 	{
 		T value;
-		infile.read(reinterpret_cast<char*>(&value), sizeof(T));
+		nbytes = fread(reinterpret_cast<char*>(&value), sizeof(T), 1, infile);
 		JA[i] = (int)value;
 	}
 
@@ -178,7 +199,7 @@ static void read_surplus(ifstream& infile, int nno, int TotalDof, Matrix<double>
 	{
 		if (JA[i] >= TotalDof)
 		{
-			cerr << "JA[i] must be within column index range - not true for JA[" << i << "] = " << JA[i] << endl;
+			process->cerr("JA[i] must be within column index range - not true for JA[%d] = %f\n", i, JA[i]);
 			process->abort();
 		}
 	}
@@ -328,45 +349,57 @@ void Data::load(const char* filename, int istate)
 
 	if (loadedStates[istate])
 	{
-		cerr << "State " << istate << " data is already loaded" << endl;
+		process->cerr("State %d data is already loaded\n", istate);
 		process->abort();
 	}
 
 	bool compressed = isCompressed(filename);
 
-	ifstream infile;
-	if (compressed)
-		infile.open(filename, ifstream::binary);
+	FILE* infile = NULL;
+	if (params.binaryio)
+		infile = fopen(filename, "r");
 	else
-		infile.open(filename, ios::in);
+		infile = fopen(filename, "rb");
 
-	if (!infile.is_open())
+	if (!infile)
 	{
-		cerr << "Error opening file: " << filename << endl;
-		process->abort();
-	}
+		process->cerr("Error opening file: %s\n", filename);
+		exit(1);
+	}  
 
 	if (compressed)
 	{
+		size_t nbytes = 0;
 		char format_marker[] = "          ";		
-		infile.read(format_marker, strlen(format_marker));
-		infile.read(reinterpret_cast<char*>(&dim), sizeof(int));
-		infile.read(reinterpret_cast<char*>(&nno), sizeof(int)); 
-		infile.read(reinterpret_cast<char*>(&TotalDof), sizeof(int));
-		infile.read(reinterpret_cast<char*>(&Level), sizeof(int));
+		nbytes += fread(reinterpret_cast<void*>(format_marker), sizeof(char), sizeof(format_marker) - 1, infile);
+		nbytes += fread(reinterpret_cast<void*>(&dim), 1, sizeof(dim), infile);
+		nbytes += fread(reinterpret_cast<void*>(&nno), 1, sizeof(nno), infile);
+		nbytes += fread(reinterpret_cast<void*>(&TotalDof), 1, sizeof(TotalDof), infile);
+		nbytes += fread(reinterpret_cast<void*>(&Level), 1, sizeof(Level), infile);
+		if (nbytes != sizeof(format_marker) - 1 + sizeof(dim) + sizeof(nno) + sizeof(TotalDof) + sizeof(Level))
+		{
+			process->cerr("Error reading file: %s\n", filename);
+			process->abort();
+		}
 	}
 	else
-	{	
-		infile >> dim;
-		infile >> nno; 
-		infile >> TotalDof;
-		infile >> Level;
+	{
+		int nbytes = 0;
+		nbytes += fscanf(infile, "%d", &dim);
+		nbytes += fscanf(infile, "%d", &nno);
+		nbytes += fscanf(infile, "%d", &TotalDof);
+		nbytes += fscanf(infile, "%d", &Level);
+		if (nbytes <= 0)
+		{
+			process->cerr("Error reading file: %s\n", filename);
+			process->abort();
+		}
 	}
 
 	if (dim != params.nagents)
 	{
-		cerr << "File \"" << filename << "\" # of dimensions (" << dim << 
-			") mismatches config (" << params.nagents << ")" << endl;
+		process->cerr("File \"%s\" # of dimensions (%d) mismatches config (%d)\n",
+			filename, dim, params.nagents);
 		process->abort();
 	}
 
@@ -393,7 +426,8 @@ void Data::load(const char* filename, int istate)
 			{
 				for (int v = 0; (v < AVX_VECTOR_SIZE) && (i < dim); v++, i++)
 				{
-					int value; infile >> value;
+					int value;
+					int nbytes = fscanf(infile, "%d", &value);
 					value = 2 << (value - 2);
 					index(j, i) = value;
 				}
@@ -402,7 +436,8 @@ void Data::load(const char* filename, int istate)
 			{
 				for (int v = 0; (v < AVX_VECTOR_SIZE) && (i < dim); v++, i++)
 				{
-					int value; infile >> value;
+					int value;
+					int nbytes = fscanf(infile, "%d", &value);
 					value--;
 					// Precompute "j" to merge two cases into one:
 					// (((i) == 0) ? (1) : (1 - fabs((x) * (i) - (j)))).
@@ -412,7 +447,8 @@ void Data::load(const char* filename, int istate)
 			}
 			for (int i = 0; i < TotalDof; i++)
 			{
-				double value; infile >> value;
+				double value;
+				int nbytes = fscanf(infile, "%lf", &value);
 				surplus[istate](j, i) = value;
 			}
 			j++;
@@ -467,7 +503,7 @@ void Data::load(const char* filename, int istate)
 		}
 	}
 	
-	infile.close();
+	fclose(infile);
 
 	const pair<int, int> zero = make_pair(0, 0);
 
@@ -696,7 +732,7 @@ void Data::load(const char* filename, int istate)
 		}
 	}
 	if (process->isMaster())
-		cout << map.xps.size() << " unique xp(s) to compute" << endl;
+		process->cout("%d unique xp(s) to compute\n", map.xps.size());
 	
 	// Add extra xp index denoting an empty frequency value.
 	int32_t last = map.xps.size();
@@ -724,8 +760,8 @@ void Data::load(const char* filename, int istate)
 		}
 	}
 	if (process->isMaster())
-		cout << (state.chains.size() / state.nfreqs) << " chains of " <<
-			state.nfreqs << " xp(s) to build" << endl;
+		process->cout("%d chains of %d xp(s) to build",
+			state.chains.size() / state.nfreqs, state.nfreqs);
 	
 	// Convert xps from map to vector.
 	xps[istate].resize(map.xps.size());
