@@ -53,7 +53,6 @@ ASSIGN(binaryio)
 
 	undefParams["priority"] = true;
 	undefParams["nagents"] = true;
-	undefParams["enableRuntimeOptimization"] = true;
 	undefParams["binaryio"] = true;
 
 	// Read the configuration file.
