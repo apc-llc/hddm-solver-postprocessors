@@ -189,7 +189,7 @@ K& JIT::jitCompile(int dim, int count, int nno, int DofPerNode,
 		string funcname = sfuncname.str();
 
 		// Read the compile command template.
-		stringstream cmd;
+		vector<char> cmd;
 		{
 			FILE* fsh = fopen(kernel.sh.c_str(), "rb");
 			if (!fsh)
@@ -207,42 +207,41 @@ K& JIT::jitCompile(int dim, int count, int nno, int DofPerNode,
 				return kernel;
 			}
 
-			string sh;
+			vector<char> sh;
 			fseek(fsh, 0, SEEK_END);
 			long length = ftell(fsh);
 			fseek(fsh, 0, SEEK_SET);
-			sh.resize(length);
+			sh.resize(length + 1);
+			sh[length] = '\0';
 			length = fread(&sh[0], 1, length, fsh);
 			fclose(fsh);
 
-			stringstream snewline;
-			snewline << endl;
-			string newline = snewline.str();
-			for (int pos = sh.find(newline); pos != string::npos; pos = sh.find(newline))
-				sh.erase(pos, newline.size());
-			cmd << sh;
-			cmd << " -DDEFERRED";
-			cmd << " -DFUNCNAME=";
-			cmd << funcname;
-			cmd << " -DDIM=";
-			cmd << dim;
-			cmd << " -DCOUNT=";
-			cmd << count;
-			cmd << " -DNNO=";
-			cmd << nno;
-			cmd << " -DVDIM8=";
-			cmd << vdim8;
-			cmd << " -DDOF_PER_NODE=";
-			cmd << DofPerNode;
-	
-			cmd << " -o ";
-			cmd << tmp.filename;
+			// Remove newlines.
+			for (long i = 0; i < length; i++)
+				if (sh[i] == '\n') sh[i] = ' ';
+
+			const char* format = "%s -DDEFERRED -DFUNCNAME=%s -DDIM=%d -DCOUNT=%d -DNNO=%d -DVDIM8=%d -DDOF_PER_NODE=%d -o %s";
+			size_t szcmd = snprintf(NULL, 0, format,
+				&sh[0], funcname.c_str(), dim, count, nno, vdim8, DofPerNode, tmp.filename.c_str());
+
+			cmd.resize(szcmd + 2);
+			cmd[szcmd + 1] = '\0';
+
+			snprintf(&cmd[0], szcmd + 1, format,
+				&sh[0], funcname.c_str(), dim, count, nno, vdim8, DofPerNode, tmp.filename.c_str());
+
+			bool keepCache = false;
+			const char* keepCacheValue = getenv("KEEP_CACHE");
+			if (keepCacheValue)
+				keepCache = atoi(keepCacheValue);
+			if (keepCache)
+				printf("cmd = %s\n", &cmd[0]);
 		}
 
 		// Run compiler as a process and create a streambuf that
 		// reads its stdout and stderr.
 		{
-			redi::ipstream proc(cmd.str(), redi::pstreams::pstderr);
+			redi::ipstream proc((string)&cmd[0], redi::pstreams::pstderr);
 
 			string line;
 			while (std::getline(proc.out(), line))

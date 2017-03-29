@@ -759,7 +759,7 @@ void Data::load(const char* filename, int istate)
 		}
 	}
 	if (process->isMaster())
-		process->cout("%d chains of %d xp(s) to build",
+		process->cout("%d chains of %d xp(s) to build\n",
 			state.chains.size() / state.nfreqs, state.nfreqs);
 	
 	// Convert xps from map to vector.
