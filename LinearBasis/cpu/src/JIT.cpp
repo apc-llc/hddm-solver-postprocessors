@@ -1,8 +1,6 @@
 #include "JIT.h"
 
 #include <functional>
-#include <fstream>
-#include <iostream>
 #include <map>
 #include <pthread.h>
 #include <pstreams/pstream.h>
@@ -142,7 +140,7 @@ K& JIT::jitCompile(int dim, int count, int nno, int DofPerNode,
 	MPI_ERR_CHECK(MPI_Process_get(&process));
 	if (process->isMaster())
 	{
-		cout << "Performing deferred CPU kernel compilation for dim = " << dim << " ..." << endl;
+		process->cout("Performing deferred CPU kernel compilation for dim = %d ...\n", dim);
 
 		char* cwd = get_current_dir_name();
 		string dir = (string)cwd + "/.cache";
@@ -172,7 +170,7 @@ K& JIT::jitCompile(int dim, int count, int nno, int DofPerNode,
 
 		if (tmp.filename == "")
 		{
-			cerr << "Deferred CPU kernel temp file creation failed!" << endl;
+			process->cerr("Deferred CPU kernel temp file creation failed!\n");
 
 			kernel.compilationFailed = true;
 			kernel.dim = dim;
@@ -193,13 +191,11 @@ K& JIT::jitCompile(int dim, int count, int nno, int DofPerNode,
 		// Read the compile command template.
 		stringstream cmd;
 		{
-			std::ifstream t(kernel.sh.c_str());
-			std::string sh((std::istreambuf_iterator<char>(t)),
-				std::istreambuf_iterator<char>());
-			if (!t.is_open())
+			FILE* fsh = fopen(kernel.sh.c_str(), "rb");
+			if (!fsh)
 			{
-				cerr << "Error opening file: " << kernel.sh << endl;
-				cerr << "Deferred CPU kernel compilation failed!" << endl;
+				process->cerr("Error opening file: %s\n", kernel.sh.c_str());
+				process->cerr("Deferred CPU kernel compilation failed!\n");
 
 				kernel.compilationFailed = true;
 				kernel.dim = dim;
@@ -210,6 +206,15 @@ K& JIT::jitCompile(int dim, int count, int nno, int DofPerNode,
 				PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 				return kernel;
 			}
+
+			string sh;
+			fseek(fsh, 0, SEEK_END);
+			long length = ftell(fsh);
+			fseek(fsh, 0, SEEK_SET);
+			sh.resize(length);
+			length = fread(&sh[0], 1, length, fsh);
+			fclose(fsh);
+
 			stringstream snewline;
 			snewline << endl;
 			string newline = snewline.str();
@@ -241,9 +246,9 @@ K& JIT::jitCompile(int dim, int count, int nno, int DofPerNode,
 
 			string line;
 			while (std::getline(proc.out(), line))
-				cout << line << endl;
+				process->cout("%s\n", line.c_str());
 			while (std::getline(proc.err(), line))
-				cerr << line << endl;
+				process->cout("%s\n", line.c_str());
 		}
 
 		// If the output file does not exist, there must be some
@@ -252,7 +257,7 @@ K& JIT::jitCompile(int dim, int count, int nno, int DofPerNode,
 		struct stat buffer;
 		if (stat(tmp.filename.c_str(), &buffer))
 		{
-			cerr << "Deferred CPU kernel compilation failed!" << endl;
+			process->cerr("Deferred CPU kernel compilation failed!\n");
 
 			kernel.compilationFailed = true;
 			kernel.dim = dim;
@@ -264,7 +269,7 @@ K& JIT::jitCompile(int dim, int count, int nno, int DofPerNode,
 			return kernel;
 		}
 
-		cout << "JIT-compiled CPU kernel for dim = " << dim << endl;
+		process->cout("JIT-compiled CPU kernel for dim = %d\n", dim);
 
 		kernel.dim = dim;
 		kernel.filename = tmp.filename;
