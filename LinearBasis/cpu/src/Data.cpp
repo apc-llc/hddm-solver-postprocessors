@@ -17,7 +17,6 @@ static bool isCompressed(const char* filename)
 {
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
-	const Parameters& params = Interpolator::getInstance()->getParameters();
 
 	FILE* infile = fopen(filename, "rb");
 	if (!infile)
