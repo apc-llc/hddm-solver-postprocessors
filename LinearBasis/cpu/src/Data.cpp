@@ -548,6 +548,7 @@ void Data::load(const char* filename, int istate)
 		indexes.resize(dim);
 
 		// Convert (i, I) indexes matrix to sparse format.
+		vector<uint32_t> nnz(dim);
 		vector<uint32_t> freqs(nno);
 		for (int i = 0; i < nno; i++)
 			for (int j = 0; j < dim; j++)
@@ -565,21 +566,7 @@ void Data::load(const char* filename, int istate)
 					continue;
 
 				// Find free position for non-zero pair.
-				bool foundPosition = false;
-				for (int irow = 0, nrows = indexes.size() / dim; irow < nrows; irow++)
-				{
-					Index<uint32_t>& index = indexes[irow * dim + j];
-					if (index.isEmpty())
-					{
-						index.i = value.first;
-						index.j = value.second;
-						index.rowind() = i;
-
-						foundPosition = true;
-						break;
-					}
-				}
-				if (!foundPosition)
+				if (nnz[j] == indexes.size() / dim)
 				{
 					// Add new free row.
 					indexes.resize(indexes.size() + dim);
@@ -590,6 +577,12 @@ void Data::load(const char* filename, int istate)
 					index.j = value.second;
 					index.rowind() = i;
 				}
+
+				Index<uint32_t>& index = indexes[nnz[j] * dim + j];
+				index.i = value.first;
+				index.j = value.second;
+				index.rowind() = i;
+				nnz[j]++;
 			}
 	
 		// Reorder indexes.
