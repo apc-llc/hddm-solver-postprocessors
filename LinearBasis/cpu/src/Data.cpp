@@ -6,7 +6,6 @@
 #include <iostream>
 #include <map>
 #include <mpi.h>
-#include <time.h>
 #include <utility> // pair
 
 using namespace NAMESPACE;
@@ -323,20 +322,8 @@ public :
 	}
 };
 
-// Get the timer value.
-static void get_time(double* ret)
-{
-	volatile struct timespec val;
-	clock_gettime(CLOCK_REALTIME, (struct timespec*)&val);
-	*ret = (double)0.000000001 * val.tv_nsec + val.tv_sec;
-}
-
 void Data::load(const char* filename, int istate)
 {
-	double start, finish;
-
-	get_time(&start);
-
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
 	const Parameters& params = Interpolator::getInstance()->getParameters();
@@ -409,14 +396,8 @@ void Data::load(const char* filename, int istate)
 	surplus[istate].resize(nno, TotalDof);
 	surplus[istate].fill(0.0);
 
-	get_time(&finish);
-
-	process->cout("file header read time = %f sec\n", finish - start);
-
 	if (!compressed)
 	{
-		get_time(&start);
-
 		int j = 0;
 		while (infile)
 		{
@@ -453,15 +434,9 @@ void Data::load(const char* filename, int istate)
 			}
 			j++;
 		}
-		
-		get_time(&finish);
-		
-		process->cout("uncompressed data read time = %f sec\n", finish - start);
 	}
 	else
 	{
-		get_time(&start);
-	
 		int szt = 0;
 		if (dim <= numeric_limits<unsigned char>::max())
 			szt = 1;
@@ -507,10 +482,6 @@ void Data::load(const char* filename, int istate)
 			read_surplus<unsigned int>(infile, nno, TotalDof, surplus[istate]);
 			break;
 		}
-		
-		get_time(&finish);
-		
-		process->cout("compressed data read time = %f sec\n", finish - start);
 	}
 	
 	fclose(infile);
@@ -529,8 +500,6 @@ void Data::load(const char* filename, int istate)
 	}
 	state(xps[istate], chains[istate]);
 
-	get_time(&start);
-	
 	// Calculate maximum frequency across row indexes.
 	state.nfreqs = 0;
 	{
@@ -551,12 +520,6 @@ void Data::load(const char* filename, int istate)
 		for (map<int, int>::iterator i = freqs.begin(), e = freqs.end(); i != e; i++)
 			state.nfreqs = max(state.nfreqs, i->second);
 	}
-
-	get_time(&finish);
-	
-	process->cout("calculate max frequency time = %f sec\n", finish - start);
-
-	get_time(&start);
 
 	vector<map<uint32_t, uint32_t> > transMaps(state.nfreqs);
 	vector<AVXIndexes> avxinds(state.nfreqs);
@@ -653,12 +616,6 @@ void Data::load(const char* filename, int istate)
 		avxindsFreq.calculateLengths();
 	}
 
-	get_time(&finish);
-
-	process->cout("index reordering time = %f sec\n", finish - start);
-
-	get_time(&start);
-
 	Matrix<double> surplusOld = surplus[istate];
 	Matrix<double>& surplusNew = surplus[istate];
 
@@ -671,12 +628,6 @@ void Data::load(const char* filename, int istate)
 		memcpy(&surplusNew(newind, 0), &(surplusOld(oldind, 0)), surplusNew.dimx() * sizeof(double));
 	}
 	
-	get_time(&finish);
-
-	process->cout("surplus reordering time = %f sec\n", finish - start);
-	
-	get_time(&start);
-	
 	// Recalculate translations between frequencies relative to the
 	// first frequency.
 	for (int ifreq = 1; ifreq < state.nfreqs; ifreq++)
@@ -686,13 +637,7 @@ void Data::load(const char* filename, int istate)
 			transRelative[transMaps[0][i]] = transMaps[ifreq][i];
 		transMaps[ifreq] = transRelative;
 	}
-	
-	get_time(&finish);
-	
-	process->cout("recalculating transactions to first-relative time = %f sec\n", finish - start);
-	
-	get_time(&start);
-	
+
 	// Store maps down to vectors.
 	vector<vector<uint32_t> > trans(state.nfreqs);
 	for (int ifreq = 1; ifreq < state.nfreqs; ifreq++)
@@ -703,12 +648,6 @@ void Data::load(const char* filename, int istate)
 			transFreq[i] = transMaps[ifreq][i];
 	}
 	
-	get_time(&finish);
-	
-	process->cout("maps to vectors conversion time = %f sec\n", finish - start);
-
-	get_time(&start);
-
 	int nnoAligned = nno;
 	if (nno % AVX_VECTOR_SIZE)
 		nnoAligned += AVX_VECTOR_SIZE - nno % AVX_VECTOR_SIZE;
@@ -773,12 +712,6 @@ void Data::load(const char* filename, int istate)
 	int32_t last = map.xps.size();
 	map.xps[Index<uint16_t>(0, 0, 0)] = last;
 
-	get_time(&finish);
-	
-	process->cout("finding unique xp(s) time = %f sec\n", finish - start);
-
-	get_time(&start);
-
 	// Create all possible chains between frequencies.
 	state.chains.resize(nno * state.nfreqs);
 	for (int i = 0, ichain = 0; i < nno; i++)
@@ -809,10 +742,6 @@ void Data::load(const char* filename, int istate)
 	for (std::map<Index<uint16_t>, uint32_t>::const_iterator i = map.xps.begin(), e = map.xps.end(); i != e; i++)
 		xps[istate][i->second] = i->first;
 
-	get_time(&finish);
-	
-	process->cout("chains creating time = %f sec\n", finish - start);
-	
 	nfreqs[istate] = state.nfreqs;
 	
 	loadedStates[istate] = true;
