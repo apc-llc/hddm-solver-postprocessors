@@ -606,16 +606,18 @@ void Data::load(const char* filename, int istate)
 		avxindsFreq.calculateLengths();
 	}
 
-	Matrix<double> surplusOld = surplus[istate];
-	Matrix<double>& surplusNew = surplus[istate];
-
 	// Reorder surpluses.
-	for (map<uint32_t, uint32_t>::iterator i = transMaps[0].begin(), e = transMaps[0].end(); i != e; i++)
 	{
-		int oldind = i->first;
-		int newind = i->second;
+		Matrix<double> surplusOld = surplus[istate];
+		Matrix<double>& surplusNew = surplus[istate];
 
-		memcpy(&surplusNew(newind, 0), &(surplusOld(oldind, 0)), surplusNew.dimx() * sizeof(double));
+		for (map<uint32_t, uint32_t>::iterator i = transMaps[0].begin(), e = transMaps[0].end(); i != e; i++)
+		{
+			int oldind = i->first;
+			int newind = i->second;
+
+			memcpy(&surplusNew(newind, 0), &(surplusOld(oldind, 0)), surplusNew.dimx() * sizeof(double));
+		}
 	}
 	
 	// Recalculate translations between frequencies relative to the
@@ -645,24 +647,27 @@ void Data::load(const char* filename, int istate)
 	// One extra vector size for *hi part in AVX code below.
 	nnoAligned += AVX_VECTOR_SIZE;
 
-	vector<vector<int, AlignedAllocator<int> > > temps(
-		state.nfreqs, vector<int, AlignedAllocator<int> >(nnoAligned, -1));
+	vector<vector<uint32_t, AlignedAllocator<uint32_t> > > temps(
+		state.nfreqs, vector<uint32_t, AlignedAllocator<uint32_t> >(nnoAligned, 0));
 
 	struct Map
 	{
 		map<Index<uint16_t>, uint32_t> xps;
 	}
 	map;
+
+	// First index denotes an empty frequency value.
+	map.xps[Index<uint16_t>(0, 0, 0)] = 0;
 	
 	// Loop through all frequences.
-	for (int ifreq = 0, ixp = 0; ifreq < state.nfreqs; ifreq++)
+	for (int ifreq = 0, ixp = 1; ifreq < state.nfreqs; ifreq++)
 	{
 		struct Freq
 		{
 			const AVXIndexes& avxinds;
-			vector<int, AlignedAllocator<int> >& temps;
+			vector<uint32_t, AlignedAllocator<uint32_t> >& temps;
 			
-			Freq(const AVXIndexes& avxinds_, vector<int, AlignedAllocator<int> >& temps_) :
+			Freq(const AVXIndexes& avxinds_, vector<uint32_t, AlignedAllocator<uint32_t> >& temps_) :
 				avxinds(avxinds_), temps(temps_) { }
 		}
 		freq(avxinds[ifreq], temps[ifreq]);
@@ -694,34 +699,18 @@ void Data::load(const char* filename, int istate)
 					if (index.isEmpty(k)) itemp--;
 			}
 		}
-	}
+	}	
 	if (process->isMaster())
 		process->cout("%d unique xp(s) to compute\n", map.xps.size());
-	
-	// Add extra xp index denoting an empty frequency value.
-	int32_t last = map.xps.size();
-	map.xps[Index<uint16_t>(0, 0, 0)] = last;
 
 	// Create all possible chains between frequencies.
 	state.chains.resize(nno * state.nfreqs);
 	for (int i = 0, ichain = 0; i < nno; i++)
 	{
-		int value = temps[0][i];
-
-		if (value == -1)
-			value = map.xps[Index<uint16_t>(0, 0, 0)];
-
-		state.chains[ichain++] = (uint32_t)value;
+		state.chains[ichain++] = temps[0][i];
 
 		for (int ifreq = 1; ifreq < state.nfreqs; ifreq++)
-		{
-			int value = temps[ifreq][trans[ifreq][i]];
-
-			if (value == -1)
-				value = map.xps[Index<uint16_t>(0, 0, 0)];
-
-			state.chains[ichain++] = (uint32_t)value;
-		}
+			state.chains[ichain++] = temps[ifreq][trans[ifreq][i]];
 	}
 	if (process->isMaster())
 		process->cout("%d chains of %d xp(s) to build\n",
@@ -731,6 +720,74 @@ void Data::load(const char* filename, int istate)
 	xps[istate].resize(map.xps.size());
 	for (std::map<Index<uint16_t>, uint32_t>::const_iterator i = map.xps.begin(), e = map.xps.end(); i != e; i++)
 		xps[istate][i->second] = i->first;
+
+	// Sort array of chains first by first frequence, then by second,
+	// then by third, etc.
+	vector<vector<uint32_t> > vv(nno);
+	for (int i = 0, e = vv.size(); i < e; i++)
+	{
+		vv[i].resize(state.nfreqs + 1);
+		for (int ifreq = 0; ifreq < state.nfreqs; ifreq++)
+			vv[i][ifreq] = state.chains[i * state.nfreqs + ifreq];
+		vv[i][state.nfreqs] = i;
+	}
+	sort(vv.begin(), vv.end(),
+		[](const vector<uint32_t>& a, const vector<uint32_t>& b) -> bool
+		{
+			return a[0] < b[0];
+		}
+	);
+	for (int ifreq = 1; ifreq < state.nfreqs; ifreq++)
+	{
+		for (vector<vector<uint32_t> >::iterator i = vv.begin(), e = vv.end(); i != e; )
+		{
+			vector<vector<uint32_t> >::iterator ii = i + 1;
+			for ( ; ii != e; ii++)
+				if ((*ii)[ifreq - 1] != (*i)[ifreq - 1])
+				{
+					sort(i, ii,
+						[=](const vector<uint32_t>& a, const vector<uint32_t>& b) -> bool
+						{
+							return a[ifreq] < b[ifreq];
+						}
+					);
+								
+					break;
+				}
+
+			i = ii;
+		}
+	}
+	for (int i = 0, e = vv.size(); i < e; i++)
+	{
+		for (int ifreq = 0; ifreq < state.nfreqs; ifreq++)
+			state.chains[i * state.nfreqs + ifreq] = vv[i][ifreq];
+	}	
+
+	// Reorder surpluses.
+	{
+		Matrix<double> surplusOld = surplus[istate];
+		Matrix<double>& surplusNew = surplus[istate];
+
+		for (int i = 0; i < nno; i++)
+		{
+			int oldind = vv[i][state.nfreqs];
+			int newind = i;
+
+			memcpy(&surplusNew(newind, 0), &(surplusOld(oldind, 0)), surplusNew.dimx() * sizeof(double));
+		}
+	}
+
+	/*for (int i = 0; i < xps[istate].size(); i++)
+		process->cout("%d -> %d (%d, %d)\n", i, xps[istate][i].index, xps[istate][i].i, xps[istate][i].j);
+
+	for (int i = 0; i < nno; i++)
+	{
+		process->cout("%d", state.chains[i * state.nfreqs]);
+		for (int ifreq = 1; ifreq < state.nfreqs; ifreq++)
+			process->cout(" -> %d", state.chains[i * state.nfreqs + ifreq]);
+		process->cout("\n");
+	}*/
 
 	nfreqs[istate] = state.nfreqs;
 	

@@ -39,7 +39,11 @@ extern "C" void FUNCNAME(
 			double temp = 1.0;
 			for (int ifreq = 0; ifreq < nfreqs; ifreq++)
 			{
-				temp *= xpv[chains[ichain + ifreq]];
+				// Early exit for shorter chains.
+				int32_t idx = chains[ichain + ifreq];
+				if (!idx) break;
+
+				temp *= xpv[idx];
 				if (!temp) goto next;
 			}
 
