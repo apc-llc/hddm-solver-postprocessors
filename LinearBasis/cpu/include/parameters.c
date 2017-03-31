@@ -10,6 +10,10 @@ int REF nagents;                     // number of agents in economy
 	
 bool REF binaryio;                   // input/output surplus files as binary or text
 
+double REF surplusCutoff;            // small surplus values cutoff threshold
+
+bool REF surplusCutoffDefined;       // set if surplus values cutoff threshold has been defined
+
 // XXX Add new parameters here
 
 #undef REF

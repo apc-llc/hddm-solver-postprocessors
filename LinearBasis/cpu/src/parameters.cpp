@@ -33,7 +33,9 @@ Parameters::Parameters(const string& targetSuffix, const string& configFile) :
 
 ASSIGN(priority),
 ASSIGN(nagents),
-ASSIGN(binaryio)
+ASSIGN(binaryio),
+ASSIGN(surplusCutoff),
+ASSIGN(surplusCutoffDefined)
 
 // XXX Add new parameters here
 
@@ -55,6 +57,7 @@ ASSIGN(binaryio)
 	undefParams["priority"] = true;
 	undefParams["nagents"] = true;
 	undefParams["binaryio"] = true;
+	undefParams["surplusCutoff"] = true;
 
 	// Read the configuration file.
 	FILE* cfg = fopen(configFile.c_str(), "r");
@@ -123,9 +126,27 @@ ASSIGN(binaryio)
 			}
 			undefParams["binaryio"] = false;
 		}
+		else if ((string)name == "surplusCutoff")
+		{
+			surplusCutoff = atof(value);
+			if (process->isMaster())
+				process->cout("surplusCutoff : %d\n", surplusCutoff);
+			undefParams["surplusCutoff"] = false;
+		}
 	}
 	
 	fclose(cfg);
+
+	// Check if surplusCutoff has been defined.
+	surplusCutoffDefined = true;
+	if (undefParams["surplusCutoff"])
+	{
+		if (process->isMaster())
+			process->cout("surplusCutoff : unused\n", surplusCutoff);
+
+		surplusCutoffDefined = false;
+		undefParams["surplusCutoff"] = false;
+	}
 
 	// Check if something is still undefined.
 	for (map<string, bool>::iterator i = undefParams.begin(), e = undefParams.end(); i != e; i++)

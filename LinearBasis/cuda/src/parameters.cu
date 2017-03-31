@@ -35,8 +35,9 @@ ASSIGN(ngpus),
 ASSIGN(warpSize),
 ASSIGN(priority),
 ASSIGN(nagents),
-ASSIGN(enableRuntimeOptimization),
-ASSIGN(binaryio)
+ASSIGN(binaryio),
+ASSIGN(surplusCutoff),
+ASSIGN(surplusCutoffDefined)
 
 // XXX Add new parameters here
 
@@ -48,120 +49,97 @@ ASSIGN(binaryio)
 
 	if (process->isMaster())
 	{
-		cout << "------------------------------------" << endl;
-		cout << "LOADING \"" << targetSuffix << "\" POSTPROCESSOR CONFIG (" << configFile << ")" << endl;
-		cout << "------------------------------------" << endl;
+		process->cout("------------------------------------\n");
+		process->cout("LOADING \"%s\" POSTPROCESSOR CONFIG (%s)\n", targetSuffix.c_str(), configFile.c_str());
+		process->cout("------------------------------------\n");
 	}
 	
 	map<string, bool> undefParams;
 
-#if defined(CUDA_INTERPOLATOR)
-
 	undefParams["ngpus"] = true;
 	undefParams["warpSize"] = true;
-
-#endif // CUDA_INTERPOLATOR
-
 	undefParams["priority"] = true;
 	undefParams["nagents"] = true;
-	undefParams["enableRuntimeOptimization"] = true;
 	undefParams["binaryio"] = true;
+	undefParams["surplusCutoff"] = true;
 
-	// Read configuration file on master.
-	ifstream cfg(configFile.c_str());
-	if (!cfg.is_open())
+	// Read the configuration file.
+	FILE* cfg = fopen(configFile.c_str(), "r");
+    if (!cfg)
 	{
-		cerr << "Cannot open config file \"" << configFile << "\"" << endl;
+		process->cerr("Cannot open config file \"%s\"\n", configFile.c_str());
 		process->abort();
 	}
 
-	string line;
-	while (getline(cfg, line))
+	char* line = NULL;
+	size_t szline = 0;
+	while (getline(&line, &szline, cfg) != -1)
 	{
-		istringstream iss(line);
-		string name;
-		iss >> name;
+		char* name = strtok(line, " \t\n");
+		if (!name) continue;
 		if (name[0] == '!') continue;
-		string value;
-		if (!(iss >> value))
+		char* value = strtok(NULL, " \t\n");
+		if (!value)
 		{
-			if (name == "") continue;
 			if (process->isMaster())
-				cerr << "Missing \"" << name << "\" parameter value" << endl;
+				process->cerr("Missing \"%s\" parameter value\n", name);
 			process->abort();
 		}
 		if (value[0] == '!')
 		{
 			if (process->isMaster())
-				cerr << "Missing \"" << name << "\" parameter value" << endl;
+				process->cerr("Missing \"%s\" parameter value\n", name);
 			process->abort();
 		}
 
-		if (name == "priorityCUDA")
+		if ((string)name == "priorityCUDA")
 		{
-			priority = atoi(value.c_str());
+			priority = atoi(value);
 			if (process->isMaster())
-				cout << "priority : " << priority << endl;
+				process->cout("priority : %d\n", priority);
 			undefParams["priority"] = false;
 		}
-		else if ((name == "n_agents") || (name == "nagents"))
+		else if (((string)name == "n_agents") || ((string)name == "nagents"))
 		{
-			nagents = atoi(value.c_str());
+			nagents = atoi(value);
 			if (process->isMaster())
-				cout << "nagents : " << nagents << endl;
+				process->cout("nagents : %d\n", nagents);
 			undefParams["nagents"] = false;
 		}
-		else if ((name == "enable_runtime_optimization") || (name == "enableRuntimeOptimization"))
+		else if ((string)name == "binaryio")
 		{
 			if (process->isMaster())
-				cout << "enableRuntimeOptimization : ";
-			if ((value == "yes") || (value == "y") || (value == "true"))
-			{
-				enableRuntimeOptimization = true;
-				if (process->isMaster())
-					cout << value << endl;
-			}
-			else if ((value == "no") || (value == "n") || (value == "false"))
-			{
-				enableRuntimeOptimization = false;
-				if (process->isMaster())
-					cout << value << endl;
-			}
-			else
-			{
-				if (process->isMaster())
-					cerr << "unknown" << endl;
-				process->abort();
-			}
-			undefParams["enableRuntimeOptimization"] = false;
-		}
-		else if (name == "binaryio")
-		{
-			if (process->isMaster())
-				cout << "binary i/o : ";
-			if ((value == "yes") || (value == "y") || (value == "true"))
+				process->cout("binary i/o : ");
+			if (((string)value == "yes") || ((string)value == "y") || ((string)value == "true"))
 			{
 				binaryio = true;
 				if (process->isMaster())
-					cout << value << endl;
+					process->cout("%s\n", value);
 			}
-			else if ((value == "no") || (value == "n") || (value == "false"))
+			else if (((string)value == "no") || ((string)value == "n") || ((string)value == "false"))
 			{
 				binaryio = false;
 				if (process->isMaster())
-					cout << value << endl;
+					process->cout("%s\n", value);
 			}
 			else
 			{
 				if (process->isMaster())
-					cerr << "unknown" << endl;
+					process->cerr("unknown\n");
 				process->abort();
 			}
 			undefParams["binaryio"] = false;
 		}
+		else if ((string)name == "surplusCutoff")
+		{
+			surplusCutoff = atof(value);
+			if (process->isMaster())
+				process->cout("surplusCutoff : %d\n", surplusCutoff);
+			undefParams["surplusCutoff"] = false;
+		}
 	}
 	
-	cfg.close();
+	fclose(cfg);
 
 	// Check for available CUDA GPU(s)
 	CUDA_ERR_CHECK(cudaGetDeviceCount(&ngpus));
@@ -174,17 +152,28 @@ ASSIGN(binaryio)
 		MPI_SUM, process->getComm()));
 
 	if (process->isMaster())
-		cout << ngpus_total << " GPU(s) available" << endl;
-	cout << endl;
+		process->cout("%d GPU(s) available\n", ngpus_total);
+	process->cout("\n");
 	
 	// Find out the warp size for each GPU.
+
+	// Check if surplusCutoff has been defined.
+	surplusCutoffDefined = true;
+	if (undefParams["surplusCutoff"])
+	{
+		if (process->isMaster())
+			process->cout("surplusCutoff : unused\n", surplusCutoff);
+
+		surplusCutoffDefined = false;
+		undefParams["surplusCutoff"] = false;
+	}
 
 	// Check if something is still undefined.
 	for (map<string, bool>::iterator i = undefParams.begin(), e = undefParams.end(); i != e; i++)
 		if (i->second)
 		{
 			if (process->isMaster())
-				cerr << "Required parameter \"" << i->first << "\" is undefined" << endl;
+				process->cerr("Required parameter %s is undefined\n", i->first);
 			process->abort();
 		}
 }
