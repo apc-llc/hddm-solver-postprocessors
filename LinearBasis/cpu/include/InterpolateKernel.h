@@ -1,7 +1,6 @@
 #include <check.h>
 #include <cstdio>
 #include <dlfcn.h>
-#include <iostream>
 #include <process.h>
 #include <string>
 #include <unistd.h>
@@ -35,6 +34,9 @@ public :
 			PTHREAD_ERR_CHECK(pthread_mutex_lock(&mutex));
 			if (!func)
 			{
+				MPI_Process* process;
+				MPI_ERR_CHECK(MPI_Process_get(&process));
+
 				string type = "CPU";
 			
 				// Open compiled library and load interpolation function entry point.
@@ -45,7 +47,7 @@ public :
 #endif
 				if (!handle)
 				{
-					cerr << "Deferred " << type << " kernel loading failed: " << dlerror() << endl;
+					process->cerr("Deferred %s kernel loading failed: %s\n", type.c_str(), dlerror());
 					compilationFailed = true;
 					PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 					return func;
@@ -53,16 +55,14 @@ public :
 				func = (T)dlsym(handle, funcname.c_str());
 				if (!func)
 				{
-					cerr << "Deferred " << type << " kernel loading failed: " << dlerror() << endl;
+					process->cerr("Deferred %s kernel loading failed: %s\n", type.c_str(), dlerror());
 					compilationFailed = true;
 					PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 					return func;
 				}
 
-				MPI_Process* process;
-				MPI_ERR_CHECK(MPI_Process_get(&process));
-				cout << "Rank #" << process->getRank() << " loaded " << type << " kernel for dim = " << dim << " : " <<
-					funcname << " @ " << hex << (void*)func << dec << endl;		
+				process->cout("Rank #%d loaded %s kernel for dim = %d : %s @ 0x%x\n",
+					process->getRank(), type.c_str(), dim, funcname.c_str(), (void*)func);
 			}
 			PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 		}

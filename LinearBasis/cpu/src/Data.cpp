@@ -2,8 +2,6 @@
 #include "Data.h"
 #include "interpolator.h"
 
-#include <fstream>
-#include <iostream>
 #include <map>
 #include <mpi.h>
 #include <utility> // pair
