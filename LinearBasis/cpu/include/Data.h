@@ -225,7 +225,7 @@ typedef std::vector<uint32_t> Chains;
 
 class Data
 {
-	int nstates, dim, vdim, nno, TotalDof, Level;
+	int nstates;
 	std::vector<int> nfreqs;
 	std::vector<XPS> xps;
 	std::vector<Chains> chains;
@@ -235,7 +235,6 @@ class Data
 	friend class Interpolator;
 
 public :
-	virtual int getNno() const;
 
 	virtual void load(const char* filename, int istate);
 	

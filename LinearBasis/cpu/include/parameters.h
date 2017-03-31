@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+namespace NAMESPACE {
+
 struct Parameters
 {
 	#define ALIGN_BOOL_4
@@ -14,6 +16,8 @@ struct Parameters
 
 	Parameters(const std::string& targetSuffix, const std::string& configFile = "hddm-solver.cfg");
 };
+
+} // namespace NAMESPACE
 
 #endif // HDDM_PARAMETERS_H
 

@@ -9,8 +9,6 @@
 using namespace NAMESPACE;
 using namespace std;
 
-int Data::getNno() const { return nno; }
-
 static bool isCompressed(const char* filename)
 {
 	MPI_Process* process;
@@ -346,6 +344,8 @@ void Data::load(const char* filename, int istate)
 		exit(1);
 	}  
 
+	int dim, vdim, nno, TotalDof, Level;
+
 	if (compressed)
 	{
 		size_t nbytes = 0;
@@ -483,6 +483,15 @@ void Data::load(const char* filename, int istate)
 	}
 	
 	fclose(infile);
+
+#if 0
+	for (int i = 0; i < nno; i++)
+	{
+		for (int j = 0; j < surplus[istate].dimx(); j++)
+			process->cout("%e ", surplus[istate](i, j));
+		process->cout("\n");
+	}
+#endif
 
 	const pair<int, int> zero = make_pair(0, 0);
 
@@ -778,7 +787,8 @@ void Data::load(const char* filename, int istate)
 		}
 	}
 
-	/*for (int i = 0; i < xps[istate].size(); i++)
+#if 0
+	for (int i = 0; i < xps[istate].size(); i++)
 		process->cout("%d -> %d (%d, %d)\n", i, xps[istate][i].index, xps[istate][i].i, xps[istate][i].j);
 
 	for (int i = 0; i < nno; i++)
@@ -787,7 +797,31 @@ void Data::load(const char* filename, int istate)
 		for (int ifreq = 1; ifreq < state.nfreqs; ifreq++)
 			process->cout(" -> %d", state.chains[i * state.nfreqs + ifreq]);
 		process->cout("\n");
-	}*/
+	}
+#endif
+
+#if 0	
+	int n1e7 = 0, n1e6 = 0, n1e5 = 0, n1e3 = 0;
+	for (int i = 0; i < nno; i++)
+	{
+		for (int j = 0; j < surplus[istate].dimx(); j++)
+		{
+			if (fabs(surplus[istate](i, j)) > 1e-7)
+				n1e7++;
+			if (fabs(surplus[istate](i, j)) > 1e-6)
+				n1e6++;
+			if (fabs(surplus[istate](i, j)) > 1e-5)
+				n1e5++;
+			if (fabs(surplus[istate](i, j)) > 1e-3)
+				n1e3++;
+		}
+	}
+	
+	process->cout("1e-7 cutoff: %d (%f%%)\n", n1e7, (double)n1e7 / (surplus[istate].dimx() * nno) * 100);
+	process->cout("1e-6 cutoff: %d (%f%%)\n", n1e6, (double)n1e6 / (surplus[istate].dimx() * nno) * 100);
+	process->cout("1e-5 cutoff: %d (%f%%)\n", n1e5, (double)n1e5 / (surplus[istate].dimx() * nno) * 100);
+	process->cout("1e-3 cutoff: %d (%f%%)\n", n1e3, (double)n1e3 / (surplus[istate].dimx() * nno) * 100);
+#endif
 
 	nfreqs[istate] = state.nfreqs;
 	
