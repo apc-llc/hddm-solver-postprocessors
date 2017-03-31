@@ -546,17 +546,9 @@ void Data::load(const char* filename, int istate)
 					continue;
 
 				// Find free position for non-zero pair.
+				// If no free position, add new free row.
 				if (nnz[j] == indexes.size() / dim)
-				{
-					// Add new free row.
 					indexes.resize(indexes.size() + dim);
-
-					Index<uint32_t>& index = indexes[indexes.size() - dim + j];
-
-					index.i = value.first;
-					index.j = value.second;
-					index.rowind() = i;
-				}
 
 				Index<uint32_t>& index = indexes[nnz[j] * dim + j];
 				index.i = value.first;
