@@ -153,7 +153,7 @@ ASSIGN(surplusCutoffDefined)
 		if (i->second)
 		{
 			if (process->isMaster())
-				cerr << "Required parameter \"" << i->first << "\" is undefined" << endl;
+				process->cerr("Required parameter \"%s\" is undefined\n", i->first.c_str());
 			process->abort();
 		}
 }
