@@ -39,7 +39,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 	if (!INTERPOLATE_ARRAY_RUNTIME_OPT)
 	{
 		INTERPOLATE_ARRAY_RUNTIME_OPT =
-			JIT::jitCompile(dim, nno, DofPerNode,
+			JIT::jitCompile(device, dim, nno, DofPerNode,
 				stringize(INTERPOLATE_ARRAY_RUNTIME_OPT) "_",
 				(Func)INTERPOLATE_ARRAY).getFunc();
 	}
@@ -69,7 +69,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 	if (!INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT)
 	{
 		INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
-			JIT::jitCompile(dim, data->nstates, nno, DofPerNode,
+			JIT::jitCompile(device, dim, data->nstates, nno, DofPerNode,
 				stringize(INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT) "_",
 				(Func)INTERPOLATE_ARRAY_MANY_MULTISTATE).getFunc();
 	}

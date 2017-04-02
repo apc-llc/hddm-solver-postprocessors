@@ -62,7 +62,7 @@ struct KSignature
 };
 
 template<typename K, typename F>
-K& JIT::jitCompile(int dim, int count, int nno, int DofPerNode,
+K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 	const string& funcnameTemplate, F fallbackFunc)
 {
 	int vdim = dim / AVX_VECTOR_SIZE;
@@ -329,17 +329,17 @@ K& JIT::jitCompile(int dim, int count, int nno, int DofPerNode,
 }
 
 InterpolateArrayKernel& JIT::jitCompile(
-	int dim, int nno, int DofPerNode,
+	Device* device, int dim, int nno, int DofPerNode,
 	const string& funcnameTemplate, InterpolateArrayFunc fallbackFunc)
 {
 	return JIT::jitCompile<InterpolateArrayKernel, InterpolateArrayFunc>(
-		dim, 1, nno, DofPerNode, funcnameTemplate, fallbackFunc);
+		device, dim, 1, nno, DofPerNode, funcnameTemplate, fallbackFunc);
 }
 
 InterpolateArrayManyMultistateKernel& JIT::jitCompile(
-	int dim, int count, int nno, int DofPerNode,
+	Device* device, int dim, int count, int nno, int DofPerNode,
 	const string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc)
 {
 	return JIT::jitCompile<InterpolateArrayManyMultistateKernel, InterpolateArrayManyMultistateFunc>(
-		dim, count, nno, DofPerNode, funcnameTemplate, fallbackFunc);
+		device, dim, count, nno, DofPerNode, funcnameTemplate, fallbackFunc);
 }

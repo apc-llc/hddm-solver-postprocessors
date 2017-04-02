@@ -29,15 +29,15 @@ class JIT
 {
 public :
 	static InterpolateArrayKernel& jitCompile(
-		int dim, int nno, int DofPerNode,
+		Device* device, int dim, int nno, int DofPerNode,
 		const std::string& funcnameTemplate, InterpolateArrayFunc fallbackFunc);
 	static InterpolateArrayManyMultistateKernel& jitCompile(
-		int dim, int count, int nno, int DofPerNode,
+		Device* device, int dim, int count, int nno, int DofPerNode,
 		const std::string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc);
 
 	template<typename K, typename F>
 	static K& jitCompile(
-		int dim, int count, int nno, int DofPerNode,
+		Device* device, int dim, int count, int nno, int DofPerNode,
 		const std::string& funcnameTemplate, F fallbackFunc);
 };
 
