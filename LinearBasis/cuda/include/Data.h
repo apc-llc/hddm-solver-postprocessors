@@ -220,15 +220,15 @@ struct Vector
 
 // Host memory matrix with all rows aligned
 template<typename T, typename VectorType>
-class MatrixHostDense
+class MatrixHost
 {
 	VectorType data;
 	int dimY, dimX, dimX_aligned;
 
 public :
-	MatrixHostDense() : data(VectorType()), dimY(0), dimX(0) { }
+	MatrixHost() : data(VectorType()), dimY(0), dimX(0) { }
 
-	MatrixHostDense(int dimY_, int dimX_) : data(VectorType()), dimY(dimY_), dimX(dimX_)
+	MatrixHost(int dimY_, int dimX_) : data(VectorType()), dimY(dimY_), dimX(dimX_)
 	{
 		dimX_aligned = dimX_;
 		if (dimX_ % AVX_VECTOR_SIZE)
@@ -275,112 +275,9 @@ public :
 	}
 };
 
-// Host memory sparse matrix in CSR format
-template<typename TValue, typename TIndex, template<typename, typename> class TVector, template<typename> class TAllocator>
-class MatrixHostSparseCSR
-{
-	TVector<TValue, TAllocator<TValue> > a;
-	TVector<TIndex, TAllocator<TIndex> > ia, ja;
-	int dimY, dimX, nnZ;
-
-public :
-	MatrixHostSparseCSR() :
-		a(TVector<TValue, TAllocator<TValue> >()),
-		ia(TVector<TIndex, TAllocator<TIndex> >()),
-		ja(TVector<TIndex, TAllocator<TIndex> >()),
-		dimY(0), dimX(0), nnZ(0)
-	{ }
-
-	MatrixHostSparseCSR(int dimY_, int dimX_, int nnz_) :
-		a(TVector<TValue, TAllocator<TValue> >()),
-		ia(TVector<TIndex, TAllocator<TIndex> >()),
-		ja(TVector<TIndex, TAllocator<TIndex> >()),
-		dimY(dimY_), dimX(dimX_), nnZ(nnz_)
-	{
-		a.resize(nnZ);
-		ia.resize(dimY + 1);
-		ja.resize(nnZ);
-	}
-
-	inline __attribute__((always_inline)) TValue& A(int i)
-	{
-		assert(i < nnZ);
-		return a[i];
-	}
-
-	inline __attribute__((always_inline)) const TValue& A(int i) const
-	{
-		assert(i < nnZ);
-		return a[i];
-	}
-	
-	inline __attribute__((always_inline)) TIndex& IA(int i)
-	{
-		assert(i < dimY + 1);
-		return ia[i];
-	}
-
-	inline __attribute__((always_inline)) const TIndex& IA(int i) const
-	{
-		assert(i < dimY + 1);
-		return ia[i];
-	}
-	
-	inline __attribute__((always_inline)) TIndex& JA(int i)
-	{
-		assert(i < nnZ);
-		return ja[i];
-	}
-
-	inline __attribute__((always_inline)) const TIndex& JA(int i) const
-	{
-		assert(i < nnZ);
-		return ja[i];
-	}
-
-	inline __attribute__((always_inline)) const TValue& operator()(int y, int x) const
-	{
-		assert(x < dimX);
-		assert(y < dimY);
-
-		for (int i = 0; ; )
-		{
-			for (int row = 0; row < y; row++)
-				for (int col = IA[row]; (col < IA[row + 1]) && (i < nnZ); col++)
-					i++;
-
-			assert (i < nnZ);
-
-			for (int col = IA[y]; col < IA[y + 1]; col++, i++)
-				if (JA[i] == x) return A[i];
-
-			return (TValue) 0;
-		}
-	}
-
-	inline __attribute__((always_inline)) int dimy() { return dimY; }
-
-	inline __attribute__((always_inline)) int dimx() { return dimX; }
-
-	inline __attribute__((always_inline)) int nnz() { return nnZ; }
-		
-	inline __attribute__((always_inline)) void resize(int dimY_, int dimX_, int nnz_)
-	{
-		dimY = dimY_; dimX = dimX_; nnZ = nnz_;
-		a.resize(nnZ);
-		ia.resize(dimY + 1);
-		ja.resize(nnZ);
-	}
-	
-	inline __attribute__((always_inline)) void fill(TValue value)
-	{
-		std::fill(a.begin(), a.end(), value);
-	}
-};
-
 // Device memory matrix with all rows aligned
 template<typename T>
-class MatrixDeviceDense
+class MatrixDevice
 {
 	T* data;
 	bool dataOwner; // whether the instance owns its data pointer or not
@@ -389,10 +286,10 @@ class MatrixDeviceDense
 
 public :
 	__host__ __device__
-	MatrixDeviceDense() : data(NULL), dataOwner(true), size(0), dimY(0), dimX(0) { }
+	MatrixDevice() : data(NULL), dataOwner(true), size(0), dimY(0), dimX(0) { }
 
 	__host__ __device__
-	MatrixDeviceDense(int dimY_, int dimX_) : data(NULL), dataOwner(true), size(0), dimY(dimY_), dimX(dimX_)
+	MatrixDevice(int dimY_, int dimX_) : data(NULL), dataOwner(true), size(0), dimY(dimY_), dimX(dimX_)
 	{
 		dimX_aligned = dimX_;
 		if (dimX_ % AVX_VECTOR_SIZE)
@@ -406,7 +303,7 @@ public :
 	}
 	
 	__host__ __device__
-	~MatrixDeviceDense()
+	~MatrixDevice()
 	{
 		if (!dataOwner) return;
 #if defined(__CUDA_ARCH__)
@@ -476,187 +373,73 @@ public :
 	}
 };
 
-// Host memory sparse matrix in CSR format
-template<typename TValue, typename TIndex>
-class MatrixDeviceSparseCSR
-{
-	TValue *a;
-	TIndex *ia, *ja;
-	bool dataOwner; // whether the instance owns its data pointer or not
-	int dimY, dimX, nnZ;
-
-public :
-	MatrixDeviceSparseCSR() :
-		a(NULL), ia(NULL), ja(NULL),
-		dimY(0), dimX(0), nnZ(0)
-	{ }
-
-	MatrixDeviceSparseCSR(int dimY_, int dimX_, int nnz_) :
-		a(NULL), ia(NULL), ja(NULL),
-		dimY(dimY_), dimX(dimX_), nnZ(nnz_)
-	{
-#if defined(__CUDA_ARCH__)
-		a = new TValue[nnZ];
-		ia = new TIndex[dimY + 1];
-		ja = new TIndex[nnZ];
-#else
-		CUDA_ERR_CHECK(cudaMalloc(&a, nnZ * sizeof(TValue)));
-		CUDA_ERR_CHECK(cudaMalloc(&ia, (dimY + 1) * sizeof(TIndex)));
-		CUDA_ERR_CHECK(cudaMalloc(&ja, nnZ * sizeof(TIndex)));
-#endif
-	}
-
-	__host__ __device__
-	~MatrixDeviceSparseCSR()
-	{
-		if (!dataOwner) return;
-#if defined(__CUDA_ARCH__)
-		if (a) delete[] a;
-		if (ia) delete[] ia;
-		if (ja) delete[] ja;
-#else
-		CUDA_ERR_CHECK(cudaFree(a));
-		CUDA_ERR_CHECK(cudaFree(ia));
-		CUDA_ERR_CHECK(cudaFree(ja));
-#endif
-	}
-
-	// Become an owner of the underlying data pointer.
-	__host__ __device__
-	void ownData() { dataOwner = true; }
-
-	// Disown the underlying data pointer.
-	__host__ __device__
-	void disownData() { dataOwner = false; }
-
-	__device__
-	inline __attribute__((always_inline)) TValue& A(int i)
-	{
-		assert(i < nnZ);
-		return a[i];
-	}
-
-	__device__
-	inline __attribute__((always_inline)) const TValue& A(int i) const
-	{
-		assert(i < nnZ);
-		return a[i];
-	}
-
-	__device__
-	inline __attribute__((always_inline)) TIndex& IA(int i)
-	{
-		assert(i < dimY + 1);
-		return ia[i];
-	}
-
-	__device__
-	inline __attribute__((always_inline)) const TIndex& IA(int i) const
-	{
-		assert(i < dimY + 1);
-		return ia[i];
-	}
-	
-	__device__
-	inline __attribute__((always_inline)) TIndex& JA(int i)
-	{
-		assert(i < nnZ);
-		return ja[i];
-	}
-
-	__device__
-	inline __attribute__((always_inline)) const TIndex& JA(int i) const
-	{
-		assert(i < nnZ);
-		return ja[i];
-	}
-
-	__device__
-	inline __attribute__((always_inline)) const TValue& operator()(int y, int x) const
-	{
-		assert(x < dimX);
-		assert(y < dimY);
-
-		for (int i = 0; ; )
-		{
-			for (int row = 0; row < y; row++)
-				for (int col = IA[row]; (col < IA[row + 1]) && (i < nnZ); col++)
-					i++;
-
-			assert (i < nnZ);
-
-			for (int col = IA[y]; col < IA[y + 1]; col++, i++)
-				if (JA[i] == x) return A[i];
-
-			return (TValue) 0;
-		}
-	}
-
-	__device__
-	inline __attribute__((always_inline)) int dimy() { return dimY; }
-
-	__device__
-	inline __attribute__((always_inline)) int dimx() { return dimX; }
-
-	__device__
-	inline __attribute__((always_inline)) int nnz() { return nnZ; }
-		
-	__host__ __device__
-	inline __attribute__((always_inline)) void resize(int dimY_, int dimX_, int nnz_)
-	{
-		dimY = dimY_; dimX = dimX_; nnZ = nnz_;
-#if defined(__CUDA_ARCH__)
-		if (a) delete[] a;
-		if (ia) delete[] ia;
-		if (ja) delete[] ja;
-#else
-		if (a) CUDA_ERR_CHECK(cudaFree(a));
-		if (ia) CUDA_ERR_CHECK(cudaFree(ia));
-		if (ja) CUDA_ERR_CHECK(cudaFree(ja));
-#endif
-#if defined(__CUDA_ARCH__)
-		a = new TValue[nnZ];
-		ia = new TIndex[dimY + 1];
-		ja = new TIndex[nnZ];
-#else
-		CUDA_ERR_CHECK(cudaMalloc(&a, nnZ * sizeof(TValue)));
-		CUDA_ERR_CHECK(cudaMalloc(&ia, (dimY + 1) * sizeof(TIndex)));
-		CUDA_ERR_CHECK(cudaMalloc(&ja, nnZ * sizeof(TIndex)));
-#endif
-	}
-};
-
 template<typename T>
 struct Matrix
 {
-	struct Host
-	{
-		typedef MatrixHostDense<T, std::vector<T, AlignedAllocator<T> > > Dense;
-		
-		template<class TIndex>
-		struct Sparse
-		{
-			typedef MatrixHostSparseCSR<T, TIndex, std::vector, AlignedAllocator> CSR;
-		};
-	};
+	typedef MatrixHost<T, std::vector<T, AlignedAllocator<T> > > Host;
+	typedef MatrixDevice<T> Device;
+};
 
-	struct Device
+template<typename TIndex>
+struct Index
+{
+	uint8_t i, j;
+	TIndex index;
+
+	__host__
+	inline __attribute__((always_inline))
+	TIndex& rowind() { return index; }
+
+	__host__
+	inline __attribute__((always_inline))
+	bool isEmpty() { return (i == 0) && (j == 0); }	
+
+	Index() : i(0), j(0), index(0) { }
+	
+	Index(short i_, short j_, int index_) : i(i_), j(j_), index(index_) { }
+
+	template <class TValue>
+	__host__
+	static inline void hashCombine(size_t& seed, const TValue& v)
 	{
-		typedef MatrixDeviceDense<T> Dense;
-		
-		template<class TIndex>
-		struct Sparse
-		{
-			typedef MatrixDeviceSparseCSR<T, TIndex> CSR;
-		};
-	};
+		std::hash<TValue> hasher;
+		seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+	}
+	
+	__host__
+	friend bool operator<(const Index& a, const Index& b)
+	{
+		size_t seedA = 0;
+		hashCombine(seedA, a.i);
+		hashCombine(seedA, a.j);
+		hashCombine(seedA, a.index);
+
+		size_t seedB = 0;
+		hashCombine(seedB, b.i);
+		hashCombine(seedB, b.j);
+		hashCombine(seedB, b.index);
+
+		return seedA < seedB;
+	}
+};
+
+struct XPS
+{
+	typedef std::vector<Index<uint16_t> > Host;
+	typedef Vector<Index<uint16_t> >::Device Device;
+};
+
+struct Chains
+{
+	typedef std::vector<uint32_t> Host;
+	typedef Vector<uint32_t>::Device Device;
 };
 
 class Interpolator;
 
 class Data
 {
-	int nstates, dim, vdim, nno, TotalDof, Level;
+	int nstates;
 	
 	class Host
 	{
@@ -667,9 +450,10 @@ class Data
 	
 	public :
 
-		Matrix<int>::Host::Dense* getIndex(int istate);
-		Matrix<real>::Host::Dense* getSurplus(int istate);
-		Matrix<real>::Host::Dense* getSurplus_t(int istate);
+		int* getNfreqs(int istate);
+		XPS::Host* getXPS(int istate);
+		Chains::Host* getChains(int istate);
+		Matrix<real>::Host* getSurplus(int istate);
 
 		Host(int nstates);
 	
@@ -688,13 +472,15 @@ class Data
 
 	public :
 
-		Matrix<int>::Device::Dense* getIndex(int istate);
-		Matrix<real>::Device::Dense* getSurplus(int istate);
-		Matrix<real>::Device::Dense* getSurplus_t(int istate);
+		int* getNfreqs(int istate);
+		XPS::Device* getXPS(int istate);
+		Chains::Device* getChains(int istate);
+		Matrix<real>::Device* getSurplus(int istate);
 
-		void setIndex(int istate, Matrix<int>::Host::Dense* matrix);
-		void setSurplus(int istate, Matrix<real>::Host::Dense* matrix);
-		void setSurplus_t(int istate, Matrix<real>::Host::Dense* matrix);
+		void setNfreqs(int istate, int nfreqs);
+		void setXPS(int istate, XPS::Host* xps);
+		void setChains(int istate, Chains::Host* chains);
+		void setSurplus(int istate, Matrix<real>::Host* matrix);
 	
 		Device(int nstates_);
 		
@@ -707,7 +493,6 @@ class Data
 	friend class Interpolator;
 
 public :
-	virtual int getNno() const;
 
 	virtual void load(const char* filename, int istate);
 	

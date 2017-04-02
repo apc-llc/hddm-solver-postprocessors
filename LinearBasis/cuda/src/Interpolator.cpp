@@ -6,6 +6,9 @@
 #include "interpolator.h"
 #include "JIT.h"
 
+#define str(x) #x
+#define stringize(x) str(x)
+
 namespace NAMESPACE {
 
 class Device
@@ -26,161 +29,72 @@ Interpolator::Interpolator(const std::string& targetSuffix, const std::string& c
 
 params(targetSuffix, configFile)
 
-{
-	jit = params.enableRuntimeOptimization;
-}
+{ }
 
-extern "C" void LinearBasis_CUDA_Generic_InterpolateValue(
-	Device* device,
-	const int dim, const int nno,
-	const int Dof_choice, const double* x,
-	const Matrix<int>::Device::Dense* index, const Matrix<real>::Device::Dense* surplus, double* value_);
-	
-// Interpolate a single value.
-void Interpolator::interpolate(Device* device, Data* data,
-	const int istate, const real* x, const int Dof_choice, real& value)
-{
-	if (jit)
-	{
-		typedef void (*Func)(
-			Device* device,
-			const int dim, const int nno,
-			const int Dof_choice, const double* x,
-			const Matrix<int>::Device::Dense* index, const Matrix<real>::Device::Dense* surplus, double* value_);
-
-		static map<long long, Func> LinearBasis_CUDA_RuntimeOpt_InterpolateValue;
-
-		if (!LinearBasis_CUDA_RuntimeOpt_InterpolateValue[device->getID()])
-		{
-			LinearBasis_CUDA_RuntimeOpt_InterpolateValue[device->getID()] =
-				JIT::jitCompile(device, data->dim, "LinearBasis_CUDA_RuntimeOpt_InterpolateValue_",
-				(Func)LinearBasis_CUDA_Generic_InterpolateValue).getFunc();
-		}
-		
-		LinearBasis_CUDA_RuntimeOpt_InterpolateValue[device->getID()](
-			device, data->dim, data->nno, Dof_choice, x,
-			data->device.getIndex(istate), data->device.getSurplus(istate), &value);
-	}
-	else
-	{			
-		LinearBasis_CUDA_Generic_InterpolateValue(
-			device, data->dim, data->nno, Dof_choice, x,
-			data->device.getIndex(istate), data->device.getSurplus(istate), &value);
-	}
-}
-
-extern "C" void LinearBasis_CUDA_Generic_InterpolateArray(
-	Device* device, const int dim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const double* x,
-	const Matrix<int>::Device::Dense* index, const Matrix<real>::Device::Dense* surplus, double* value);
+extern "C" void INTERPOLATE_ARRAY(
+	Device* device, const int dim, const int nno, int DofPerNode, const double* x,
+	const int nfreqs, const XPS* xps, const Chains* chains,
+	const Matrix<double>::Device* surplus, double* value);
 
 // Interpolate array of values.
 void Interpolator::interpolate(Device* device, Data* data,
-	const int istate, const real* x, const int Dof_choice_start, const int Dof_choice_end, real* value)
+	const int istate, const real* x, int DofPerNode, real* value)
 {
-	if (jit)
-	{
-		typedef void (*Func)(
-			Device* device, const int dim, const int nno,
-			const int Dof_choice_start, const int Dof_choice_end, const double* x,
-			const Matrix<int>::Device::Dense* index, const Matrix<real>::Device::Dense* surplus, double* value);
+	typedef void (*Func)(
+		Device* device, const int dim, const int nno, int DofPerNode, const double* x,
+		const int nfreqs, const XPS::Device* xps, const Chains::Device* chains,
+		const Matrix<double>::Device* surplus, double* value);
 
-		static map<long long, Func> LinearBasis_CUDA_RuntimeOpt_InterpolateArray;
+	static Func INTERPOLATE_ARRAY_RUNTIME_OPT;
 
-		if (!LinearBasis_CUDA_RuntimeOpt_InterpolateArray[device->getID()])
-		{
-			LinearBasis_CUDA_RuntimeOpt_InterpolateArray[device->getID()] =
-				JIT::jitCompile(device, data->dim, "LinearBasis_CUDA_RuntimeOpt_InterpolateArray_",
-				(Func)LinearBasis_CUDA_Generic_InterpolateArray).getFunc();
-		}
-		
-		LinearBasis_CUDA_RuntimeOpt_InterpolateArray[device->getID()](
-			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, x,
-			data->device.getIndex(istate), data->device.getSurplus(istate), value);
-	}
-	else
+	int dim = data->host.getSurplus(istate)->dimx();
+	int nno = data->host.getSurplus(istate)->dimy();
+
+	if (!INTERPOLATE_ARRAY_RUNTIME_OPT)
 	{
-		LinearBasis_CUDA_Generic_InterpolateArray(
-			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, x,
-			data->device.getIndex(istate), data->device.getSurplus(istate), value);
+		INTERPOLATE_ARRAY_RUNTIME_OPT =
+			JIT::jitCompile(dim, nno, DofPerNode,
+				stringize(INTERPOLATE_ARRAY_RUNTIME_OPT) "_",
+				(Func)INTERPOLATE_ARRAY).getFunc();
 	}
+	
+	INTERPOLATE_ARRAY_RUNTIME_OPT(
+		device, dim, nno, DofPerNode, x,
+		*data->device.getNfreqs(istate), data->device.getXPS(istate),
+		data->device.getChains(istate), data->device.getSurplus(istate), value);
 }
 
-extern "C" void LinearBasis_CUDA_Generic_InterpolateArrayManyStateless(
-	Device* device, const int dim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* x_,
-	const Matrix<int>::Device::Dense* index, const Matrix<real>::Device::Dense* surplus, double* value);
-
-// TODO
-// Interpolate multiple arrays of values, with single surplus state.
-void Interpolator::interpolate(Device* device, Data* data,
-	const int istate, const real* x, const int Dof_choice_start, const int Dof_choice_end, const int count, real* value)
-{
-	if (jit)
-	{
-		typedef void (*Func)(
-			Device* device, const int dim, const int nno,
-			const int Dof_choice_start, const int Dof_choice_end, const int count, const double* x_,
-			const Matrix<int>::Device::Dense* index, const Matrix<real>::Device::Dense* surplus, double* value);
-
-		static map<long long, Func> LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyStateless;
-
-		if (!LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyStateless[device->getID()])
-		{
-			LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyStateless[device->getID()] =
-				JIT::jitCompile(device, data->dim, count, "LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyStateless_",
-				(Func)LinearBasis_CUDA_Generic_InterpolateArrayManyStateless).getFunc();
-		}
-
-		LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyStateless[device->getID()](
-			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, count, x,
-			data->device.getIndex(istate), data->device.getSurplus(istate), value);
-	}
-	else
-	{
-		LinearBasis_CUDA_Generic_InterpolateArrayManyStateless(
-			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, count, x,
-			data->device.getIndex(istate), data->device.getSurplus(istate), value);
-	}
-}
-
-extern "C" void LinearBasis_CUDA_Generic_InterpolateArrayManyMultistate(
-	Device* device,
-	const int dim, const int nno,
-	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
-	const Matrix<int>::Device::Dense* index, const Matrix<real>::Device::Dense* surplus, double** value);
+extern "C" void INTERPOLATE_ARRAY_MANY_MULTISTATE(
+	Device* device, const int dim, const int nno, int DofPerNode, const int count, const double* const* x_,
+	const int* nfreqs, const XPS* xps, const Chains* chains,
+	const Matrix<double>::Device* surplus, double** value);
 
 // Interpolate multiple arrays of values, with multiple surplus states.
 void Interpolator::interpolate(Device* device, Data* data,
-	const real** x, const int Dof_choice_start, const int Dof_choice_end, real** value)
+	const real** x, int DofPerNode, real** value)
 {
-	if (jit)
+	typedef void (*Func)(
+		Device* device, const int dim, const int nno, int DofPerNode, const int count, const double* const* x_,
+		const int* nfreqs, const XPS::Device * xps, const Chains::Device* chains,
+		const Matrix<double>::Device* surplus, double** value);
+
+	static Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT;
+
+	int dim = data->host.getSurplus(0)->dimx();
+	int nno = data->host.getSurplus(0)->dimy();
+
+	if (!INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT)
 	{
-		typedef void (*Func)(
-			Device* device,
-			const int dim, const int nno,
-			const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
-			const Matrix<int>::Device::Dense* index, const Matrix<real>::Device::Dense* surplus, double** value);
-
-		static map<long long, Func> LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyMultistate;
-
-		if (!LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyMultistate[device->getID()])
-		{
-			LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyMultistate[device->getID()] =
-				JIT::jitCompile(device, data->dim, data->nstates, "LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyMultistate_",
-				(Func)LinearBasis_CUDA_Generic_InterpolateArrayManyMultistate).getFunc();
-		}
-
-		LinearBasis_CUDA_RuntimeOpt_InterpolateArrayManyMultistate[device->getID()](
-			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
-			data->device.getIndex(0), data->device.getSurplus(0), value);
+		INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
+			JIT::jitCompile(dim, data->nstates, nno, DofPerNode,
+				stringize(INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT) "_",
+				(Func)INTERPOLATE_ARRAY_MANY_MULTISTATE).getFunc();
 	}
-	else
-	{
-		LinearBasis_CUDA_Generic_InterpolateArrayManyMultistate(
-			device, data->dim, data->nno, Dof_choice_start, Dof_choice_end, data->nstates, x,
-			data->device.getIndex(0), data->device.getSurplus(0), value);
-	}
+
+	INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
+		device, dim, nno, DofPerNode, data->nstates, x,
+		data->device.getNfreqs(0), data->device.getXPS(0),
+		data->device.getChains(0), data->device.getSurplus(0), value);
 }
 
 Interpolator* Interpolator::getInstance()
@@ -188,7 +102,7 @@ Interpolator* Interpolator::getInstance()
 	static unique_ptr<Interpolator> interp;
 
 	if (!interp.get())
-		interp.reset(new Interpolator(stringize(NAME));
+		interp.reset(new Interpolator(stringize(NAME)));
 	
 	return interp.get();
 }
