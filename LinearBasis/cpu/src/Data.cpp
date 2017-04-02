@@ -500,10 +500,10 @@ void Data::load(const char* filename, int istate)
 	struct State
 	{
 		int nfreqs;
-		vector<Index<uint16_t> >& xps;
-		vector<uint32_t>& chains;
+		XPS& xps;
+		Chains& chains;
 		
-		State(vector<Index<uint16_t> >& xps_, vector<uint32_t>& chains_) : xps(xps_), chains(chains_) { }
+		State(XPS& xps_, Chains& chains_) : xps(xps_), chains(chains_) { }
 	}
 	state(xps[istate], chains[istate]);
 
@@ -598,7 +598,7 @@ void Data::load(const char* filename, int istate)
 		AVXIndexes& avxindsFreq = avxinds[ifreq];
 		avxindsFreq.resize(nno, dim);
 
-		for (int j = 0, iavx = 0, length = indexes.size() / dim / AVX_VECTOR_SIZE; j < dim; j++)
+		for (int j = 0, length = indexes.size() / dim / AVX_VECTOR_SIZE; j < dim; j++)
 		{
 			for (int i = 0; i < length; i++)
 			{
