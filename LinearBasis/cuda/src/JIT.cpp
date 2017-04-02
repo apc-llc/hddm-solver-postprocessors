@@ -1,9 +1,6 @@
-#ifdef HAVE_RUNTIME_OPTIMIZATION
-
 #include "JIT.h"
 
-#include <iostream>
-#include <fstream>
+#include <functional>
 #include <map>
 #include <pthread.h>
 #include <pstreams/pstream.h>
@@ -17,15 +14,6 @@
 using namespace NAMESPACE;
 using namespace std;
 
-template<>
-const string InterpolateValueKernel::sh = INTERPOLATE_VALUE_SH;
-template<>
-const string InterpolateArrayKernel::sh = INTERPOLATE_ARRAY_SH;
-template<>
-const string InterpolateArrayManyStatelessKernel::sh = INTERPOLATE_ARRAY_MANY_STATELESS_SH;
-template<>
-const string InterpolateArrayManyMultistateKernel::sh = INTERPOLATE_ARRAY_MANY_MULTISTATE_SH;
-
 namespace NAMESPACE {
 
 class Device
@@ -37,26 +25,83 @@ public :
 
 } // namespace NAMESPACE
 
-template<typename K, typename F>
-K& JIT::jitCompile(
-	const Device* device, int dim, int count, const string& funcnameTemplate,
-	F fallbackFunc)
+template<>
+const string InterpolateArrayKernel::sh = INTERPOLATE_ARRAY_SH;
+template<>
+const string InterpolateArrayManyMultistateKernel::sh = INTERPOLATE_ARRAY_MANY_MULTISTATE_SH;
+
+struct KSignature
 {
-	map<int, K>* kernels_tls = NULL;
+	int dim;
+	int count;
+	int nno;
+	int DofPerNode;
+	
+	KSignature() : 
+	
+	dim(0), count(0), nno(0), DofPerNode(0)
+	
+	{ }
+	
+	KSignature(int dim_, int count_, int nno_, int DofPerNode_) :
+	
+	dim(dim_), count(count_), nno(nno_), DofPerNode(DofPerNode_)
+	
+	{ }
+	
+	template<class T>
+	static inline void hashCombine(size_t& seed, const T& v)
+	{
+		std::hash<T> hasher;
+		seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+	}
+
+	size_t hash() const
+	{
+		size_t seed = 0;
+		hashCombine(seed, dim);
+		hashCombine(seed, count);
+		hashCombine(seed, nno);
+		hashCombine(seed, DofPerNode);
+		return seed;
+	}
+
+	bool operator()(const KSignature& a, const KSignature& b) const
+	{
+		return a.hash() < b.hash();
+	}
+};
+
+template<typename K, typename F>
+K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
+	const string& funcnameTemplate, F fallbackFunc)
+{
+	int vdim = dim / AVX_VECTOR_SIZE;
+	if (dim % AVX_VECTOR_SIZE) vdim++;
+	vdim *= AVX_VECTOR_SIZE;
+	int vdim8 = vdim / AVX_VECTOR_SIZE;
+
+	map<KSignature, K, KSignature>* kernels_tls_ = NULL;
 
 	// Already in TLS cache?
 	{
 		static __thread bool kernels_init = false;
-		static __thread char kernels_a[sizeof(map<int, K>)];
-		kernels_tls = (map<int, K>*)kernels_a;
+		static __thread char kernels_a[sizeof(map<KSignature, K, KSignature>)];
+		kernels_tls_ = (map<KSignature, K, KSignature>*)kernels_a;
 
 		if (!kernels_init)
 		{
-			kernels_tls = new (kernels_a) map<int, K>();
+			kernels_tls_ = new (kernels_a) map<KSignature, K, KSignature>();
 			kernels_init = true;
 		}
+	}
 
-		K& kernel = kernels_tls->operator[](dim);
+	map<KSignature, K, KSignature>& kernels_tls = *kernels_tls_;
+
+	KSignature signature(dim, count, nno, DofPerNode);
+
+	{
+		K& kernel = kernels_tls[signature];
 
 		// Already successfully compiled?
 		if (kernel.filename != "")
@@ -69,25 +114,23 @@ K& JIT::jitCompile(
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
 
-			__sync_synchronize();
-	
 			return kernel;
 		}
 	}
 
 	// Already in process cache?
-	static map<int, K> kernels;
+	static map<KSignature, K, KSignature> kernels;
 
 	static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 	PTHREAD_ERR_CHECK(pthread_mutex_lock(&mutex));
 
-	K& kernel = kernels[dim];
+	K& kernel = kernels[signature];
 
 	// Already successfully compiled?
 	if (kernel.filename != "")
 	{
-		kernels_tls->operator[](dim) = kernel;
+		kernels_tls[signature] = kernel;
 		PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 		return kernel;
 	}
@@ -99,9 +142,7 @@ K& JIT::jitCompile(
 		kernel.fileowner = false;
 		kernel.func = fallbackFunc;
 
-		__sync_synchronize();
-
-		kernels_tls->operator[](dim) = kernel;
+		kernels_tls[signature] = kernel;
 		PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 		return kernel;
 	}
@@ -110,23 +151,7 @@ K& JIT::jitCompile(
 	MPI_ERR_CHECK(MPI_Process_get(&process));
 	if (process->isMaster())
 	{
-		cerr << "Performing deferred GPU kernel compilation for dim = " << 59 << " ..." << endl;
-
-		// Deferred compilation with X vector in kernel argument is only possible,
-		// when X vector fits constant memory. Constant memory consists of 10 (or 11)
-		// discontinous memory banks of 64KB each. Kernel arguments are loaded
-		// into a single constant memory bank. Thus, in order to get the X vector
-		// fit the bank size, we limit vector size by, say, 60KB.
-		// If X vector exceeds this size, then deferred compilation goes
-		// without X vector in kernel argument, only substituting
-		// integer constants.
-		bool deferred = true;
-		size_t maxVectorSize = 60 * 1024;
-		if (dim * sizeof(real) >= maxVectorSize)
-		{
-			cerr << "Deferred GPU kernel compilation without X constant vector, as it exceeds 60KB size" << endl;
-			deferred = false;
-		}
+		process->cout("Performing deferred GPU kernel compilation for dim = %d ...\n", dim);
 
 		char* cwd = get_current_dir_name();
 		string dir = (string)cwd + "/.cache";
@@ -156,16 +181,14 @@ K& JIT::jitCompile(
 
 		if (tmp.filename == "")
 		{
-			cerr << "Deferred GPU kernel temp file creation failed!" << endl;
+			process->cerr("Deferred GPU kernel temp file creation failed!\n");
 
 			kernel.compilationFailed = true;
 			kernel.dim = dim;
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
 
-			__sync_synchronize();
-
-			kernels_tls->operator[](dim) = kernel;
+			kernels_tls[signature] = kernel;
 			PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 			return kernel;
 		}
@@ -173,56 +196,78 @@ K& JIT::jitCompile(
 		// Generate function name for specific number of arguments.
 		stringstream sfuncname;
 		sfuncname << funcnameTemplate;
-		sfuncname << dim;
+		sfuncname << signature.hash();
 		string funcname = sfuncname.str();
 
 		// Read the compile command template.
-		stringstream cmd;
+		vector<char> cmd;
 		{
-			std::ifstream t(kernel.sh.c_str());
-			std::string sh((std::istreambuf_iterator<char>(t)),
-				std::istreambuf_iterator<char>());
-			stringstream snewline;
-			snewline << endl;
-			string newline = snewline.str();
-			for (int pos = sh.find(newline); pos != string::npos; pos = sh.find(newline))
-				sh.erase(pos, newline.size());
-			cmd << sh;
-			if (deferred)
-				cmd << " -DDEFERRED";
-			cmd << " -DFUNCNAME=";
-			cmd << funcname;
-			cmd << " -DDIM=";
-			cmd << 59;
-			cmd << " -DCOUNT=";
-			cmd << count;
+			FILE* fsh = fopen(kernel.sh.c_str(), "rb");
+			if (!fsh)
+			{
+				process->cerr("Error opening file: %s\n", kernel.sh.c_str());
+				process->cerr("Deferred GPU kernel compilation failed!\n");
+
+				kernel.compilationFailed = true;
+				kernel.dim = dim;
+				kernel.fileowner = false;
+				kernel.func = fallbackFunc;
+
+				kernels_tls[signature] = kernel;
+				PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
+				return kernel;
+			}
+
+			vector<char> sh;
+			fseek(fsh, 0, SEEK_END);
+			long length = ftell(fsh);
+			fseek(fsh, 0, SEEK_SET);
+			sh.resize(length + 1);
+			sh[length] = '\0';
+			length = fread(&sh[0], 1, length, fsh);
+			fclose(fsh);
+
+			// Remove newlines.
+			for (long i = 0; i < length; i++)
+				if (sh[i] == '\n') sh[i] = ' ';
+
+			const char* format = "%s -arch=sm_%d -lineinfo -DDEFERRED -DFUNCNAME=%s -DDIM=%d "
+				"-DCOUNT=%d -DNNO=%d -DVDIM8=%d -DDOF_PER_NODE=%d -o %s";
+
 			bool keepCache = false;
 			const char* keepCacheValue = getenv("KEEP_CACHE");
 			if (keepCacheValue)
 				keepCache = atoi(keepCacheValue);
 			if (keepCache)
-				cmd << " -keep";
-			cmd << " -lineinfo";
+				format = "%s -arch=sm_%d -lineinfo -DDEFERRED -DFUNCNAME=%s -DDIM=%d "
+					"-DCOUNT=%d -DNNO=%d -DVDIM8=%d -DDOF_PER_NODE=%d -o %s -keep";
 
 			// Add arch specification based on CC of the given device.
-			cmd << " -arch=sm_";
-			cmd << device->getCC();
-	
-			cmd << " -o ";
-			cmd << tmp.filename;
+			int cc = device->getCC();
+
+			size_t szcmd = snprintf(NULL, 0, format,
+				&sh[0], cc, funcname.c_str(), dim, count, nno, vdim8, DofPerNode, tmp.filename.c_str());
+
+			cmd.resize(szcmd + 2);
+			cmd[szcmd + 1] = '\0';
+
+			snprintf(&cmd[0], szcmd + 1, format,
+				&sh[0], cc, funcname.c_str(), dim, count, nno, vdim8, DofPerNode, tmp.filename.c_str());
+
+			if (keepCache)
+				printf("cmd = %s\n", &cmd[0]);
 		}
-		cerr << cmd.str() << endl;
 
 		// Run compiler as a process and create a streambuf that
 		// reads its stdout and stderr.
 		{
-			redi::ipstream proc(cmd.str(), redi::pstreams::pstderr);
+			redi::ipstream proc((string)&cmd[0], redi::pstreams::pstderr);
 
 			string line;
 			while (std::getline(proc.out(), line))
-				cerr << line << endl;
+				process->cout("%s\n", line.c_str());
 			while (std::getline(proc.err(), line))
-				cerr << line << endl;
+				process->cout("%s\n", line.c_str());
 		}
 
 		// If the output file does not exist, there must be some
@@ -231,49 +276,48 @@ K& JIT::jitCompile(
 		struct stat buffer;
 		if (stat(tmp.filename.c_str(), &buffer))
 		{
-			cerr << "Deferred GPU kernel compilation failed!" << endl;
+			process->cerr("Deferred GPU kernel compilation failed!\n");
 
 			kernel.compilationFailed = true;
 			kernel.dim = dim;
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
 
-			__sync_synchronize();
-
-			kernels_tls->operator[](dim) = kernel;
+			kernels_tls[signature] = kernel;
 			PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 			return kernel;
 		}
 
-		cout << "JIT-compiled GPU kernel for dim = " << dim << endl;
+		process->cout("JIT-compiled GPU kernel for dim = %d\n", dim);
 
 		kernel.dim = dim;
 		kernel.filename = tmp.filename;
 		kernel.fileowner = true;
 		kernel.funcname = funcname;
-	
-		__sync_synchronize();
+
+		// Convert filename to char array.
+		vector<char> vfilename;
+		vfilename.resize(tmp.filename.length() + 1);
+		memcpy(&vfilename[0], tmp.filename.c_str(), vfilename.size());
 
 		// Send filename to everyone.
 		vector<MPI_Request> vrequests;
-		vrequests.resize(vrequests.size() + process->getSize() * 2);
-		MPI_Request* requests = &vrequests[vrequests.size() - 1 - process->getSize() * 2];
+		vrequests.resize(process->getSize() * 2);
+		MPI_Request* requests = &vrequests[0];
 		for (int i = 0, e = process->getSize(); i != e; i++)
 		{
 			if (i == process->getRoot()) continue;
 
-			int length = tmp.filename.length();
-			MPI_ERR_CHECK(MPI_Isend(&length,
-				1, MPI_INT, i, (int)(((size_t)&JIT::jitCompile<K, F>) % 32767), process->getComm(), &requests[2 * i]));
-			MPI_ERR_CHECK(MPI_Isend((void*)tmp.filename.c_str(), tmp.filename.length(),
-				MPI_BYTE, i, (int)(((size_t)&JIT::jitCompile<K, F> + 1) % 32767), process->getComm(), &requests[2 * i + 1]));
+			int length = vfilename.size();
+			MPI_ERR_CHECK(MPI_Isend(&length, 1, MPI_INT, i, i, process->getComm(), &requests[2 * i]));
+			MPI_ERR_CHECK(MPI_Isend(&vfilename[0], length, MPI_BYTE, i, i + e, process->getComm(), &requests[2 * i + 1]));
 		}
-		/*for (int i = 0, e = requests.size(); i != e; i++)
+		for (int i = 0, e = vrequests.size(); i != e; i++)
 		{
 			if (i == 2 * process->getRoot()) continue;
 			if (i == 2 * process->getRoot() + 1) continue;
 			MPI_ERR_CHECK(MPI_Wait(&requests[i], MPI_STATUS_IGNORE));
-		}*/
+		}
 	}
 	else
 	{
@@ -286,57 +330,36 @@ K& JIT::jitCompile(
 		// Receive filename from master.
 		int length = 0;
 		MPI_ERR_CHECK(MPI_Recv(&length, 1, MPI_INT,
-			process->getRoot(), (int)(((size_t)&JIT::jitCompile<K, F>) % 32767), process->getComm(), MPI_STATUS_IGNORE));
-		vector<char> buffer;
-		buffer.resize(length);
-		MPI_ERR_CHECK(MPI_Recv(&buffer[0], length, MPI_BYTE,
-			process->getRoot(), (int)(((size_t)&JIT::jitCompile<K, F> + 1) % 32767), process->getComm(), MPI_STATUS_IGNORE));
+			process->getRoot(), process->getRank(), process->getComm(), MPI_STATUS_IGNORE));
+		vector<char> vfilename;
+		vfilename.resize(length);
+		MPI_ERR_CHECK(MPI_Recv(&vfilename[0], length, MPI_BYTE,
+			process->getRoot(), process->getRank() + process->getSize(), process->getComm(), MPI_STATUS_IGNORE));
 
 		kernel.dim = dim;
-		kernel.filename = string(&buffer[0], buffer.size());
+		kernel.filename = string(&vfilename[0], vfilename.size());
 		kernel.fileowner = false;
 		kernel.funcname = funcname;
-		
-		__sync_synchronize();
 	}
 
 	kernel.func = kernel.getFunc();
-	kernels_tls->operator[](dim) = kernel;
+	kernels_tls[signature] = kernel;
 	PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 	return kernel;
 }
 
-InterpolateValueKernel& JIT::jitCompile(
-	const Device* device, int dim, const string& funcnameTemplate,
-	InterpolateValueFunc fallbackFunc)
-{
-	return JIT::jitCompile<InterpolateValueKernel, InterpolateValueFunc>(
-		device, dim, 1, funcnameTemplate, fallbackFunc);
-}
-
 InterpolateArrayKernel& JIT::jitCompile(
-	const Device* device, int dim, const string& funcnameTemplate,
-	InterpolateArrayFunc fallbackFunc)
+	Device* device, int dim, int nno, int DofPerNode,
+	const string& funcnameTemplate, InterpolateArrayFunc fallbackFunc)
 {
 	return JIT::jitCompile<InterpolateArrayKernel, InterpolateArrayFunc>(
-		device, dim, 1, funcnameTemplate, fallbackFunc);
-}
-
-InterpolateArrayManyStatelessKernel& JIT::jitCompile(
-	const Device* device, int dim, int count, const string& funcnameTemplate,
-	InterpolateArrayManyStatelessFunc fallbackFunc)
-{
-	return JIT::jitCompile<InterpolateArrayManyStatelessKernel, InterpolateArrayManyStatelessFunc>(
-		device, dim, count, funcnameTemplate, fallbackFunc);
+		device, dim, 1, nno, DofPerNode, funcnameTemplate, fallbackFunc);
 }
 
 InterpolateArrayManyMultistateKernel& JIT::jitCompile(
-	const Device* device, int dim, int count, const string& funcnameTemplate,
-	InterpolateArrayManyMultistateFunc fallbackFunc)
+	Device* device, int dim, int count, int nno, int DofPerNode,
+	const string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc)
 {
 	return JIT::jitCompile<InterpolateArrayManyMultistateKernel, InterpolateArrayManyMultistateFunc>(
-		device, dim, count, funcnameTemplate, fallbackFunc);
+		device, dim, count, nno, DofPerNode, funcnameTemplate, fallbackFunc);
 }
-
-#endif // HAVE_RUNTIME_OPTIMIZATION
-

@@ -88,7 +88,7 @@ ASSIGN(surplusCutoffDefined)
 			process->abort();
 		}
 
-		if ((string)name == "priorityCPU")
+		if ((string)name == "priorityCUDA")
 		{
 			priority = atoi(value);
 			if (process->isMaster())
@@ -153,7 +153,7 @@ ASSIGN(surplusCutoffDefined)
 		if (i->second)
 		{
 			if (process->isMaster())
-				cerr << "Required parameter \"" << i->first << "\" is undefined" << endl;
+				process->cerr("Required parameter \"%s\" is undefined\n", i->first.c_str());
 			process->abort();
 		}
 }
