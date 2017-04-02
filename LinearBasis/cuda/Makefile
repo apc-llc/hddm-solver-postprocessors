@@ -36,7 +36,7 @@ $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
 	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(CXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -llinearbasis -L$(CUDA_LIBRARY_PATH) -lcudart_static -Wl,-rpath=$(CUDA_LIBRARY_PATH)
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.cu
-	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArray -DDIM=dim $(CINC) $(NVCCOPT) -c $< -o $@
+	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArray -DDIM=dim -DCOUNT=count -DNNO=nno -DDOF_PER_NODE=DofPerNode $(CINC) $(NVCCOPT) -c $< -o $@
 
 $(BUILD)/InterpolateArrayManyMultistate.o: src/InterpolateArrayManyMultistate.cu
 	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArrayManyMultistate -DDIM=dim -DCOUNT=count $(CINC) $(NVCCOPT) -c $< -o $@
