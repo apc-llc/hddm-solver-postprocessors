@@ -5,6 +5,8 @@ include $(LOCATION)/Makefile.inc
 CINC += -I../include -I../../include
 CDIR = mkdir -p $(shell dirname $@)
 
+NVCC := $(shell which nvcc 2>/dev/null)
+
 TARGETS = x86
 ifneq (,$(AVX))
 TARGETS += avx
