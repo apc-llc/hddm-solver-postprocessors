@@ -6,6 +6,25 @@
 #define CAT(kernel, name) name##_kernel
 #define KERNEL(name) CAT(kernel, name)
 
+// CUDA 8.0 introduces sm_60_atomic_functions.h with atomicAdd(double*, double)
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
+inline __attribute__((always_inline)) __device__ double atomicAdd(double* address, double val)
+{
+	unsigned long long int* address_as_ull = (unsigned long long int*)address;
+	unsigned long long int old = *address_as_ull, assumed;
+
+	do
+	{
+		assumed = old;
+		old = atomicCAS(address_as_ull, assumed,
+			__double_as_longlong(val + __longlong_as_double(assumed)));
+	}
+	while (assumed != old);
+
+	return __longlong_as_double(old);
+}
+#endif // __CUDA_ARCH__
+
 using namespace NAMESPACE;
 using namespace std;
 
@@ -13,53 +32,50 @@ class Device;
 
 __global__ void KERNEL(FUNCNAME)(
 	const int dim, const int nno, const int DofPerNode, const int count, const double* const* x_,
-	const int* nfreqs_, const XPS::Device* xps_, const int* szxps_, double* xpv_, const Chains::Device* chains_,
+	const int* nfreqs_, const XPS::Device* xps_, const int* szxps_, double** xpv_, const Chains::Device* chains_,
 	const Matrix<double>::Device* surplus_, double** value_)
 {
-	if ((blockIdx.x == 0) && (threadIdx.x == 0))
+	for (int many = 0; many < COUNT; many++)
 	{
-		for (int many = 0; many < COUNT; many++)
+		const double* x = x_[many];
+		const int& nfreqs = nfreqs_[many];
+		const XPS::Device& xps = xps_[many];
+		double* xpv = xpv_[blockIdx.x];
+		const Chains::Device& chains = chains_[many];
+		const Matrix<double>::Device& surplus = surplus_[many];
+		double* value = value_[many];
+
+		// Loop to calculate all unique xp values.
+		for (int i = threadIdx.x, e = szxps_[many]; i < e; i += blockDim.x)
 		{
-			const double* x = x_[many];
-			const int& nfreqs = nfreqs_[many];
-			const XPS::Device& xps = xps_[many];
-			const Chains::Device& chains = chains_[many];
-			const Matrix<double>::Device& surplus = surplus_[many];
-			double* value = value_[many];
+			const Index<uint16_t>& index = xps(i);
+			const uint32_t& j = index.index;
+			double xp = LinearBasis(x[j], index.i, index.j);
+			xpv[i] = fmax(0.0, xp);
+		}
 
-			// Loop to calculate all unique xp values.
-			for (int i = 0, e = szxps_[many]; i < e; i++)
+		__syncthreads();
+
+		// Loop to calculate scaled surplus product.
+		for (int i = blockIdx.x; i < NNO; i += gridDim.x)
+		{
+			double temp = 1.0;
+			for (int ifreq = 0; ifreq < nfreqs; ifreq++)
 			{
-				const Index<uint16_t>& index = xps(i);
-				const uint32_t& j = index.index;
-				double xp = LinearBasis(x[j], index.i, index.j);
-				xpv_[i] = fmax(0.0, xp);
+				// Early exit for shorter chains.
+				int32_t idx = chains(i * nfreqs + ifreq);
+				if (!idx) break;
+
+				temp *= xpv[idx];
+				if (!temp) goto next;
 			}
 
-			// Zero the values array.
-			memset(value, 0, sizeof(double) * DOF_PER_NODE);
+			for (int Dof_choice = threadIdx.x; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x)
+				atomicAdd(&value[Dof_choice], temp * surplus(i, Dof_choice));
+		
+		next :
 
-			// Loop to calculate scaled surplus product.
-			for (int i = 0, ichain = 0; i < NNO; i++, ichain += nfreqs)
-			{
-				double temp = 1.0;
-				for (int ifreq = 0; ifreq < nfreqs; ifreq++)
-				{
-					// Early exit for shorter chains.
-					int32_t idx = chains(ichain + ifreq);
-					if (!idx) break;
-
-					temp *= xpv_[idx];
-					if (!temp) goto next;
-				}
-
-				for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE; Dof_choice++)
-					value[Dof_choice] += temp * surplus(i, Dof_choice);
-			
-			next :
-
-				continue;
-			}
+			continue;
 		}
 	}
 }
@@ -100,20 +116,29 @@ extern "C" void FUNCNAME(
 	CUDA_ERR_CHECK(cudaMemcpy(&szxpsDev[0], &szxps_[0], sizeof(int) * count,
 		cudaMemcpyHostToDevice)); 
 
+	// Choose CUDA compute grid.
+	int szblock = 128;
+	int nblocks = nno / szblock;
+	if (nno % szblock) nblocks++;
+
 	// Prepare the XPV buffer vector sized to max xps.size()
 	// across all states.
 	int szxpv = 0;
 	for (int many = 0; many < count; many++)
 		szxpv = max(szxpv, szxps_[many]);
-	Vector<double>::Device xpvDev(szxpv);
-	double* xpv_ = xpvDev.getData();
+
+	double** xpvDev = NULL;
+	CUDA_ERR_CHECK(cudaMalloc(&xpvDev, sizeof(double*) * nblocks));
+	vector<double*> xpv(nblocks);
+	Matrix<double>::Device xpvMatrixDev(nblocks, szxpv);
+	for (int i = 0; i < nblocks; i++)
+		xpv[i] = xpvMatrixDev.getData(i, 0);
+	CUDA_ERR_CHECK(cudaMemcpy(&xpvDev[0], &xpv[0], sizeof(double*) * nblocks,
+		cudaMemcpyHostToDevice));
 	
 	// Launch the kernel.
-	int szblock = 128;
-	int nblocks = nno / szblock;
-	if (nno % szblock) nblocks++;
 	KERNEL(FUNCNAME)<<<nblocks, szblock>>>(dim, nno, DofPerNode, count, xDev,
-		nfreqs_, xps_, szxpsDev, xpv_, chains_, surplus_, valueDev);
+		nfreqs_, xps_, szxpsDev, xpvDev, chains_, surplus_, valueDev);
 
 	CUDA_ERR_CHECK(cudaDeviceSynchronize());
 	
@@ -124,5 +149,6 @@ extern "C" void FUNCNAME(
 	CUDA_ERR_CHECK(cudaFree(xDev));
 	CUDA_ERR_CHECK(cudaFree(valueDev));
 	CUDA_ERR_CHECK(cudaFree(szxpsDev));
+	CUDA_ERR_CHECK(cudaFree(xpvDev));
 }
 
