@@ -3,6 +3,9 @@
 #include "LinearBasis.h"
 #include "Data.h"
 
+#define CAT(name) name_##cutoff
+#define CUTOFF(name) CAT(name)
+
 using namespace NAMESPACE;
 using namespace std;
 
@@ -52,7 +55,7 @@ extern "C" void FUNCNAME(
 			{
 				const __m256d temp64 = _mm256_set1_pd(temp);
 
-				for (int Dof_choice = 0; Dof_choice <= DOF_PER_NODE;
+				for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE;
 					Dof_choice += sizeof(temp64) / sizeof(double))
 				{
 					const __m256d surplus64 = _mm256_load_pd(&surplus(i, Dof_choice));

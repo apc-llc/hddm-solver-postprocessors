@@ -47,7 +47,7 @@ extern "C" void FUNCNAME(
 		{
 			const __m512d temp64 = _mm512_set1_pd(temp);
 
-			for (int Dof_choice = 0; Dof_choice <= DOF_PER_NODE;
+			for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE;
 				Dof_choice += sizeof(temp64) / sizeof(double))
 			{
 				const __m512d surplus64 = _mm512_load_pd(&surplus(i, Dof_choice));

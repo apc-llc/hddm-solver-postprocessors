@@ -42,7 +42,7 @@ extern "C" void FUNCNAME(
 			if (!temp) goto next;
 		}
 
-		for (int Dof_choice = 0; Dof_choice <= DOF_PER_NODE; Dof_choice++)
+		for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE; Dof_choice++)
 			value[Dof_choice] += temp * surplus(i, Dof_choice);
 		
 	next :
