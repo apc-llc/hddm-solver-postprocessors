@@ -80,75 +80,120 @@ __global__ void KERNEL(FUNCNAME)(
 	}
 }
 
+namespace {
+
+class InterpolateArrayManyMultistate
+{
+	Matrix<double>::Device xMatrixDev;
+	Matrix<double>::Device valueMatrixDev;
+	Matrix<double>::Device xpvMatrixDev;
+
+public :
+
+	int dim, count;
+
+	int szblock;
+	int nblocks;
+
+	double** xDev;
+	double** valueDev;
+	int* szxpsDev;
+	double** xpvDev;
+
+	InterpolateArrayManyMultistate(int dim, int count, int nno, const int* szxps_) :
+		dim(dim), count(count),
+		szblock(128), nblocks(nno / szblock),
+		xDev(NULL), xMatrixDev(count, dim),
+		valueDev(NULL), valueMatrixDev(count, dim),
+		szxpsDev(NULL),	xpvDev(NULL)
+
+	{
+		CUDA_ERR_CHECK(cudaMalloc(&xDev, sizeof(double*) * count));
+		vector<double*> x(count);
+		for (int i = 0; i < count; i++)
+			x[i] = xMatrixDev.getData(i, 0);
+		CUDA_ERR_CHECK(cudaMemcpy(&xDev[0], &x[0], sizeof(double*) * count,
+			cudaMemcpyHostToDevice));
+
+		CUDA_ERR_CHECK(cudaMalloc(&valueDev, sizeof(double*) * count));
+		vector<double*> value(count);
+		for (int i = 0; i < count; i++)
+			value[i] = valueMatrixDev.getData(i, 0);
+		CUDA_ERR_CHECK(cudaMemcpy(&valueDev[0], &value[0], sizeof(double*) * count,
+			cudaMemcpyHostToDevice));
+
+		CUDA_ERR_CHECK(cudaMalloc(&szxpsDev, sizeof(int) * count));
+		CUDA_ERR_CHECK(cudaMemcpy(&szxpsDev[0], &szxps_[0], sizeof(int) * count,
+			cudaMemcpyHostToDevice)); 
+
+		// Choose CUDA compute grid.
+		int szblock = 128;
+		int nblocks = nno / szblock;
+		if (nno % szblock) nblocks++;
+
+		// Prepare the XPV buffer vector sized to max xps.size()
+		// across all states.
+		int szxpv = 0;
+		for (int many = 0; many < count; many++)
+			szxpv = max(szxpv, szxps_[many]);
+
+		CUDA_ERR_CHECK(cudaMalloc(&xpvDev, sizeof(double*) * nblocks));
+		vector<double*> xpv(nblocks);
+		xpvMatrixDev.resize(nblocks, szxpv);
+		for (int i = 0; i < nblocks; i++)
+			xpv[i] = xpvMatrixDev.getData(i, 0);
+		CUDA_ERR_CHECK(cudaMemcpy(&xpvDev[0], &xpv[0], sizeof(double*) * nblocks,
+			cudaMemcpyHostToDevice));
+	}
+
+	void load(const double* const* x_)
+	{
+		for (int i = 0; i < count; i++)
+			CUDA_ERR_CHECK(cudaMemcpy(xMatrixDev.getData(i, 0), x_[i], sizeof(double) * dim,
+				cudaMemcpyHostToDevice));
+
+		for (int i = 0; i < count; i++)
+			CUDA_ERR_CHECK(cudaMemset(valueMatrixDev.getData(i, 0), 0, sizeof(double) * dim));
+	}
+
+	void save(double** value_)
+	{
+		for (int i = 0; i < count; i++)
+			CUDA_ERR_CHECK(cudaMemcpy(value_[i], valueMatrixDev.getData(i, 0), sizeof(double) * dim,
+				cudaMemcpyDeviceToHost));
+	}
+
+	~InterpolateArrayManyMultistate()
+	{
+		CUDA_ERR_CHECK(cudaFree(xDev));
+		CUDA_ERR_CHECK(cudaFree(valueDev));
+		CUDA_ERR_CHECK(cudaFree(szxpsDev));
+		CUDA_ERR_CHECK(cudaFree(xpvDev));
+	}
+};
+
+} // namespace
+
+unique_ptr<InterpolateArrayManyMultistate> interp;
+
 extern "C" void FUNCNAME(
 	Device* device,
 	const int dim, const int nno, const int DofPerNode, const int count, const double* const* x_,
 	const int* nfreqs_, const XPS::Device* xps_, const int* szxps_, const Chains::Device* chains_,
 	const Matrix<double>::Device* surplus_, double** value_)
 {
-	double** xDev = NULL;
-	CUDA_ERR_CHECK(cudaMalloc(&xDev, sizeof(double*) * count));
-	vector<double*> x(count);
-	Matrix<double>::Device xMatrixDev(count, dim);
-	for (int i = 0; i < count; i++)
-	{
-		CUDA_ERR_CHECK(cudaMemcpy(xMatrixDev.getData(i, 0), x_[i], sizeof(double) * dim,
-			cudaMemcpyHostToDevice));
-		x[i] = xMatrixDev.getData(i, 0);
-	}
-	CUDA_ERR_CHECK(cudaMemcpy(&xDev[0], &x[0], sizeof(double*) * count,
-		cudaMemcpyHostToDevice));
+	if (!interp.get())
+		interp.reset(new InterpolateArrayManyMultistate(dim, count, nno, szxps_));
 
-	double** valueDev = NULL;
-	CUDA_ERR_CHECK(cudaMalloc(&valueDev, sizeof(double*) * count));
-	vector<double*> value(count);
-	Matrix<double>::Device valueMatrixDev(count, dim);
-	for (int i = 0; i < count; i++)
-	{
-		value[i] = valueMatrixDev.getData(i, 0);
-		CUDA_ERR_CHECK(cudaMemset(value[i], 0, sizeof(double) * dim));
-	}
-	CUDA_ERR_CHECK(cudaMemcpy(&valueDev[0], &value[0], sizeof(double*) * count,
-		cudaMemcpyHostToDevice));
+	interp->load(x_);
 
-	int* szxpsDev = NULL;
-	CUDA_ERR_CHECK(cudaMalloc(&szxpsDev, sizeof(int) * count));
-	CUDA_ERR_CHECK(cudaMemcpy(&szxpsDev[0], &szxps_[0], sizeof(int) * count,
-		cudaMemcpyHostToDevice)); 
-
-	// Choose CUDA compute grid.
-	int szblock = 128;
-	int nblocks = nno / szblock;
-	if (nno % szblock) nblocks++;
-
-	// Prepare the XPV buffer vector sized to max xps.size()
-	// across all states.
-	int szxpv = 0;
-	for (int many = 0; many < count; many++)
-		szxpv = max(szxpv, szxps_[many]);
-
-	double** xpvDev = NULL;
-	CUDA_ERR_CHECK(cudaMalloc(&xpvDev, sizeof(double*) * nblocks));
-	vector<double*> xpv(nblocks);
-	Matrix<double>::Device xpvMatrixDev(nblocks, szxpv);
-	for (int i = 0; i < nblocks; i++)
-		xpv[i] = xpvMatrixDev.getData(i, 0);
-	CUDA_ERR_CHECK(cudaMemcpy(&xpvDev[0], &xpv[0], sizeof(double*) * nblocks,
-		cudaMemcpyHostToDevice));
-	
 	// Launch the kernel.
-	KERNEL(FUNCNAME)<<<nblocks, szblock>>>(dim, nno, DofPerNode, count, xDev,
-		nfreqs_, xps_, szxpsDev, xpvDev, chains_, surplus_, valueDev);
+	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock>>>(
+		dim, nno, DofPerNode, count, interp->xDev,
+		nfreqs_, xps_, interp->szxpsDev, interp->xpvDev, chains_, surplus_, interp->valueDev);
+
+	interp->save(value_);
 
 	CUDA_ERR_CHECK(cudaDeviceSynchronize());
-	
-	for (int i = 0; i < count; i++)
-		CUDA_ERR_CHECK(cudaMemcpy(value_[i], valueMatrixDev.getData(i, 0), sizeof(double) * dim,
-			cudaMemcpyDeviceToHost));
-	
-	CUDA_ERR_CHECK(cudaFree(xDev));
-	CUDA_ERR_CHECK(cudaFree(valueDev));
-	CUDA_ERR_CHECK(cudaFree(szxpsDev));
-	CUDA_ERR_CHECK(cudaFree(xpvDev));
 }
 
