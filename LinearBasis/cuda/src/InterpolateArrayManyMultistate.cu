@@ -31,7 +31,7 @@ using namespace std;
 class Device;
 
 __global__ void KERNEL(FUNCNAME)(
-	const int dim, const int nno, const int DofPerNode, const int count, const double* const* x_,
+	const int dim, const int nno, const int nnoPerBlock, const int DofPerNode, const int count, const double* const* x_,
 	const int* nfreqs_, const XPS::Device* xps_, const int* szxps_, double** xpv_, const Chains::Device* chains_,
 	const Matrix<double>::Device* surplus_, double** value_)
 {
@@ -56,8 +56,18 @@ __global__ void KERNEL(FUNCNAME)(
 
 		__syncthreads();
 
+#define szcache 4
+		// Each thread hosts a part of blockDim.x-shared register cache
+		// to accumulate nnoPerBlock intermediate additions.
+		// blockDim.x -sharing is done due to limited number of registers
+		// available per thread.
+		double cache[szcache];
+		for (int i = 0; i < szcache; i++)
+			cache[i] = 0;
+#undef szcache
+
 		// Loop to calculate scaled surplus product.
-		for (int i = blockIdx.x; i < NNO; i += gridDim.x)
+		for (int i = blockIdx.x * nnoPerBlock, e = min(i + nnoPerBlock, NNO); i < e; i++)
 		{
 			double temp = 1.0;
 			for (int ifreq = 0; ifreq < nfreqs; ifreq++)
@@ -70,13 +80,16 @@ __global__ void KERNEL(FUNCNAME)(
 				if (!temp) goto next;
 			}
 
-			for (int Dof_choice = threadIdx.x; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x)
-				atomicAdd(&value[Dof_choice], temp * surplus(i, Dof_choice));
+			for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
+				cache[icache] += temp * surplus(i, Dof_choice);
 		
 		next :
 
 			continue;
 		}
+
+		for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
+			atomicAdd(&value[Dof_choice], cache[icache]);
 	}
 }
 
@@ -90,9 +103,12 @@ class InterpolateArrayManyMultistate
 
 public :
 
-	int dim, count;
+	int dim;
+	int DofPerNode;
+	int count;
 
 	int szblock;
+	int nnoPerBlock;
 	int nblocks;
 
 	double** xDev;
@@ -100,9 +116,9 @@ public :
 	int* szxpsDev;
 	double** xpvDev;
 
-	InterpolateArrayManyMultistate(int dim, int count, int nno, const int* szxps_) :
-		dim(dim), count(count),
-		szblock(128), nblocks(nno / szblock),
+	InterpolateArrayManyMultistate(int dim, int nno, int DofPerNode, int count, const int* szxps_) :
+		dim(dim), DofPerNode(DofPerNode), count(count),
+		szblock(128), nnoPerBlock(16), nblocks(nno / nnoPerBlock + (nno % nnoPerBlock ? 1 : 0)),
 		xDev(NULL), xMatrixDev(count, dim),
 		valueDev(NULL), valueMatrixDev(count, dim),
 		szxpsDev(NULL),	xpvDev(NULL)
@@ -126,13 +142,8 @@ public :
 		CUDA_ERR_CHECK(cudaMemcpy(&szxpsDev[0], &szxps_[0], sizeof(int) * count,
 			cudaMemcpyHostToDevice)); 
 
-		// Choose CUDA compute grid.
-		int szblock = 128;
-		int nblocks = nno / szblock;
-		if (nno % szblock) nblocks++;
-
 		// Prepare the XPV buffer vector sized to max xps.size()
-		// across all states.
+		// across all states. Individual buffer for each CUDA block.
 		int szxpv = 0;
 		for (int many = 0; many < count; many++)
 			szxpv = max(szxpv, szxps_[many]);
@@ -153,13 +164,13 @@ public :
 				cudaMemcpyHostToDevice));
 
 		for (int i = 0; i < count; i++)
-			CUDA_ERR_CHECK(cudaMemset(valueMatrixDev.getData(i, 0), 0, sizeof(double) * dim));
+			CUDA_ERR_CHECK(cudaMemset(valueMatrixDev.getData(i, 0), 0, sizeof(double) * DOF_PER_NODE));
 	}
 
 	void save(double** value_)
 	{
 		for (int i = 0; i < count; i++)
-			CUDA_ERR_CHECK(cudaMemcpy(value_[i], valueMatrixDev.getData(i, 0), sizeof(double) * dim,
+			CUDA_ERR_CHECK(cudaMemcpy(value_[i], valueMatrixDev.getData(i, 0), sizeof(double) * DOF_PER_NODE,
 				cudaMemcpyDeviceToHost));
 	}
 
@@ -172,9 +183,9 @@ public :
 	}
 };
 
-} // namespace
-
 unique_ptr<InterpolateArrayManyMultistate> interp;
+
+} // namespace
 
 extern "C" void FUNCNAME(
 	Device* device,
@@ -183,17 +194,17 @@ extern "C" void FUNCNAME(
 	const Matrix<double>::Device* surplus_, double** value_)
 {
 	if (!interp.get())
-		interp.reset(new InterpolateArrayManyMultistate(dim, count, nno, szxps_));
+		interp.reset(new InterpolateArrayManyMultistate(dim, nno, DofPerNode, count, szxps_));
 
 	interp->load(x_);
 
 	// Launch the kernel.
 	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock>>>(
-		dim, nno, DofPerNode, count, interp->xDev,
+		dim, nno, interp->nnoPerBlock, DofPerNode, count, interp->xDev,
 		nfreqs_, xps_, interp->szxpsDev, interp->xpvDev, chains_, surplus_, interp->valueDev);
 
-	interp->save(value_);
-
 	CUDA_ERR_CHECK(cudaDeviceSynchronize());
+
+	interp->save(value_);
 }
 

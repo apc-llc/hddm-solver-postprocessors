@@ -60,7 +60,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 	
 	INTERPOLATE_ARRAY_RUNTIME_OPT(
 		device, dim, nno, DofPerNode, x,
-		*data->device.getNfreqs(istate), data->device.getXPS(istate), *data->host.getSzXPS(istate),
+		*data->host.getNfreqs(istate), data->device.getXPS(istate), *data->host.getSzXPS(istate),
 		data->device.getChains(istate), data->device.getSurplus(istate), value);
 }
 
