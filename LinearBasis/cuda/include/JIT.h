@@ -12,14 +12,16 @@ typedef void (*InterpolateArrayFunc)(
 	Device* device,
 	const int dim, const int nno,
 	const int DofPerNode, const real* x,
-	const int nfreqs, const XPS::Device* xps, const Chains::Device* chains, const Matrix<real>::Device* surplus,
+	const int nfreqs, const XPS::Device* xps, const int szxps,
+	const Chains::Device* chains, const Matrix<real>::Device* surplus,
 	real* value);
 
 typedef void (*InterpolateArrayManyMultistateFunc)(
 	Device* device,
 	const int dim, const int nno,
 	const int DofPerNode, const int count, const real* const* x,
-	const int* nfreqs, const XPS::Device* xps, const Chains::Device* chains, const Matrix<real>::Device* surplus,
+	const int* nfreqs, const XPS::Device* xps, const int* szxps,
+	const Chains::Device* chains, const Matrix<real>::Device* surplus,
 	real** value);
 
 typedef InterpolateKernel<InterpolateArrayFunc> InterpolateArrayKernel;

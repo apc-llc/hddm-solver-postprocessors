@@ -33,7 +33,7 @@ params(targetSuffix, configFile)
 
 extern "C" void INTERPOLATE_ARRAY(
 	Device* device, const int dim, const int nno, int DofPerNode, const double* x,
-	const int nfreqs, const XPS* xps, const Chains* chains,
+	const int nfreqs, const XPS* xps, const int szxps, const Chains* chains,
 	const Matrix<double>::Device* surplus, double* value);
 
 // Interpolate array of values.
@@ -42,7 +42,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 {
 	typedef void (*Func)(
 		Device* device, const int dim, const int nno, int DofPerNode, const double* x,
-		const int nfreqs, const XPS::Device* xps, const Chains::Device* chains,
+		const int nfreqs, const XPS::Device* xps, const int szxps, const Chains::Device* chains,
 		const Matrix<double>::Device* surplus, double* value);
 
 	static Func INTERPOLATE_ARRAY_RUNTIME_OPT;
@@ -60,13 +60,13 @@ void Interpolator::interpolate(Device* device, Data* data,
 	
 	INTERPOLATE_ARRAY_RUNTIME_OPT(
 		device, dim, nno, DofPerNode, x,
-		*data->device.getNfreqs(istate), data->device.getXPS(istate),
+		*data->device.getNfreqs(istate), data->device.getXPS(istate), *data->host.getSzXPS(istate),
 		data->device.getChains(istate), data->device.getSurplus(istate), value);
 }
 
 extern "C" void INTERPOLATE_ARRAY_MANY_MULTISTATE(
 	Device* device, const int dim, const int nno, int DofPerNode, const int count, const double* const* x_,
-	const int* nfreqs, const XPS* xps, const Chains* chains,
+	const int* nfreqs, const XPS* xps, const int* szxps, const Chains* chains,
 	const Matrix<double>::Device* surplus, double** value);
 
 // Interpolate multiple arrays of values, with multiple surplus states.
@@ -75,7 +75,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 {
 	typedef void (*Func)(
 		Device* device, const int dim, const int nno, int DofPerNode, const int count, const double* const* x_,
-		const int* nfreqs, const XPS::Device * xps, const Chains::Device* chains,
+		const int* nfreqs, const XPS::Device* xps, const int* szxps, const Chains::Device* chains,
 		const Matrix<double>::Device* surplus, double** value);
 
 	static Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT;
@@ -93,7 +93,7 @@ void Interpolator::interpolate(Device* device, Data* data,
 
 	INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
 		device, dim, nno, DofPerNode, data->nstates, x,
-		data->device.getNfreqs(0), data->device.getXPS(0),
+		data->device.getNfreqs(0), data->device.getXPS(0), data->host.getSzXPS(0),
 		data->device.getChains(0), data->device.getSurplus(0), value);
 }
 

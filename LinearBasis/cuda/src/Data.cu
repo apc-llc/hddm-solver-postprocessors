@@ -13,6 +13,7 @@ class Data::Host::DataHost
 {
 	std::vector<int> nfreqs;
 	std::vector<XPS::Host> xps;
+	std::vector<int> szxps;
 	std::vector<Chains::Host> chains;
 	std::vector<Matrix<real>::Host> surplus;
 
@@ -22,6 +23,7 @@ public :
 
 		nfreqs(nstates),
 		xps(nstates),
+		szxps(nstates),
 		chains(nstates),
 		surplus(nstates)
 
@@ -515,11 +517,17 @@ void Data::load(const char* filename, int istate)
 	{
 		int nfreqs;
 		XPS::Host& xps;
+		int& szxps;
 		Chains::Host& chains;
 		
-		State(XPS::Host& xps_, Chains::Host& chains_) : xps(xps_), chains(chains_) { }
+		State(XPS::Host& xps_, int& szxps_, Chains::Host& chains_) : xps(xps_), szxps(szxps_), chains(chains_) { }
+		
+		~State()
+		{
+			szxps = xps.size();
+		}
 	}
-	state(host.data->xps[istate], host.data->chains[istate]);
+	state(host.data->xps[istate], host.data->szxps[istate], host.data->chains[istate]);
 
 	// Calculate maximum frequency across row indexes.
 	state.nfreqs = 0;
@@ -842,6 +850,11 @@ XPS::Host* Data::Host::getXPS(int istate)
 	return &data->xps[istate];
 }
 
+int* Data::Host::getSzXPS(int istate)
+{
+	return &data->szxps[istate];
+}
+
 Chains::Host* Data::Host::getChains(int istate)
 {
 	return &data->chains[istate];
@@ -998,43 +1011,70 @@ Matrix<real>::Device* Data::Device::getSurplus(int istate)
 	return &data->surplus[istate];
 }
 
-template<typename T>
-static void setMatrix(int istate,
-	MatrixHost<T, std::vector<T, AlignedAllocator<T> > > * pMatrixHost, MatrixDevice<T>* pMatrixDevice)
+void Data::Device::setNfreqs(int istate, int nfreqs)
 {
-	MatrixHost<T, std::vector<T, AlignedAllocator<T> > >& matrixHost = *pMatrixHost;
+	CUDA_ERR_CHECK(cudaMemcpy(&data->nfreqs[istate], &nfreqs, sizeof(int),
+		cudaMemcpyHostToDevice));
+}
 
-	MatrixDevice<T> matrixDevice;
-	CUDA_ERR_CHECK(cudaMemcpy(&matrixDevice, pMatrixDevice, sizeof(MatrixDevice<T>), cudaMemcpyDeviceToHost));
+void Data::Device::setXPS(int istate, XPS::Host* xps)
+{
+	XPS::Host& xpsHost = *xps;
+	
+	XPS::Device xpsDevice;
+	CUDA_ERR_CHECK(cudaMemcpy(&xpsDevice, &data->xps[istate], sizeof(XPS::Device),
+		cudaMemcpyDeviceToHost));
+	xpsDevice.resize(xpsHost.size());
+	
+	CUDA_ERR_CHECK(cudaMemcpy(xpsDevice.getData(), &xpsHost[0],
+		xpsHost.size() * sizeof(Index<uint16_t>), cudaMemcpyHostToDevice));
+
+	// Set that vector does not own its underlying data buffer.
+	xpsDevice.disownData();
+
+	CUDA_ERR_CHECK(cudaMemcpy(&data->xps[istate], &xpsDevice, sizeof(XPS::Device),
+		cudaMemcpyHostToDevice));
+}
+
+void Data::Device::setChains(int istate, Chains::Host* chains)
+{
+	Chains::Host& chainsHost = *chains;
+	
+	Chains::Device chainsDevice;
+	CUDA_ERR_CHECK(cudaMemcpy(&chainsDevice, &data->chains[istate], sizeof(Chains::Device),
+		cudaMemcpyDeviceToHost));
+	chainsDevice.resize(chainsHost.size());
+	
+	CUDA_ERR_CHECK(cudaMemcpy(chainsDevice.getData(), &chainsHost[0],
+		chainsHost.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+	
+	// Set that vector does not own its underlying data buffer.
+	chainsDevice.disownData();
+
+	CUDA_ERR_CHECK(cudaMemcpy(&data->chains[istate], &chainsDevice, sizeof(Chains::Device),
+		cudaMemcpyHostToDevice));
+}
+
+void Data::Device::setSurplus(int istate, Matrix<real>::Host* matrix)
+{
+	Matrix<double>::Host& matrixHost = *matrix;
+
+	Matrix<double>::Device matrixDevice;
+	CUDA_ERR_CHECK(cudaMemcpy(&matrixDevice, &data->surplus[istate], sizeof(Matrix<double>::Device),
+		cudaMemcpyDeviceToHost));
 	matrixDevice.resize(matrixHost.dimy(), matrixHost.dimx());
 
 	// It is assumed to be safe to copy padded data from host to device matrix,
 	// as they use the same memory allocation policy.
 	size_t size = (ptrdiff_t)&matrixHost(matrixHost.dimy() - 1, matrixHost.dimx() - 1) -
-		(ptrdiff_t)matrixHost.getData() + sizeof(T);
-	CUDA_ERR_CHECK(cudaMemcpy(matrixDevice.getData(), pMatrixHost->getData(), size, cudaMemcpyHostToDevice));
+		(ptrdiff_t)matrixHost.getData() + sizeof(double);
+	CUDA_ERR_CHECK(cudaMemcpy(matrixDevice.getData(), matrixHost.getData(), size, cudaMemcpyHostToDevice));
 
 	// Set that matrix does not own its underlying data buffer.
 	matrixDevice.disownData();
 
-	CUDA_ERR_CHECK(cudaMemcpy(pMatrixDevice, &matrixDevice, sizeof(MatrixDevice<T>), cudaMemcpyHostToDevice));
-}
-
-void Data::Device::setNfreqs(int istate, int nfreqs)
-{
-}
-
-void Data::Device::setXPS(int istate, XPS::Host* xps)
-{
-}
-
-void Data::Device::setChains(int istate, Chains::Host* chains)
-{
-}
-
-void Data::Device::setSurplus(int istate, Matrix<real>::Host* matrix)
-{
-	setMatrix<double>(istate, matrix, &data->surplus[istate]);
+	CUDA_ERR_CHECK(cudaMemcpy(&data->surplus[istate], &matrixDevice, sizeof(Matrix<double>::Device),
+		cudaMemcpyHostToDevice));
 }
 
 extern "C" Data* getData(int nstates)

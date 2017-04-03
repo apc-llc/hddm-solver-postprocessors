@@ -187,8 +187,8 @@ public :
 		return data[x];
 	}
 
-	__device__
-	inline __attribute__((always_inline)) int length() { return dim; }
+	__host__ __device__
+	inline __attribute__((always_inline)) int length() const { return dim; }
 
 	__host__ __device__
 	inline __attribute__((always_inline)) void resize(int length)
@@ -323,6 +323,16 @@ public :
 
 	__host__ __device__
 	inline __attribute__((always_inline)) T* getData() { return &data[0]; }
+
+	__host__ __device__
+	inline __attribute__((always_inline)) T* getData(int y, int x)
+	{
+		assert(x < dimX);
+		assert(y < dimY);
+		int index = x + dimX_aligned * y;
+		assert(index < size);
+		return &data[index];
+	}
 	
 	__device__
 	inline __attribute__((always_inline)) T& operator()(int y, int x)
@@ -394,8 +404,10 @@ struct Index
 	inline __attribute__((always_inline))
 	bool isEmpty() { return (i == 0) && (j == 0); }	
 
+	__host__ __device__
 	Index() : i(0), j(0), index(0) { }
 	
+	__host__ __device__
 	Index(short i_, short j_, int index_) : i(i_), j(j_), index(index_) { }
 
 	template <class TValue>
@@ -452,6 +464,7 @@ class Data
 
 		int* getNfreqs(int istate);
 		XPS::Host* getXPS(int istate);
+		int* getSzXPS(int istate);
 		Chains::Host* getChains(int istate);
 		Matrix<real>::Host* getSurplus(int istate);
 
