@@ -388,15 +388,31 @@ void Data::load(const char* filename, int istate)
 	}
 	else
 	{
-		int nbytes = 0;
-		nbytes += fscanf(infile, "%d", &dim);
-		nbytes += fscanf(infile, "%d", &nno);
-		nbytes += fscanf(infile, "%d", &TotalDof);
-		nbytes += fscanf(infile, "%d", &Level);
-		if (nbytes <= 0)
+		if (params.binaryio)
 		{
-			process->cerr("Error reading file: %s\n", filename);
-			process->abort();
+			size_t nbytes = 0;
+			nbytes += fread(reinterpret_cast<void*>(&dim), 1, sizeof(dim), infile);
+			nbytes += fread(reinterpret_cast<void*>(&nno), 1, sizeof(nno), infile);
+			nbytes += fread(reinterpret_cast<void*>(&TotalDof), 1, sizeof(TotalDof), infile);
+			nbytes += fread(reinterpret_cast<void*>(&Level), 1, sizeof(Level), infile);
+			if (nbytes != sizeof(dim) + sizeof(nno) + sizeof(TotalDof) + sizeof(Level))
+			{
+				process->cerr("Error reading file: %s\n", filename);
+				process->abort();
+			}
+		}
+		else
+		{
+			int nbytes = 0;
+			nbytes += fscanf(infile, "%d", &dim);
+			nbytes += fscanf(infile, "%d", &nno);
+			nbytes += fscanf(infile, "%d", &TotalDof);
+			nbytes += fscanf(infile, "%d", &Level);
+			if (nbytes <= 0)
+			{
+				process->cerr("Error reading file: %s\n", filename);
+				process->abort();
+			}
 		}
 	}
 
@@ -427,35 +443,72 @@ void Data::load(const char* filename, int istate)
 		{
 			if (j == nno) break;
 
-			for (int i = 0; i < dim; )
 			{
-				for (int v = 0; (v < AVX_VECTOR_SIZE) && (i < dim); v++, i++)
+				vector<int> values(2 * dim);
+				if (params.binaryio)
 				{
-					int value;
-					int nbytes = fscanf(infile, "%d", &value);
-					value = 2 << (value - 2);
-					index(j, i) = value;
+					size_t nbytes = 0;
+					nbytes += fread(reinterpret_cast<int*>(&values[0]), 1, sizeof(int) * 2 * dim, infile);
+					if (nbytes != sizeof(int) * 2 * dim)
+					{
+						process->cerr("Error reading file: %s\n", filename);
+						process->abort();
+					}
+				}
+				else
+				{
+					for (int i = 0; i < 2 * dim; i++)
+						int nbytes = fscanf(infile, "%d", &values[i]);
+				}
+
+				for (int i = 0; i < dim; )
+				{
+					for (int v = 0; (v < AVX_VECTOR_SIZE) && (i < dim); v++, i++)
+					{
+						int value = values[i];
+						value = 2 << (value - 2);
+						index(j, i) = value;
+					}
+				}
+				for (int i = 0; i < dim; )
+				{
+					for (int v = 0; (v < AVX_VECTOR_SIZE) && (i < dim); v++, i++)
+					{
+						int value = values[i + dim];
+						value--;
+						// Precompute "j" to merge two cases into one:
+						// (((i) == 0) ? (1) : (1 - fabs((x) * (i) - (j)))).
+						if (!index(j, i)) value = 0;
+						index(j, i + vdim * AVX_VECTOR_SIZE) = value;
+					}
 				}
 			}
-			for (int i = 0; i < dim; )
+
 			{
-				for (int v = 0; (v < AVX_VECTOR_SIZE) && (i < dim); v++, i++)
+				vector<double> values(TotalDof);
+				if (params.binaryio)
 				{
-					int value;
-					int nbytes = fscanf(infile, "%d", &value);
-					value--;
-					// Precompute "j" to merge two cases into one:
-					// (((i) == 0) ? (1) : (1 - fabs((x) * (i) - (j)))).
-					if (!index(j, i)) value = 0;
-					index(j, i + vdim * AVX_VECTOR_SIZE) = value;
+					size_t nbytes = 0;
+					nbytes += fread(reinterpret_cast<int*>(&values[0]), 1, sizeof(double) * TotalDof, infile);
+					if (nbytes != sizeof(double) * TotalDof)
+					{
+						process->cerr("Error reading file: %s\n", filename);
+						process->abort();
+					}
+				}
+				else
+				{
+					for (int i = 0; i < TotalDof; i++)
+						int nbytes = fscanf(infile, "%lf", &values[i]);
+				}
+
+				for (int i = 0; i < TotalDof; i++)
+				{
+					double value = values[i];
+					surplus[istate](j, i) = value;
 				}
 			}
-			for (int i = 0; i < TotalDof; i++)
-			{
-				double value;
-				int nbytes = fscanf(infile, "%lf", &value);
-				surplus[istate](j, i) = value;
-			}
+
 			j++;
 		}
 	}
