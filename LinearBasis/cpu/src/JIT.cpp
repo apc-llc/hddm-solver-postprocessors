@@ -135,6 +135,12 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 		PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 		return kernel;
 	}
+
+	// Generate function name for specific number of arguments.
+	stringstream sfuncname;
+	sfuncname << funcnameTemplate;
+	sfuncname << signature.hash();
+	string funcname = sfuncname.str();
 	
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
@@ -181,12 +187,6 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 			PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 			return kernel;
 		}
-
-		// Generate function name for specific number of arguments.
-		stringstream sfuncname;
-		sfuncname << funcnameTemplate;
-		sfuncname << signature.hash();
-		string funcname = sfuncname.str();
 
 		// Read the compile command template.
 		vector<char> cmd;
@@ -301,12 +301,6 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 	}
 	else
 	{
-		// Generate function name for specific number of arguments.
-		stringstream sfuncname;
-		sfuncname << funcnameTemplate;
-		sfuncname << dim;
-		string funcname = sfuncname.str();
-
 		// Receive filename from master.
 		int length = 0;
 		MPI_ERR_CHECK(MPI_Recv(&length, 1, MPI_INT,
