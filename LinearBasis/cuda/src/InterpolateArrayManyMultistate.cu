@@ -104,6 +104,7 @@ class InterpolateArrayManyMultistate
 public :
 
 	int dim;
+	int nno;
 	int DofPerNode;
 	int count;
 
@@ -113,15 +114,20 @@ public :
 
 	double** xDev;
 	double** valueDev;
+	vector<int> szxps;
 	int* szxpsDev;
 	double** xpvDev;
 
+	// Keep szxpv for further reference: its change
+	// triggers xpv reallocation.
+	int szxpv;
+
 	InterpolateArrayManyMultistate(int dim, int nno, int DofPerNode, int count, const int* szxps_) :
-		dim(dim), DofPerNode(DofPerNode), count(count),
+		dim(dim), nno(nno), DofPerNode(DofPerNode), count(count),
 		szblock(128), nnoPerBlock(16), nblocks(nno / nnoPerBlock + (nno % nnoPerBlock ? 1 : 0)),
 		xDev(NULL), xMatrixDev(count, dim),
 		valueDev(NULL), valueMatrixDev(count, dim),
-		szxpsDev(NULL),	xpvDev(NULL)
+		szxps(count), szxpsDev(NULL), szxpv(0), xpvDev(NULL)
 
 	{
 		CUDA_ERR_CHECK(cudaMalloc(&xDev, sizeof(double*) * count));
@@ -140,13 +146,14 @@ public :
 
 		CUDA_ERR_CHECK(cudaMalloc(&szxpsDev, sizeof(int) * count));
 		CUDA_ERR_CHECK(cudaMemcpy(&szxpsDev[0], &szxps_[0], sizeof(int) * count,
-			cudaMemcpyHostToDevice)); 
+			cudaMemcpyHostToDevice));
 
 		// Prepare the XPV buffer vector sized to max xps.size()
 		// across all states. Individual buffer for each CUDA block.
-		int szxpv = 0;
+		szxpv = 0;
+		memcpy(&szxps[0], &szxps_[0], sizeof(int) * count);
 		for (int many = 0; many < count; many++)
-			szxpv = max(szxpv, szxps_[many]);
+			szxpv = max(szxpv, szxps[many]);
 
 		CUDA_ERR_CHECK(cudaMalloc(&xpvDev, sizeof(double*) * nblocks));
 		vector<double*> xpv(nblocks);
@@ -157,7 +164,29 @@ public :
 			cudaMemcpyHostToDevice));
 	}
 
-	void load(const double* const* x_)
+	template<class T>
+	static inline void hashCombine(size_t& seed, const T& v)
+	{
+		std::hash<T> hasher;
+		seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+	}
+
+	static size_t hash(int dim, int nno, int DofPerNode, int count)
+	{
+		size_t seed = 0;
+		hashCombine(seed, dim);
+		hashCombine(seed, nno);
+		hashCombine(seed, DofPerNode);
+		hashCombine(seed, count);
+		return seed;
+	}
+
+	size_t hash() const
+	{
+		return InterpolateArrayManyMultistate::hash(dim, nno, DofPerNode, count);
+	}
+	
+	void load(const double* const* x_, const int* szxps_)
 	{
 		for (int i = 0; i < count; i++)
 			CUDA_ERR_CHECK(cudaMemcpy(xMatrixDev.getData(i, 0), x_[i], sizeof(double) * dim,
@@ -165,6 +194,33 @@ public :
 
 		for (int i = 0; i < count; i++)
 			CUDA_ERR_CHECK(cudaMemset(valueMatrixDev.getData(i, 0), 0, sizeof(double) * DOF_PER_NODE));
+
+		// Copy szxps, if different.
+		for (int i = 0; i < count; i++)
+			if (szxps_[i] != szxps[i])
+			{
+				memcpy(&szxps[0], &szxps_[0], sizeof(int) * count);
+				CUDA_ERR_CHECK(cudaMemcpy(&szxpsDev[0], &szxps_[0], sizeof(int) * count,
+					cudaMemcpyHostToDevice));
+				break;
+			}
+
+		int szxpvNew = 0;
+		for (int many = 0; many < count; many++)
+			szxpvNew = max(szxpvNew, szxps_[many]);
+		
+		// Reallocate xpv, if not enough space.
+		if (szxpv < szxpvNew)
+		{
+			szxpv = szxpvNew;
+		
+			vector<double*> xpv(nblocks);
+			xpvMatrixDev.resize(nblocks, szxpv);
+			for (int i = 0; i < nblocks; i++)
+				xpv[i] = xpvMatrixDev.getData(i, 0);
+			CUDA_ERR_CHECK(cudaMemcpy(&xpvDev[0], &xpv[0], sizeof(double*) * nblocks,
+				cudaMemcpyHostToDevice));
+		}
 	}
 
 	void save(double** value_)
@@ -193,14 +249,21 @@ extern "C" void FUNCNAME(
 	const int* nfreqs_, const XPS::Device* xps_, const int* szxps_, const Chains::Device* chains_,
 	const Matrix<double>::Device* surplus_, double** value_)
 {
+	bool rebuild = false;
 	if (!interp.get())
-		interp.reset(new InterpolateArrayManyMultistate(dim, nno, DofPerNode, count, szxps_));
+		rebuild = true;
+	else
+		if (interp->hash() != InterpolateArrayManyMultistate::hash(dim, nno, DOF_PER_NODE, count))
+			rebuild = true;
+	
+	if (rebuild)
+		interp.reset(new InterpolateArrayManyMultistate(dim, nno, DOF_PER_NODE, count, szxps_));
 
-	interp->load(x_);
+	interp->load(x_, szxps_);
 
 	// Launch the kernel.
 	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock>>>(
-		dim, nno, interp->nnoPerBlock, DofPerNode, count, interp->xDev,
+		dim, nno, interp->nnoPerBlock, DOF_PER_NODE, count, interp->xDev,
 		nfreqs_, xps_, interp->szxpsDev, interp->xpvDev, chains_, surplus_, interp->valueDev);
 
 	CUDA_ERR_CHECK(cudaDeviceSynchronize());

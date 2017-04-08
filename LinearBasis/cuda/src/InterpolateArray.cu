@@ -98,6 +98,7 @@ class InterpolateArray
 public :
 
 	int dim;
+	int nno;
 	int DofPerNode;
 
 	int szblock;
@@ -107,9 +108,13 @@ public :
 	double* xDev;
 	double* valueDev;
 	double** xpvDev;
+	
+	// Keep szxps for further reference: its change
+	// triggers xpv reallocation.
+	int szxps;
 
 	InterpolateArray(int dim, int nno, int DofPerNode, const int szxps) :
-		dim(dim), DofPerNode(DofPerNode),
+		dim(dim), nno(nno), DofPerNode(DofPerNode),
 		szblock(128), nnoPerBlock(16), nblocks(nno / nnoPerBlock + (nno % nnoPerBlock ? 1 : 0)),
 		xDev(NULL), xVectorDev(dim),
 		valueDev(NULL), valueVectorDev(dim),
@@ -130,12 +135,46 @@ public :
 			cudaMemcpyHostToDevice));
 	}
 
-	void load(const double* x)
+	template<class T>
+	static inline void hashCombine(size_t& seed, const T& v)
+	{
+		std::hash<T> hasher;
+		seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+	}
+
+	static size_t hash(int dim, int nno, int DofPerNode)
+	{
+		size_t seed = 0;
+		hashCombine(seed, dim);
+		hashCombine(seed, nno);
+		hashCombine(seed, DofPerNode);
+		return seed;
+	}
+
+	size_t hash() const
+	{
+		return InterpolateArray::hash(dim, nno, DofPerNode);
+	}
+
+	void load(const double* x, const int szxps_)
 	{
 		CUDA_ERR_CHECK(cudaMemcpy(xVectorDev.getData(), x, sizeof(double) * dim,
 			cudaMemcpyHostToDevice));
 
 		CUDA_ERR_CHECK(cudaMemset(valueVectorDev.getData(), 0, sizeof(double) * DOF_PER_NODE));
+
+		// Reallocate xpv, if not enough space.
+		if (szxps_ < szxps)
+		{
+			szxps = szxps_;
+
+			vector<double*> xpv(nblocks);
+			xpvMatrixDev.resize(nblocks, szxps);
+			for (int i = 0; i < nblocks; i++)
+				xpv[i] = xpvMatrixDev.getData(i, 0);
+			CUDA_ERR_CHECK(cudaMemcpy(&xpvDev[0], &xpv[0], sizeof(double*) * nblocks,
+				cudaMemcpyHostToDevice));
+		}
 	}
 
 	void save(double* value)
@@ -160,10 +199,17 @@ extern "C" void FUNCNAME(
 	const int nfreqs, const XPS::Device* xps_, const int szxps, const Chains::Device* chains_,
 	const Matrix<double>::Device* surplus_, double* value)
 {
+	bool rebuild = false;
 	if (!interp.get())
-		interp.reset(new InterpolateArray(dim, nno, DofPerNode, szxps));
+		rebuild = true;
+	else
+		if (interp->hash() != InterpolateArray::hash(dim, nno, DOF_PER_NODE))
+			rebuild = true;
+	
+	if (rebuild)
+		interp.reset(new InterpolateArray(dim, nno, DOF_PER_NODE, szxps));
 
-	interp->load(x);
+	interp->load(x, szxps);
 
 	// Launch the kernel.
 	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock>>>(
