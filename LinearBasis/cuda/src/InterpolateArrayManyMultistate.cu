@@ -40,7 +40,11 @@ __global__ void KERNEL(FUNCNAME)(
 		const double* x = x_[many];
 		const int& nfreqs = nfreqs_[many];
 		const XPS::Device& xps = xps_[many];
+#if 0
 		double* xpv = xpv_[blockIdx.x];
+#else
+		extern __shared__ double xpv[];
+#endif
 		const Chains::Device& chains = chains_[many];
 		const Matrix<double>::Device& surplus = surplus_[many];
 		double* value = value_[many];
@@ -122,6 +126,8 @@ public :
 	// triggers xpv reallocation.
 	int szxpv;
 
+	cudaStream_t stream;
+
 	InterpolateArrayManyMultistate(int dim, int nno, int DofPerNode, int count, const int* szxps_) :
 		dim(dim), nno(nno), DofPerNode(DofPerNode), count(count),
 		szblock(128), nnoPerBlock(16), nblocks(nno / nnoPerBlock + (nno % nnoPerBlock ? 1 : 0)),
@@ -162,6 +168,8 @@ public :
 			xpv[i] = xpvMatrixDev.getData(i, 0);
 		CUDA_ERR_CHECK(cudaMemcpy(&xpvDev[0], &xpv[0], sizeof(double*) * nblocks,
 			cudaMemcpyHostToDevice));
+
+		CUDA_ERR_CHECK(cudaStreamCreate(&stream));
 	}
 
 	template<class T>
@@ -236,6 +244,8 @@ public :
 		CUDA_ERR_CHECK(cudaFree(valueDev));
 		CUDA_ERR_CHECK(cudaFree(szxpsDev));
 		CUDA_ERR_CHECK(cudaFree(xpvDev));
+
+		CUDA_ERR_CHECK(cudaStreamDestroy(stream));
 	}
 };
 
@@ -262,11 +272,15 @@ extern "C" void FUNCNAME(
 	interp->load(x_, szxps_);
 
 	// Launch the kernel.
-	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock>>>(
+#if 0
+	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, interp->stream>>>(
+#else
+	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, interp->szxpv * sizeof(double), interp->stream>>>(
+#endif
 		dim, nno, interp->nnoPerBlock, DOF_PER_NODE, count, interp->xDev,
 		nfreqs_, xps_, interp->szxpsDev, interp->xpvDev, chains_, surplus_, interp->valueDev);
 
-	CUDA_ERR_CHECK(cudaDeviceSynchronize());
+	CUDA_ERR_CHECK(cudaStreamSynchronize(interp->stream));
 
 	interp->save(value_);
 }
