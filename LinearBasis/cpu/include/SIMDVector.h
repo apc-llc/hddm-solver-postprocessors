@@ -12,7 +12,7 @@ class SIMDVector
 {
 public :
 
-	virtual inline __attribute__((always_inline)) size_t getLength(size_t szelement) const
+	virtual size_t getLength(size_t szelement) const
 	{
 		// TODO Temporary workaround
 		// TODO Privatize this function in different interpolators

@@ -17,7 +17,7 @@ public :
 
 	SIMDVector(const Device* device);
 
-	virtual inline __attribute__((always_inline)) size_t getLength(size_t szelement) const
+	virtual size_t getLength(size_t szelement) const
 	{
 		switch (szelement)
 		{
