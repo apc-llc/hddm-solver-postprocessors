@@ -19,18 +19,21 @@ static vector<DeviceProperties*> props;
 
 namespace NAMESPACE
 {
-	extern Devices devices;
+	extern unique_ptr<Devices> devices;
 }
 
 vector<DeviceProperties*>& DeviceProperties::getDeviceProperties()
 {
 	if (!propsInitialized)
 	{
-		uniqueProps.resize(devices.getCount());
-		props.resize(devices.getCount());
+		if (!devices)
+			devices.reset(new Devices());
+
+		uniqueProps.resize(devices->getCount());
+		props.resize(devices->getCount());
 		for (int i = 0, e = uniqueProps.size(); i != e; i++)
 		{
-			uniqueProps[i].reset(new DeviceProperties(devices.getDevice(i)));
+			uniqueProps[i].reset(new DeviceProperties(devices->getDevice(i)));
 			props[i] = uniqueProps[i].get();
 		}
 		
