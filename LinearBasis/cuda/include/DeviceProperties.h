@@ -17,7 +17,7 @@ public :
 
 	virtual const SIMDVector* getSIMDVector() const;
 	
-	static std::vector<DeviceProperties*>* getDeviceProperties();
+	static std::vector<DeviceProperties*>& getDeviceProperties();
 };
 
 } // namespace NAMESPACE

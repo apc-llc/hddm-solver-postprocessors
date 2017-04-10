@@ -2,6 +2,8 @@
 #include "interpolator.h"
 
 #include <iostream>
+#include <memory>
+#include <mutex>
 
 using namespace NAMESPACE;
 using namespace std;
@@ -13,6 +15,7 @@ Devices::Devices()
 
 	// Check for available CUDA GPU(s)
 	int ngpus = 0;
+	CUDA_ERR_CHECK(cudaGetLastError());
 	cudaError_t cudaError = cudaGetDeviceCount(&ngpus);
 	if (cudaError == cudaErrorNoDevice)
 	{
@@ -63,8 +66,10 @@ Device* Devices::tryAcquire()
 
 	for (int i = 0; i < devices.size(); i++)
 	{
-		#pragma omp critical
 		{
+			static std::mutex mutex;
+			std::lock_guard<std::mutex> lock(mutex);
+
 			if (devices[i].available && !device)
 			{
 				devices[i].available = 0;
@@ -82,22 +87,32 @@ void Devices::release(Device* device)
 {
 	if (!device) return;
 
-	#pragma omp atomic
-	device->available++;
+	{
+		static std::mutex mutex;
+		std::lock_guard<std::mutex> lock(mutex);
+
+		device->available++;
+	}
 }
 
 namespace NAMESPACE
 {
-	Devices devices;
+	unique_ptr<Devices> devices;
 }
 
 extern "C" Device* tryAcquireDevice()
 {
-	return devices.tryAcquire();
+	if (!devices)
+		devices.reset(new Devices());
+
+	return devices->tryAcquire();
 }
 
 extern "C" void releaseDevice(Device* device)
 {
-	devices.release(device);
+	if (!devices)
+		devices.reset(new Devices());
+
+	devices->release(device);
 }
 

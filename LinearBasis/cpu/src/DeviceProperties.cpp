@@ -15,7 +15,7 @@ const SIMDVector* DeviceProperties::getSIMDVector() const
 static DeviceProperties props;
 static vector<DeviceProperties*> vprops;
 
-extern "C" vector<DeviceProperties*>* getDeviceProperties()
+extern "C" void getDeviceProperties(DeviceProperties*** result, size_t* szresult)
 {
 	if (!vprops.size())
 	{
@@ -23,6 +23,7 @@ extern "C" vector<DeviceProperties*>* getDeviceProperties()
 		vprops[0] = &props;
 	}
 	
-	return &vprops;
+	*result = &vprops[0];
+	*szresult = vprops.size();
 }
 

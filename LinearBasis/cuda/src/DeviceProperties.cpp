@@ -13,7 +13,7 @@ const SIMDVector* DeviceProperties::getSIMDVector() const
 {
 	return &simdVector;
 }
-
+static bool propsInitialized = false;
 static vector<unique_ptr<DeviceProperties> > uniqueProps;
 static vector<DeviceProperties*> props;
 
@@ -22,9 +22,9 @@ namespace NAMESPACE
 	extern Devices devices;
 }
 
-vector<DeviceProperties*>* DeviceProperties::getDeviceProperties()
+vector<DeviceProperties*>& DeviceProperties::getDeviceProperties()
 {
-	if (!uniqueProps.size())
+	if (!propsInitialized)
 	{
 		uniqueProps.resize(devices.getCount());
 		props.resize(devices.getCount());
@@ -33,13 +33,17 @@ vector<DeviceProperties*>* DeviceProperties::getDeviceProperties()
 			uniqueProps[i].reset(new DeviceProperties(devices.getDevice(i)));
 			props[i] = uniqueProps[i].get();
 		}
+		
+		propsInitialized = true;
 	}
 	
-	return &props;
+	return props;
 }
 
-extern "C" vector<DeviceProperties*>* getDeviceProperties()
+extern "C" void getDeviceProperties(DeviceProperties*** result, size_t* szresult)
 {
-	return DeviceProperties::getDeviceProperties();
+	vector<DeviceProperties*>& vprops = DeviceProperties::getDeviceProperties();
+	*result = &vprops[0];
+	*szresult = vprops.size();
 }
 
