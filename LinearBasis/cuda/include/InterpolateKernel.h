@@ -37,7 +37,7 @@ public :
 				MPI_Process* process;
 				MPI_ERR_CHECK(MPI_Process_get(&process));
 
-				string type = "CPU";
+				string type = "GPU";
 			
 				// Open compiled library and load interpolation function entry point.
 #ifndef RTLD_DEEPBIND
