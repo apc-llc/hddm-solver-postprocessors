@@ -24,6 +24,8 @@ public :
 
 } // namespace NAMESPACE
 
+static int id = 1; // TODO
+
 template<>
 const string InterpolateArrayKernel::sh = INTERPOLATE_ARRAY_SH;
 template<>
@@ -308,8 +310,8 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 			if (i == process->getRoot()) continue;
 
 			int length = vfilename.size();
-			MPI_ERR_CHECK(MPI_Isend(&length, 1, MPI_INT, i, i, process->getComm(), &requests[2 * i]));
-			MPI_ERR_CHECK(MPI_Isend(&vfilename[0], length, MPI_BYTE, i, i + e, process->getComm(), &requests[2 * i + 1]));
+			MPI_ERR_CHECK(MPI_Isend(&length, 1, MPI_INT, i, id, process->getComm(), &requests[2 * i]));
+			MPI_ERR_CHECK(MPI_Isend(&vfilename[0], length, MPI_BYTE, i, 2 * id, process->getComm(), &requests[2 * i + 1]));
 		}
 		for (int i = 0, e = vrequests.size(); i != e; i++)
 		{
@@ -323,11 +325,11 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 		// Receive filename from master.
 		int length = 0;
 		MPI_ERR_CHECK(MPI_Recv(&length, 1, MPI_INT,
-			process->getRoot(), process->getRank(), process->getComm(), MPI_STATUS_IGNORE));
+			process->getRoot(), id, process->getComm(), MPI_STATUS_IGNORE));
 		vector<char> vfilename;
 		vfilename.resize(length);
 		MPI_ERR_CHECK(MPI_Recv(&vfilename[0], length, MPI_BYTE,
-			process->getRoot(), process->getRank() + process->getSize(), process->getComm(), MPI_STATUS_IGNORE));
+			process->getRoot(), 2 * id, process->getComm(), MPI_STATUS_IGNORE));
 
 		kernel.dim = dim;
 		kernel.filename = string(&vfilename[0], vfilename.size());
