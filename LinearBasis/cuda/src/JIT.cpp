@@ -4,7 +4,6 @@
 #include <map>
 #include <pthread.h>
 #include <pstreams/pstream.h>
-#include <sstream>
 #include <string>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -148,10 +147,10 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 	}
 
 	// Generate function name for specific number of arguments.
-	stringstream sfuncname;
-	sfuncname << funcnameTemplate;
-	sfuncname << signature.hash();
-	string funcname = sfuncname.str();	
+	int length = snprintf(NULL, 0, "%s%zu", funcnameTemplate.c_str(), signature.hash());
+	string funcname;
+	funcname.resize(length + 1);
+	sprintf(&funcname[0], "%s%zu", funcnameTemplate.c_str(), signature.hash());
 
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
