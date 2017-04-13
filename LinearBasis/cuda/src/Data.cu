@@ -2,6 +2,7 @@
 #include "Data.h"
 #include "interpolator.h"
 
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -348,6 +349,12 @@ void Data::load(const char* filename, int istate)
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
 	const Parameters& params = Interpolator::getInstance()->getParameters();
+
+	bool showDataAnalysis = false;
+	const char* iShowDataAnalysis = getenv("SHOW_DATA_ANALYSIS");
+	if (iShowDataAnalysis)
+		if (atoi(iShowDataAnalysis))
+			showDataAnalysis = true;
 
 	if (loadedStates[istate])
 	{
@@ -785,8 +792,11 @@ void Data::load(const char* filename, int istate)
 			}
 		}
 	}	
-	if (process->isMaster())
-		process->cout("%d unique xp(s) to compute\n", map.xps.size());
+	if (showDataAnalysis)
+	{
+		if (process->isMaster())
+			process->cout("%d unique xp(s) to compute\n", map.xps.size());
+	}
 
 	// Create all possible chains between frequencies.
 	state.chains.resize(nno * state.nfreqs);
@@ -797,9 +807,12 @@ void Data::load(const char* filename, int istate)
 		for (int ifreq = 1; ifreq < state.nfreqs; ifreq++)
 			state.chains[ichain++] = temps[ifreq][trans[ifreq][i]];
 	}
-	if (process->isMaster())
-		process->cout("%d chains of %d xp(s) to build\n",
-			state.chains.size() / state.nfreqs, state.nfreqs);
+	if (showDataAnalysis)
+	{
+		if (process->isMaster())
+			process->cout("%d chains of %d xp(s) to build\n",
+				state.chains.size() / state.nfreqs, state.nfreqs);
+	}
 	
 	// Convert xps from map to vector.
 	state.xps.resize(map.xps.size());
