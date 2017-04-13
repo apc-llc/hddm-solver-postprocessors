@@ -358,10 +358,10 @@ void Data::load(const char* filename, int istate)
 	bool compressed = isCompressed(filename);
 
 	FILE* infile = NULL;
-	if (params.binaryio)
-		infile = fopen(filename, "r");
-	else
+	if (params.binaryio || compressed)
 		infile = fopen(filename, "rb");
+	else
+		infile = fopen(filename, "r");
 
 	if (!infile)
 	{
