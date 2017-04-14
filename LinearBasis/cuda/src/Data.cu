@@ -801,12 +801,15 @@ void Data::load(const char* filename, int istate)
 
 	// Create all possible chains between frequencies.
 	state.chains.resize(nno * state.nfreqs);
-	for (int i = 0, ichain = 0; i < nno; i++)
+	if (state.nfreqs)
 	{
-		state.chains[ichain++] = temps[0][i];
+		for (int i = 0, ichain = 0; i < nno; i++)
+		{
+			state.chains[ichain++] = temps[0][i];
 
-		for (int ifreq = 1; ifreq < state.nfreqs; ifreq++)
-			state.chains[ichain++] = temps[ifreq][trans[ifreq][i]];
+			for (int ifreq = 1; ifreq < state.nfreqs; ifreq++)
+				state.chains[ichain++] = temps[ifreq][trans[ifreq][i]];
+		}
 	}
 	if (showDataAnalysis)
 	{
