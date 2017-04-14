@@ -676,6 +676,7 @@ void Data::load(const char* filename, int istate)
 	}
 
 	// Reorder surpluses.
+	if (state.nfreqs)
 	{
 		Matrix<double> surplusOld = surplus[istate];
 		Matrix<double>& surplusNew = surplus[istate];
@@ -840,6 +841,7 @@ void Data::load(const char* filename, int istate)
 	}	
 
 	// Reorder surpluses.
+	if (state.nfreqs)
 	{
 		Matrix<double> surplusOld = surplus[istate];
 		Matrix<double>& surplusNew = surplus[istate];
