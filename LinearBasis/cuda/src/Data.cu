@@ -496,7 +496,7 @@ void Data::load(const char* filename, int istate)
 				if (params.binaryio)
 				{
 					size_t nbytes = 0;
-					nbytes += fread(reinterpret_cast<int*>(&values[0]), 1, sizeof(double) * TotalDof, infile);
+					nbytes += fread(reinterpret_cast<double*>(&values[0]), 1, sizeof(double) * TotalDof, infile);
 					if (nbytes != sizeof(double) * TotalDof)
 					{
 						process->cerr("Error reading file: %s\n", filename);
