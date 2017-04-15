@@ -45,18 +45,13 @@ void Interpolator::interpolate(Device* device, Data* data,
 		const int nfreqs, const XPS::Device* xps, const int szxps, const Chains::Device* chains,
 		const Matrix<double>::Device* surplus, double* value);
 
-	static Func INTERPOLATE_ARRAY_RUNTIME_OPT;
-
 	int dim = data->host.getSurplus(istate)->dimx();
 	int nno = data->host.getSurplus(istate)->dimy();
 
-	if (!INTERPOLATE_ARRAY_RUNTIME_OPT)
-	{
-		INTERPOLATE_ARRAY_RUNTIME_OPT =
-			JIT::jitCompile(device, dim, nno, DofPerNode,
-				stringize(INTERPOLATE_ARRAY_RUNTIME_OPT) "_",
-				(Func)INTERPOLATE_ARRAY).getFunc();
-	}
+	Func INTERPOLATE_ARRAY_RUNTIME_OPT =
+		JIT::jitCompile(device, dim, nno, DofPerNode,
+			stringize(INTERPOLATE_ARRAY_RUNTIME_OPT) "_",
+			(Func)INTERPOLATE_ARRAY).getFunc();
 	
 	INTERPOLATE_ARRAY_RUNTIME_OPT(
 		device, dim, nno, DofPerNode, x,
@@ -78,18 +73,13 @@ void Interpolator::interpolate(Device* device, Data* data,
 		const int* nfreqs, const XPS::Device* xps, const int* szxps, const Chains::Device* chains,
 		const Matrix<double>::Device* surplus, double** value);
 
-	static Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT;
-
 	int dim = data->host.getSurplus(0)->dimx();
 	int nno = data->host.getSurplus(0)->dimy();
 
-	if (!INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT)
-	{
-		INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
-			JIT::jitCompile(device, dim, data->nstates, nno, DofPerNode,
-				stringize(INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT) "_",
-				(Func)INTERPOLATE_ARRAY_MANY_MULTISTATE).getFunc();
-	}
+	Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
+		JIT::jitCompile(device, dim, data->nstates, nno, DofPerNode,
+			stringize(INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT) "_",
+			(Func)INTERPOLATE_ARRAY_MANY_MULTISTATE).getFunc();
 
 	INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
 		device, dim, nno, DofPerNode, data->nstates, x,
