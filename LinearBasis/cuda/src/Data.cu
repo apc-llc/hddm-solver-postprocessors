@@ -1117,8 +1117,9 @@ void Data::Device::setChains(int istate, Chains::Host* chains)
 		cudaMemcpyDeviceToHost));
 	chainsDevice.resize(chainsHost.size());
 	
-	CUDA_ERR_CHECK(cudaMemcpy(chainsDevice.getData(), &chainsHost[0],
-		chainsHost.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+	if (chainsHost.size())
+		CUDA_ERR_CHECK(cudaMemcpy(chainsDevice.getData(), &chainsHost[0],
+			chainsHost.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
 	
 	// Set that vector does not own its underlying data buffer.
 	chainsDevice.disownData();
