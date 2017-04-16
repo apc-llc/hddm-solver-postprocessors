@@ -48,10 +48,10 @@ $(BUILD)/InterpolateArrayManyMultistate.o: src/InterpolateArrayManyMultistate.cu
 	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArrayManyMultistate -DDIM=dim -DCOUNT=count -DNNO=nno -DDOF_PER_NODE=DofPerNode $(CINC) $(NVCCOPT) -c $< -o $@
 
 $(BUILD)/libInterpolateArray.sh: src/InterpolateArray.cu
-	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(NVCCOPT) -shared $< > $@
+	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(filter-out -gencode%,$(NVCCOPT)) -shared $< > $@
 
 $(BUILD)/libInterpolateArrayManyMultistate.sh: src/InterpolateArrayManyMultistate.cu
-	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(NVCCOPT) -shared $< > $@
+	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(filter-out -gencode%,$(NVCCOPT)) -shared $< > $@
 
 $(BUILD)/parameters.o: src/parameters.cpp $(LOCATION)/include/check.h include/parameters.h include/parameters.c
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
