@@ -116,6 +116,7 @@ public :
 	int nnoPerBlock;
 	int nblocks;
 
+	const double* const* xHost;
 	double** xDev;
 	double** valueDev;
 	vector<int> szxps;
@@ -196,20 +197,24 @@ public :
 	
 	void load(const double* const* x_, const int* szxps_)
 	{
+		xHost = x_;
 		for (int i = 0; i < count; i++)
-			CUDA_ERR_CHECK(cudaMemcpy(xMatrixDev.getData(i, 0), x_[i], sizeof(double) * dim,
-				cudaMemcpyHostToDevice));
+		{
+			CUDA_ERR_CHECK(cudaHostRegister(const_cast<double*>(x_[i]), sizeof(double) * dim, cudaHostRegisterDefault));
+			CUDA_ERR_CHECK(cudaMemcpyAsync(xMatrixDev.getData(i, 0), x_[i], sizeof(double) * dim,
+				cudaMemcpyHostToDevice, stream));
+		}
 
 		for (int i = 0; i < count; i++)
-			CUDA_ERR_CHECK(cudaMemset(valueMatrixDev.getData(i, 0), 0, sizeof(double) * DOF_PER_NODE));
+			CUDA_ERR_CHECK(cudaMemsetAsync(valueMatrixDev.getData(i, 0), 0, sizeof(double) * DOF_PER_NODE, stream));
 
 		// Copy szxps, if different.
 		for (int i = 0; i < count; i++)
 			if (szxps_[i] != szxps[i])
 			{
 				memcpy(&szxps[0], &szxps_[0], sizeof(int) * count);
-				CUDA_ERR_CHECK(cudaMemcpy(&szxpsDev[0], &szxps_[0], sizeof(int) * count,
-					cudaMemcpyHostToDevice));
+				CUDA_ERR_CHECK(cudaMemcpyAsync(&szxpsDev[0], &szxps_[0], sizeof(int) * count,
+					cudaMemcpyHostToDevice, stream));
 				break;
 			}
 
@@ -217,6 +222,7 @@ public :
 		for (int many = 0; many < count; many++)
 			szxpvNew = max(szxpvNew, szxps_[many]);
 		
+#if 0
 		// Reallocate xpv, if not enough space.
 		if (szxpv < szxpvNew)
 		{
@@ -226,16 +232,28 @@ public :
 			xpvMatrixDev.resize(nblocks, szxpv);
 			for (int i = 0; i < nblocks; i++)
 				xpv[i] = xpvMatrixDev.getData(i, 0);
-			CUDA_ERR_CHECK(cudaMemcpy(&xpvDev[0], &xpv[0], sizeof(double*) * nblocks,
-				cudaMemcpyHostToDevice));
+			CUDA_ERR_CHECK(cudaMemcpyAsync(&xpvDev[0], &xpv[0], sizeof(double*) * nblocks,
+				cudaMemcpyHostToDevice, stream));
 		}
+#endif
 	}
 
 	void save(double** value_)
 	{
 		for (int i = 0; i < count; i++)
-			CUDA_ERR_CHECK(cudaMemcpy(value_[i], valueMatrixDev.getData(i, 0), sizeof(double) * DOF_PER_NODE,
-				cudaMemcpyDeviceToHost));
+		{
+			CUDA_ERR_CHECK(cudaHostRegister(value_[i], sizeof(double) * DOF_PER_NODE, cudaHostRegisterDefault));
+			CUDA_ERR_CHECK(cudaMemcpyAsync(value_[i], valueMatrixDev.getData(i, 0), sizeof(double) * DOF_PER_NODE,
+				cudaMemcpyDeviceToHost, stream));
+		}
+
+		CUDA_ERR_CHECK(cudaStreamSynchronize(stream));
+
+		for (int i = 0; i < count; i++)
+		{
+			CUDA_ERR_CHECK(cudaHostUnregister(const_cast<double*>(xHost[i])));
+			CUDA_ERR_CHECK(cudaHostUnregister(value_[i]));
+		}
 	}
 
 	~InterpolateArrayManyMultistate()
@@ -243,8 +261,9 @@ public :
 		CUDA_ERR_CHECK(cudaFree(xDev));
 		CUDA_ERR_CHECK(cudaFree(valueDev));
 		CUDA_ERR_CHECK(cudaFree(szxpsDev));
+#if 0		
 		CUDA_ERR_CHECK(cudaFree(xpvDev));
-
+#endif
 		CUDA_ERR_CHECK(cudaStreamDestroy(stream));
 	}
 };
@@ -279,8 +298,6 @@ extern "C" void FUNCNAME(
 #endif
 		dim, nno, interp->nnoPerBlock, DOF_PER_NODE, count, interp->xDev,
 		nfreqs_, xps_, interp->szxpsDev, interp->xpvDev, chains_, surplus_, interp->valueDev);
-
-	CUDA_ERR_CHECK(cudaStreamSynchronize(interp->stream));
 
 	interp->save(value_);
 }
