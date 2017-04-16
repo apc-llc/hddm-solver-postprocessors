@@ -147,7 +147,7 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 	MPI_ERR_CHECK(MPI_Process_get(&process));
 	if (process->isMaster())
 	{
-		process->cout("Performing deferred GPU kernel compilation for dim = %d, count = %d, nno = %d, DofPerNode = %d ...\n",
+		process->cout("Performing deferred CPU kernel compilation for dim = %d, count = %d, nno = %d, DofPerNode = %d ...\n",
 			dim, count, nno, DofPerNode);
 
 		char* cwd = get_current_dir_name();
@@ -270,7 +270,7 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 			return kernel;
 		}
 
-		process->cout("JIT-compiled GPU kernel for dim = %d, count = %d, nno = %d, DofPerNode = %d\n",
+		process->cout("JIT-compiled CPU kernel for dim = %d, count = %d, nno = %d, DofPerNode = %d\n",
 			dim, count, nno, DofPerNode);
 
 		kernel.dim = dim;
