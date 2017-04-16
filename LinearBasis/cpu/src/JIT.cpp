@@ -101,6 +101,9 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 		if (kernel.compilationFailed)
 		{
 			kernel.dim = dim;
+			kernel.count = count;
+			kernel.nno = nno;
+			kernel.DofPerNode = DofPerNode;
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
 
@@ -129,6 +132,9 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 	if (kernel.compilationFailed)
 	{
 		kernel.dim = dim;
+		kernel.count = count;
+		kernel.nno = nno;
+		kernel.DofPerNode = DofPerNode;
 		kernel.fileowner = false;
 		kernel.func = fallbackFunc;
 
@@ -182,6 +188,9 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 
 			kernel.compilationFailed = true;
 			kernel.dim = dim;
+			kernel.count = count;
+			kernel.nno = nno;
+			kernel.DofPerNode = DofPerNode;
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
 
@@ -201,6 +210,9 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 
 				kernel.compilationFailed = true;
 				kernel.dim = dim;
+				kernel.count = count;
+				kernel.nno = nno;
+				kernel.DofPerNode = DofPerNode;
 				kernel.fileowner = false;
 				kernel.func = fallbackFunc;
 
@@ -262,6 +274,9 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 
 			kernel.compilationFailed = true;
 			kernel.dim = dim;
+			kernel.count = count;
+			kernel.nno = nno;
+			kernel.DofPerNode = DofPerNode;
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
 
@@ -274,6 +289,9 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 			dim, count, nno, DofPerNode);
 
 		kernel.dim = dim;
+		kernel.count = count;
+		kernel.nno = nno;
+		kernel.DofPerNode = DofPerNode;
 		kernel.filename = tmp.filename;
 		kernel.fileowner = true;
 		kernel.funcname = funcname;
@@ -314,6 +332,9 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 			process->getRoot(), 2 * id, process->getComm(), MPI_STATUS_IGNORE));
 
 		kernel.dim = dim;
+		kernel.count = count;
+		kernel.nno = nno;
+		kernel.DofPerNode = DofPerNode;
 		kernel.filename = string(&vfilename[0], vfilename.size());
 		kernel.fileowner = false;
 		kernel.funcname = funcname;

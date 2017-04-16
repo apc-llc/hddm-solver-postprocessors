@@ -12,7 +12,7 @@ class JIT;
 template<typename T>
 class InterpolateKernel
 {
-	int dim;
+	int dim, count, nno, DofPerNode;
 	bool compilationFailed;
 	T func;
 	static const std::string sh;
@@ -61,8 +61,8 @@ public :
 					return func;
 				}
 
-				process->cout("Rank #%d loaded %s kernel for dim = %d : %s @ 0x%x\n",
-					process->getRank(), type.c_str(), dim, funcname.c_str(), (void*)func);
+				process->cout("Rank #%d loaded %s kernel for dim = %d, count = %d, nno = %d, DofPerNode = %d: %s @ 0x%x\n",
+					process->getRank(), type.c_str(), dim, count, nno, DofPerNode, funcname.c_str(), (void*)func);
 			}
 			PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 		}
