@@ -36,7 +36,7 @@ __global__ void KERNEL(FUNCNAME)(
 	const Matrix<double>::Device* surplus_, double* value)
 {
 	const XPS::Device& xps = *xps_;
-#if 0
+#ifdef XPV_IN_GLOBAL_MEMORY
 	double* xpv = xpv_[blockIdx.x];
 #else
 	extern __shared__ double xpv[];
@@ -112,6 +112,9 @@ public :
 	const double* xHost;
 	double* xDev;
 	double* valueDev;
+#ifdef XPV_IN_GLOBAL_MEMORY
+	vector<double*> xpv;
+#endif
 	double** xpvDev;
 	
 	// Keep szxps for further reference: its change
@@ -133,7 +136,7 @@ public :
 		xDev = xVectorDev.getData();
 		valueDev = valueVectorDev.getData();
 
-#if 0
+#ifdef XPV_IN_GLOBAL_MEMORY
 		// Prepare the XPV buffer vector sized to max xps.size()
 		// across all states. Individual buffer for each CUDA block.
 		CUDA_ERR_CHECK(cudaMalloc(&xpvDev, sizeof(double*) * nblocks));
@@ -170,19 +173,22 @@ public :
 	void load(const double* x, const int szxps_)
 	{
 		xHost = x;
-		CUDA_ERR_CHECK(cudaHostRegister(const_cast<double*>(x), sizeof(double) * dim, cudaHostRegisterDefault));
+		cudaError_t cudaError = cudaHostRegister(const_cast<double*>(x), sizeof(double) * dim, cudaHostRegisterDefault);
+		if (cudaError != cudaErrorHostMemoryAlreadyRegistered)
+			CUDA_ERR_CHECK(cudaError);
 		CUDA_ERR_CHECK(cudaMemcpyAsync(xVectorDev.getData(), x, sizeof(double) * dim,
 			cudaMemcpyHostToDevice, stream));
 
 		CUDA_ERR_CHECK(cudaMemsetAsync(valueVectorDev.getData(), 0, sizeof(double) * DOF_PER_NODE, stream));
 
-#if 0
+#ifdef XPV_IN_GLOBAL_MEMORY
 		// Reallocate xpv, if not enough space.
+		xpv.resize(nblocks);
+		CUDA_ERR_CHECK(cudaHostRegister(&xpv[0], sizeof(double*) * nblocks, cudaHostRegisterDefault));
 		if (szxps_ < szxps)
 		{
 			szxps = szxps_;
 
-			vector<double*> xpv(nblocks);
 			xpvMatrixDev.resize(nblocks, szxps);
 			for (int i = 0; i < nblocks; i++)
 				xpv[i] = xpvMatrixDev.getData(i, 0);
@@ -194,19 +200,29 @@ public :
 
 	void save(double* value)
 	{
-		CUDA_ERR_CHECK(cudaHostRegister(value, sizeof(double) * DOF_PER_NODE, cudaHostRegisterDefault));
+		cudaError_t cudaError = cudaHostRegister(value, sizeof(double) * DOF_PER_NODE, cudaHostRegisterDefault);
+		if (cudaError != cudaErrorHostMemoryAlreadyRegistered)
+			CUDA_ERR_CHECK(cudaError);
 		CUDA_ERR_CHECK(cudaMemcpyAsync(value, valueVectorDev.getData(), sizeof(double) * DOF_PER_NODE,
 			cudaMemcpyDeviceToHost, stream));
 
 		CUDA_ERR_CHECK(cudaStreamSynchronize(stream));
 
-		CUDA_ERR_CHECK(cudaHostUnregister(const_cast<double*>(xHost)));
-		CUDA_ERR_CHECK(cudaHostUnregister(value));
+		cudaError = cudaHostUnregister(const_cast<double*>(xHost));
+		if (cudaError != cudaErrorHostMemoryNotRegistered)
+			CUDA_ERR_CHECK(cudaError);
+		cudaError = cudaHostUnregister(value);
+		if (cudaError != cudaErrorHostMemoryNotRegistered)
+			CUDA_ERR_CHECK(cudaError);
+
+#ifdef XPV_IN_GLOBAL_MEMORY
+		CUDA_ERR_CHECK(cudaHostUnregister(&xpv[0]));
+#endif
 	}
 
 	~InterpolateArray()
 	{
-#if 0
+#ifdef XPV_IN_GLOBAL_MEMORY
 		CUDA_ERR_CHECK(cudaFree(xpvDev));
 #endif
 		CUDA_ERR_CHECK(cudaStreamDestroy(stream));
@@ -236,7 +252,7 @@ extern "C" void FUNCNAME(
 	interp->load(x, szxps);
 
 	// Launch the kernel.
-#if 0
+#ifdef XPV_IN_GLOBAL_MEMORY
 	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, interp->stream>>>(
 #else
 	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, interp->szxps * sizeof(double), interp->stream>>>(

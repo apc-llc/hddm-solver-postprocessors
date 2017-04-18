@@ -40,7 +40,7 @@ __global__ void KERNEL(FUNCNAME)(
 		const double* x = x_[many];
 		const int& nfreqs = nfreqs_[many];
 		const XPS::Device& xps = xps_[many];
-#if 0
+#ifdef XPV_IN_GLOBAL_MEMORY
 		double* xpv = xpv_[blockIdx.x];
 #else
 		extern __shared__ double xpv[];
@@ -116,11 +116,14 @@ public :
 	int nnoPerBlock;
 	int nblocks;
 
-	const double* const* xHost;
+	vector<double> xHost;
 	double** xDev;
 	double** valueDev;
 	vector<int> szxps;
 	int* szxpsDev;
+#ifdef XPV_IN_GLOBAL_MEMORY
+	vector<double*> xpv;
+#endif
 	double** xpvDev;
 
 	// Keep szxpv for further reference: its change
@@ -132,7 +135,7 @@ public :
 	InterpolateArrayManyMultistate(int dim, int nno, int DofPerNode, int count, const int* szxps_) :
 		dim(dim), nno(nno), DofPerNode(DofPerNode), count(count),
 		szblock(128), nnoPerBlock(16), nblocks(nno / nnoPerBlock + (nno % nnoPerBlock ? 1 : 0)),
-		xDev(NULL), xMatrixDev(count, dim),
+		xHost(dim * count), xDev(NULL), xMatrixDev(count, dim),
 		valueDev(NULL), valueMatrixDev(count, dim),
 		szxps(count), szxpsDev(NULL), szxpv(0), xpvDev(NULL)
 
@@ -197,13 +200,14 @@ public :
 	
 	void load(const double* const* x_, const int* szxps_)
 	{
-		xHost = x_;
 		for (int i = 0; i < count; i++)
-		{
-			CUDA_ERR_CHECK(cudaHostRegister(const_cast<double*>(x_[i]), sizeof(double) * dim, cudaHostRegisterDefault));
-			CUDA_ERR_CHECK(cudaMemcpyAsync(xMatrixDev.getData(i, 0), x_[i], sizeof(double) * dim,
+			memcpy(&xHost[i * dim], x_[i], sizeof(double) * dim);
+
+		CUDA_ERR_CHECK(cudaHostRegister(&xHost[0], sizeof(double) * dim * count, cudaHostRegisterDefault));
+
+		for (int i = 0; i < count; i++)
+			CUDA_ERR_CHECK(cudaMemcpyAsync(xMatrixDev.getData(i, 0), &xHost[i * dim], sizeof(double) * dim,
 				cudaMemcpyHostToDevice, stream));
-		}
 
 		for (int i = 0; i < count; i++)
 			CUDA_ERR_CHECK(cudaMemsetAsync(valueMatrixDev.getData(i, 0), 0, sizeof(double) * DOF_PER_NODE, stream));
@@ -222,13 +226,14 @@ public :
 		for (int many = 0; many < count; many++)
 			szxpvNew = max(szxpvNew, szxps_[many]);
 		
-#if 0
+#ifdef XPV_IN_GLOBAL_MEMORY
 		// Reallocate xpv, if not enough space.
+		xpv.resize(nblocks);
+		CUDA_ERR_CHECK(cudaHostRegister(&xpv[0], sizeof(double*) * nblocks, cudaHostRegisterDefault));
 		if (szxpv < szxpvNew)
 		{
 			szxpv = szxpvNew;
 		
-			vector<double*> xpv(nblocks);
 			xpvMatrixDev.resize(nblocks, szxpv);
 			for (int i = 0; i < nblocks; i++)
 				xpv[i] = xpvMatrixDev.getData(i, 0);
@@ -242,18 +247,26 @@ public :
 	{
 		for (int i = 0; i < count; i++)
 		{
-			CUDA_ERR_CHECK(cudaHostRegister(value_[i], sizeof(double) * DOF_PER_NODE, cudaHostRegisterDefault));
+			cudaError_t cudaError = cudaHostRegister(value_[i], sizeof(double) * DOF_PER_NODE, cudaHostRegisterDefault);
+			if (cudaError != cudaErrorHostMemoryAlreadyRegistered)
+				CUDA_ERR_CHECK(cudaError);
 			CUDA_ERR_CHECK(cudaMemcpyAsync(value_[i], valueMatrixDev.getData(i, 0), sizeof(double) * DOF_PER_NODE,
 				cudaMemcpyDeviceToHost, stream));
 		}
 
 		CUDA_ERR_CHECK(cudaStreamSynchronize(stream));
 
+		CUDA_ERR_CHECK(cudaHostUnregister(&xHost[0]));
 		for (int i = 0; i < count; i++)
 		{
-			CUDA_ERR_CHECK(cudaHostUnregister(const_cast<double*>(xHost[i])));
-			CUDA_ERR_CHECK(cudaHostUnregister(value_[i]));
+			cudaError_t cudaError = cudaHostUnregister(value_[i]);
+			if (cudaError != cudaErrorHostMemoryNotRegistered)
+				CUDA_ERR_CHECK(cudaError);
 		}
+		
+#ifdef XPV_IN_GLOBAL_MEMORY
+		CUDA_ERR_CHECK(cudaHostUnregister(&xpv[0]));
+#endif
 	}
 
 	~InterpolateArrayManyMultistate()
@@ -261,7 +274,7 @@ public :
 		CUDA_ERR_CHECK(cudaFree(xDev));
 		CUDA_ERR_CHECK(cudaFree(valueDev));
 		CUDA_ERR_CHECK(cudaFree(szxpsDev));
-#if 0		
+#ifdef XPV_IN_GLOBAL_MEMORY		
 		CUDA_ERR_CHECK(cudaFree(xpvDev));
 #endif
 		CUDA_ERR_CHECK(cudaStreamDestroy(stream));
@@ -291,7 +304,7 @@ extern "C" void FUNCNAME(
 	interp->load(x_, szxps_);
 
 	// Launch the kernel.
-#if 0
+#ifdef XPV_IN_GLOBAL_MEMORY
 	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, interp->stream>>>(
 #else
 	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, interp->szxpv * sizeof(double), interp->stream>>>(
