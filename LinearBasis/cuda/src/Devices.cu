@@ -26,16 +26,6 @@ Devices::Devices()
 	else
 		CUDA_ERR_CHECK(cudaError);
 	devices.resize(ngpus);
-
-	// Find out the total number of GPU(s) available to
-	// all participating hosts.
-	int ngpus_total = ngpus;
-	MPI_ERR_CHECK(MPI_Allreduce(MPI_IN_PLACE, &ngpus_total, 1, MPI_INT,
-		MPI_SUM, process->getComm()));
-
-	if (process->isMaster())
-		cout << ngpus_total << " GPU(s) available" << endl;
-	cout << endl;
 	
 	struct cudaDeviceProp props;
 	for (int igpu = 0; igpu < ngpus; igpu++)

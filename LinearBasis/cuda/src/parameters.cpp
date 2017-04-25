@@ -1,4 +1,5 @@
 #include "check.h"
+#include "Devices.h"
 #include "parameters.h"
 #include "process.h"
 
@@ -6,6 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <mpi.h>
 #include <sstream>
 #include <string>
@@ -14,6 +16,11 @@
 
 using namespace NAMESPACE;
 using namespace std;
+
+namespace NAMESPACE
+{
+	extern unique_ptr<Devices> devices;
+}
 
 // For compatibility with Fortran, all parameters are declared
 // as global variables. Parameters class stores only references
@@ -156,5 +163,17 @@ ASSIGN(surplusCutoffDefined)
 				process->cerr("Required parameter \"%s\" is undefined\n", i->first.c_str());
 			process->abort();
 		}
+
+	if (!devices)
+		devices.reset(new Devices());
+
+	// Find out the total number of GPU(s) available to
+	// all participating hosts.
+	int ngpus_total = devices->getCount();
+	MPI_ERR_CHECK(MPI_Allreduce(MPI_IN_PLACE, &ngpus_total, 1, MPI_INT,
+		MPI_SUM, process->getComm()));
+
+	if (process->isMaster())
+		process->cout("%d GPU(s) available\n", ngpus_total);
 }
 
