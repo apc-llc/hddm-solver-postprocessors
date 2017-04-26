@@ -38,7 +38,8 @@ $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
 	$(BUILD)/InterpolateArray.o $(BUILD)/InterpolateArrayManyMultistate.o \
 	$(BUILD)/libInterpolateArray.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
 	$(BUILD)/parameters.o $(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o $(BUILD)/SIMDVector.o \
-	$(BUILD)/priority.o $(BUILD)/supported.o $(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o
+	$(BUILD)/priority.o $(BUILD)/supported.o $(BUILD)/reset.o \
+	$(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o
 	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(CXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -L$(CUDA_LIBRARY_PATH) -lcudart_static -Wl,-rpath=$(CUDA_LIBRARY_PATH)
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.cu
@@ -72,6 +73,9 @@ $(BUILD)/priority.o: src/priority.cpp
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/supported.o: src/supported.cpp
+	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
+
+$(BUILD)/reset.o: src/reset.cpp
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/Device.o: src/Device.cpp

@@ -69,10 +69,13 @@ void Interpolator::interpolate(Device* device, Data* data,
 		&data->nfreqs[0], &data->xps[0], &data->chains[0], &data->surplus[0], value);
 }
 
+namespace NAMESPACE
+{
+	unique_ptr<Interpolator> interp;
+}
+
 Interpolator* Interpolator::getInstance()
 {
-	static unique_ptr<Interpolator> interp;
-
 	if (!interp.get())
 		interp.reset(new Interpolator(stringize(NAME)));
 	
