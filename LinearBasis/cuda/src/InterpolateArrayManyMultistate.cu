@@ -54,26 +54,25 @@ __global__ void KERNEL(FUNCNAME)(
 		{
 			const Index<uint16_t>& index = xps(i);
 			const uint32_t& j = index.index;
-			double xp = LinearBasis(x[j], index.i, index.j);
-			xpv[i] = fmax(0.0, xp);
+			xpv[i] = LinearBasis(x[j], index.i, index.j);
 		}
-
-		__syncthreads();
 
 #define szcache 4
 		// Each thread hosts a part of blockDim.x-shared register cache
 		// to accumulate nnoPerBlock intermediate additions.
 		// blockDim.x -sharing is done due to limited number of registers
 		// available per thread.
-		double cache[szcache];
-		for (int i = 0; i < szcache; i++)
-			cache[i] = 0;
+		double cache[szcache] = { 0.0, 0.0, 0.0, 0.0 };
 #undef szcache
+
+		__syncthreads();
 
 		// Loop to calculate scaled surplus product.
 		for (int i = blockIdx.x * nnoPerBlock, e = min(i + nnoPerBlock, NNO); i < e; i++)
 		{
 			double temp = 1.0;
+			
+			#pragma unroll
 			for (int ifreq = 0; ifreq < nfreqs; ifreq++)
 			{
 				// Early exit for shorter chains.
@@ -81,7 +80,7 @@ __global__ void KERNEL(FUNCNAME)(
 				if (!idx) break;
 
 				temp *= xpv[idx];
-				if (!temp) goto next;
+				if (temp <= 0.0) goto next;
 			}
 
 			for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
