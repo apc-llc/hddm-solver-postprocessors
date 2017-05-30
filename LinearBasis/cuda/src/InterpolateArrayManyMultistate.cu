@@ -57,13 +57,11 @@ __global__ void KERNEL(FUNCNAME)(
 			xpv[i] = LinearBasis(x[j], index.i, index.j);
 		}
 
-#define szcache 4
 		// Each thread hosts a part of blockDim.x-shared register cache
 		// to accumulate nnoPerBlock intermediate additions.
 		// blockDim.x -sharing is done due to limited number of registers
 		// available per thread.
-		double cache[szcache] = { 0.0, 0.0, 0.0, 0.0 };
-#undef szcache
+		double cache1 = 0.0, cache2 = 0.0, cache3 = 0.0, cache4 = 0.0;
 
 		__syncthreads();
 
@@ -72,7 +70,6 @@ __global__ void KERNEL(FUNCNAME)(
 		{
 			double temp = 1.0;
 			
-			#pragma unroll
 			for (int ifreq = 0; ifreq < nfreqs; ifreq++)
 			{
 				// Early exit for shorter chains.
@@ -83,16 +80,41 @@ __global__ void KERNEL(FUNCNAME)(
 				if (temp <= 0.0) goto next;
 			}
 
-			for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
-				cache[icache] += temp * surplus(i, Dof_choice);
+			if (threadIdx.x < DOF_PER_NODE)
+			{
+				cache1 += temp * surplus(i, threadIdx.x);
+				if (threadIdx.x + blockDim.x < DOF_PER_NODE)
+				{
+					cache2 += temp * surplus(i, threadIdx.x + blockDim.x);
+					if (threadIdx.x + 2 * blockDim.x < DOF_PER_NODE)
+					{
+						cache3 += temp * surplus(i, threadIdx.x + 2 * blockDim.x);
+						if (threadIdx.x + 3 * blockDim.x < DOF_PER_NODE)
+							cache4 += temp * surplus(i, threadIdx.x + 3 * blockDim.x);
+					}
+				}
+			}
+				
 		
 		next :
 
 			continue;
 		}
 
-		for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
-			atomicAdd(&value[Dof_choice], cache[icache]);
+		if (threadIdx.x < DOF_PER_NODE)
+		{
+			atomicAdd(&value[threadIdx.x], cache1);
+			if (threadIdx.x + blockDim.x < DOF_PER_NODE)
+			{
+				atomicAdd(&value[threadIdx.x + blockDim.x], cache2);
+				if (threadIdx.x + 2 * blockDim.x < DOF_PER_NODE)
+				{
+					atomicAdd(&value[threadIdx.x + 2 * blockDim.x], cache3);
+					if (threadIdx.x + 3 * blockDim.x < DOF_PER_NODE)
+						atomicAdd(&value[threadIdx.x + 3 * blockDim.x], cache4);
+				}
+			}
+		}
 	}
 }
 
@@ -304,7 +326,7 @@ extern "C" void FUNCNAME(
 
 	// Launch the kernel.
 #ifdef XPV_IN_GLOBAL_MEMORY
-	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, interp->stream>>>(
+	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, 0, interp->stream>>>(
 #else
 	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, interp->szxpv * sizeof(double), interp->stream>>>(
 #endif
