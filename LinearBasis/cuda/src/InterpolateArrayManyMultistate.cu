@@ -61,7 +61,7 @@ __global__ void KERNEL(FUNCNAME)(
 		// to accumulate nnoPerBlock intermediate additions.
 		// blockDim.x -sharing is done due to limited number of registers
 		// available per thread.
-		double cache1 = 0.0, cache2 = 0.0, cache3 = 0.0, cache4 = 0.0;
+		double cache = 0.0;
 
 		__syncthreads();
 
@@ -81,19 +81,7 @@ __global__ void KERNEL(FUNCNAME)(
 			}
 
 			if (threadIdx.x < DOF_PER_NODE)
-			{
-				cache1 += temp * surplus(i, threadIdx.x);
-				if (threadIdx.x + blockDim.x < DOF_PER_NODE)
-				{
-					cache2 += temp * surplus(i, threadIdx.x + blockDim.x);
-					if (threadIdx.x + 2 * blockDim.x < DOF_PER_NODE)
-					{
-						cache3 += temp * surplus(i, threadIdx.x + 2 * blockDim.x);
-						if (threadIdx.x + 3 * blockDim.x < DOF_PER_NODE)
-							cache4 += temp * surplus(i, threadIdx.x + 3 * blockDim.x);
-					}
-				}
-			}
+				cache += temp * surplus(i, threadIdx.x);
 				
 		
 		next :
@@ -102,19 +90,7 @@ __global__ void KERNEL(FUNCNAME)(
 		}
 
 		if (threadIdx.x < DOF_PER_NODE)
-		{
-			atomicAdd(&value[threadIdx.x], cache1);
-			if (threadIdx.x + blockDim.x < DOF_PER_NODE)
-			{
-				atomicAdd(&value[threadIdx.x + blockDim.x], cache2);
-				if (threadIdx.x + 2 * blockDim.x < DOF_PER_NODE)
-				{
-					atomicAdd(&value[threadIdx.x + 2 * blockDim.x], cache3);
-					if (threadIdx.x + 3 * blockDim.x < DOF_PER_NODE)
-						atomicAdd(&value[threadIdx.x + 3 * blockDim.x], cache4);
-				}
-			}
-		}
+			atomicAdd(&value[threadIdx.x], cache);
 	}
 }
 
@@ -133,8 +109,8 @@ public :
 	int DofPerNode;
 	int count;
 
-	int szblock;
-	int nnoPerBlock;
+	static const int szblock = 128;
+	static const int nnoPerBlock = 16;
 	int nblocks;
 
 	vector<double> xHost;
@@ -154,10 +130,10 @@ public :
 	cudaStream_t stream;
 
 	InterpolateArrayManyMultistate(int dim, int nno, int DofPerNode, int count, const int* szxps_) :
-		dim(dim), nno(nno), DofPerNode(DofPerNode), count(count),
-		szblock(128), nnoPerBlock(16), nblocks(nno / nnoPerBlock + (nno % nnoPerBlock ? 1 : 0)),
+		dim(dim), nno(nno), DofPerNode(DOF_PER_NODE), count(count),
+		nblocks(nno / nnoPerBlock + (nno % nnoPerBlock ? 1 : 0)),
 		xHost(dim * count), xDev(NULL), xMatrixDev(count, dim),
-		valueDev(NULL), valueMatrixDev(count, dim),
+		valueDev(NULL), valueMatrixDev(count, DOF_PER_NODE),
 		szxps(count), szxpsDev(NULL), szxpv(0), xpvDev(NULL)
 
 	{
