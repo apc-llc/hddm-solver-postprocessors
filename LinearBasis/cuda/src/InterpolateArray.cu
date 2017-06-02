@@ -68,6 +68,8 @@ __global__ void KERNEL(FUNCNAME)(
 
 			double xp = xpv[idx];
 			if (xp <= 0.0) goto next;
+			
+			temp *= xp[idx];
 		}
 
 		//for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
