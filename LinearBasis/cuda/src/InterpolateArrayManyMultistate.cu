@@ -51,11 +51,7 @@ __global__ void KERNEL(FUNCNAME)(
 
 		// Loop to calculate all unique xp values.
 		for (int i = threadIdx.x, e = szxps_[many]; i < e; i += blockDim.x)
-		{
-			const Index<uint16_t>& index = xps(i);
-			const uint32_t& j = index.index;
-			xpv[i] = LinearBasis(x[j], index.i, index.j);
-		}
+			xpv[i] = LinearBasis(x, (uint32_t*)&xps(i));
 
 		// Each thread hosts a part of blockDim.x-shared register cache
 		// to accumulate nnoPerBlock intermediate additions.
@@ -76,19 +72,21 @@ __global__ void KERNEL(FUNCNAME)(
 				int32_t idx = chains(i * nfreqs + ifreq);
 				if (!idx) break;
 
+				double xp = xpv[idx];
+				if (xp <= 0.0) goto next;
+
 				temp *= xpv[idx];
-				if (temp <= 0.0) goto next;
 			}
 
-			if (threadIdx.x < DOF_PER_NODE)
-				cache += temp * surplus(i, threadIdx.x);
-				
+			//for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
+			cache += temp * surplus(i, threadIdx.x);				
 		
 		next :
 
 			continue;
 		}
 
+		//for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
 		if (threadIdx.x < DOF_PER_NODE)
 			atomicAdd(&value[threadIdx.x], cache);
 	}
@@ -110,7 +108,7 @@ public :
 	int count;
 
 	static const int szblock = 128;
-	static const int nnoPerBlock = 16;
+	static const int nnoPerBlock = 64;
 	int nblocks;
 
 	vector<double> xHost;

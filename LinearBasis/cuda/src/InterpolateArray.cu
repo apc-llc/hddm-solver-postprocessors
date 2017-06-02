@@ -46,24 +46,15 @@ __global__ void KERNEL(FUNCNAME)(
 
 	// Loop to calculate all unique xp values.
 	for (int i = threadIdx.x, e = szxps; i < e; i += blockDim.x)
-	{
-		const Index<uint16_t>& index = xps(i);
-		const uint32_t& j = index.index;
-		double xp = LinearBasis(x[j], index.i, index.j);
-		xpv[i] = fmax(0.0, xp);
-	}
+		xpv[i] = LinearBasis(x, (uint32_t*)&xps(i));
 
-	__syncthreads();
-
-#define szcache 4
 	// Each thread hosts a part of blockDim.x-shared register cache
 	// to accumulate nnoPerBlock intermediate additions.
 	// blockDim.x -sharing is done due to limited number of registers
 	// available per thread.
-	double cache[szcache];
-	for (int i = 0; i < szcache; i++)
-		cache[i] = 0;
-#undef szcache
+	double cache = 0.0;
+
+	__syncthreads();
 
 	// Loop to calculate scaled surplus product.
 	for (int i = blockIdx.x * nnoPerBlock, e = min(i + nnoPerBlock, NNO); i < e; i++)
@@ -75,20 +66,21 @@ __global__ void KERNEL(FUNCNAME)(
 			int32_t idx = chains(i * nfreqs + ifreq);
 			if (!idx) break;
 
-			temp *= xpv[idx];
-			if (!temp) goto next;
+			double xp = xpv[idx];
+			if (xp <= 0.0) goto next;
 		}
 
-		for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
-			cache[icache] += temp * surplus(i, Dof_choice);
+		//for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
+		cache += temp * surplus(i, threadIdx.x);				
 	
 	next :
 
 		continue;
 	}
 
-	for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
-		atomicAdd(&value[Dof_choice], cache[icache]);
+	//for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
+	if (threadIdx.x < DOF_PER_NODE)
+		atomicAdd(&value[threadIdx.x], cache);
 }
 
 namespace {
@@ -105,8 +97,8 @@ public :
 	int nno;
 	int DofPerNode;
 
-	int szblock;
-	int nnoPerBlock;
+	static const int szblock = 128;
+	static const int nnoPerBlock = 64;
 	int nblocks;
 
 	const double* xHost;
@@ -124,10 +116,10 @@ public :
 	cudaStream_t stream;
 
 	InterpolateArray(int dim, int nno, int DofPerNode, const int szxps) :
-		dim(dim), nno(nno), DofPerNode(DofPerNode),
-		szblock(128), nnoPerBlock(16), nblocks(nno / nnoPerBlock + (nno % nnoPerBlock ? 1 : 0)),
+		dim(dim), nno(nno), DofPerNode(DOF_PER_NODE),
+		nblocks(nno / nnoPerBlock + (nno % nnoPerBlock ? 1 : 0)),
 		xDev(NULL), xVectorDev(dim),
-		valueDev(NULL), valueVectorDev(dim),
+		valueDev(NULL), valueVectorDev(DOF_PER_NODE),
 		szxps(szxps), xpvDev(NULL)
 
 	{
@@ -253,7 +245,7 @@ extern "C" void FUNCNAME(
 
 	// Launch the kernel.
 #ifdef XPV_IN_GLOBAL_MEMORY
-	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, interp->stream>>>(
+	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, 0, interp->stream>>>(
 #else
 	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, interp->szxps * sizeof(double), interp->stream>>>(
 #endif
