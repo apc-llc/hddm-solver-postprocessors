@@ -860,10 +860,17 @@ void Data::load(const char* filename, int istate)
 			i = ii;
 		}
 	}
+	
+	// Refill chains, packing frequencies in series of 4.
+	int nfreqsAligned = state.nfreqs;
+	if (state.nfreqs % 4)
+		nfreqsAligned += 4 - state.nfreqs % 4;
+	state.chains.resize(0);
+	state.chains.resize(nno * nfreqsAligned);
 	for (int i = 0, e = vv.size(); i < e; i++)
 	{
 		for (int ifreq = 0; ifreq < state.nfreqs; ifreq++)
-			state.chains[i * state.nfreqs + ifreq] = vv[i][ifreq];
+			state.chains[i * nfreqsAligned + ifreq] = vv[i][ifreq];
 	}	
 
 	// Reorder surpluses.
@@ -880,6 +887,8 @@ void Data::load(const char* filename, int istate)
 			memcpy(&surplusNew(newind, 0), &(surplusOld(oldind, 0)), surplusNew.dimx() * sizeof(double));
 		}
 	}
+	
+	state.nfreqs = nfreqsAligned;
 
 	host.data->nfreqs[istate] = state.nfreqs;
 	

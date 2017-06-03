@@ -65,17 +65,30 @@ __global__ void KERNEL(FUNCNAME)(
 		for (int i = blockIdx.x * nnoPerBlock, e = min(i + nnoPerBlock, NNO); i < e; i++)
 		{
 			double temp = 1.0;
-			
-			for (int ifreq = 0; ifreq < nfreqs; ifreq++)
+
+			for (int ifreq = 0; ifreq < nfreqs; ifreq += 4)
 			{
-				// Early exit for shorter chains.
-				int32_t idx = chains(i * nfreqs + ifreq);
-				if (!idx) break;
+				int4 idx = *(int4*)&chains(i * nfreqs + ifreq);
 
-				double xp = xpv[idx];
+				if (!idx.x) break;
+				double xp = xpv[idx.x];
 				if (xp <= 0.0) goto next;
+				temp *= xp;
 
-				temp *= xpv[idx];
+				if (!idx.y) break;
+				xp = xpv[idx.y];
+				if (xp <= 0.0) goto next;
+				temp *= xp;
+
+				if (!idx.z) break;
+				xp = xpv[idx.z];
+				if (xp <= 0.0) goto next;
+				temp *= xp;
+
+				if (!idx.w) break;
+				xp = xpv[idx.w];
+				if (xp <= 0.0) goto next;
+				temp *= xp;
 			}
 
 			//for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
