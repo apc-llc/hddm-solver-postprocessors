@@ -35,34 +35,31 @@ __global__ void KERNEL(FUNCNAME)(
 	const int* nfreqs_, const XPS::Device* xps_, const int* szxps_, double** xpv_, const Chains::Device* chains_,
 	const Matrix<double>::Device* surplus_, double** value_)
 {
+	extern __shared__ double temps[];
+
 	for (int many = 0; many < COUNT; many++)
 	{
 		const double* x = x_[many];
 		const int& nfreqs = nfreqs_[many];
 		const XPS::Device& xps = xps_[many];
-#ifdef XPV_IN_GLOBAL_MEMORY
-		double* xpv = xpv_[blockIdx.x];
-#else
-		extern __shared__ double xpv[];
-#endif
 		const Chains::Device& chains = chains_[many];
 		const Matrix<double>::Device& surplus = surplus_[many];
 		double* value = value_[many];
+
+#ifdef XPV_IN_GLOBAL_MEMORY
+		double* xpv = xpv_[blockIdx.x];
+#else
+		double* xpv = temps + nnoPerBlock;
+#endif
 
 		// Loop to calculate all unique xp values.
 		for (int i = threadIdx.x, e = szxps_[many]; i < e; i += blockDim.x)
 			xpv[i] = LinearBasis(x, (uint32_t*)&xps(i));
 
-		// Each thread hosts a part of blockDim.x-shared register cache
-		// to accumulate nnoPerBlock intermediate additions.
-		// blockDim.x -sharing is done due to limited number of registers
-		// available per thread.
-		double cache = 0.0;
-
 		__syncthreads();
 
-		// Loop to calculate scaled surplus product.
-		for (int i = blockIdx.x * nnoPerBlock, e = min(i + nnoPerBlock, NNO); i < e; i++)
+		for (int i = blockIdx.x * nnoPerBlock + threadIdx.x, ii = threadIdx.x,
+			e = min(i + nnoPerBlock - threadIdx.x, NNO); i < e; i += blockDim.x, ii += blockDim.x)
 		{
 			double temp = 1.0;
 
@@ -91,12 +88,28 @@ __global__ void KERNEL(FUNCNAME)(
 				temp *= xp;
 			}
 
-			//for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
-			cache += temp * surplus(i, threadIdx.x);				
-		
-		next :
-
+			temps[ii] = temp;
 			continue;
+
+		next :
+		
+			temps[ii] = 0.0;
+			continue;
+		}
+
+		__syncthreads();
+
+		// Each thread hosts a part of blockDim.x-shared register cache
+		// to accumulate nnoPerBlock intermediate additions.
+		// blockDim.x -sharing is done due to limited number of registers
+		// available per thread.
+		double cache = 0.0;
+
+		// Loop to calculate scaled surplus product.
+		for (int i = blockIdx.x * nnoPerBlock, e = min(i + nnoPerBlock, NNO), ii = 0; i < e; i++, ii++)
+		{
+			//for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
+			cache += temps[ii] * surplus(i, threadIdx.x);
 		}
 
 		//for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
@@ -313,9 +326,9 @@ extern "C" void FUNCNAME(
 
 	// Launch the kernel.
 #ifdef XPV_IN_GLOBAL_MEMORY
-	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, 0, interp->stream>>>(
+	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, interp->nnoPerBlock * sizeof(double), interp->stream>>>(
 #else
-	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, interp->szxpv * sizeof(double), interp->stream>>>(
+	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, (interp->szxpv + interp->nnoPerBlock) * sizeof(double), interp->stream>>>(
 #endif
 		dim, nno, interp->nnoPerBlock, DOF_PER_NODE, count, interp->xDev,
 		nfreqs_, xps_, interp->szxpsDev, interp->xpvDev, chains_, surplus_, interp->valueDev);
