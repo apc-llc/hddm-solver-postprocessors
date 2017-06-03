@@ -31,20 +31,20 @@ using namespace std;
 class Device;
 
 __global__ void KERNEL(FUNCNAME)(
-	const int dim, const int nno, const int nnoPerBlock, const int DofPerNode, const int count, const double* const* x_,
+	const int dim, const int nno, const int nnoPerBlock, const int DofPerNode, const int count, const double* x_,
 	const int* nfreqs_, const XPS::Device* xps_, const int* szxps_, double** xpv_, const Chains::Device* chains_,
-	const Matrix<double>::Device* surplus_, double** value_)
+	const Matrix<double>::Device* surplus_, double* value_)
 {
 	extern __shared__ double temps[];
 
 	for (int many = 0; many < COUNT; many++)
 	{
-		const double* x = x_[many];
+		const double* x = x_ + many * dim;
 		const int& nfreqs = nfreqs_[many];
 		const XPS::Device& xps = xps_[many];
 		const Chains::Device& chains = chains_[many];
 		const Matrix<double>::Device& surplus = surplus_[many];
-		double* value = value_[many];
+		double* value = value_ + many * DOF_PER_NODE;
 
 #ifdef XPV_IN_GLOBAL_MEMORY
 		double* xpv = xpv_[blockIdx.x];
@@ -122,8 +122,6 @@ namespace {
 
 class InterpolateArrayManyMultistate
 {
-	Matrix<double>::Device xMatrixDev;
-	Matrix<double>::Device valueMatrixDev;
 	Matrix<double>::Device xpvMatrixDev;
 
 public :
@@ -138,8 +136,8 @@ public :
 	int nblocks;
 
 	vector<double> xHost;
-	double** xDev;
-	double** valueDev;
+	double* xDev;
+	double* valueDev;
 	vector<int> szxps;
 	int* szxpsDev;
 #ifdef XPV_IN_GLOBAL_MEMORY
@@ -156,24 +154,13 @@ public :
 	InterpolateArrayManyMultistate(int dim, int nno, int DofPerNode, int count, const int* szxps_) :
 		dim(dim), nno(nno), DofPerNode(DOF_PER_NODE), count(count),
 		nblocks(nno / nnoPerBlock + (nno % nnoPerBlock ? 1 : 0)),
-		xHost(dim * count), xDev(NULL), xMatrixDev(count, dim),
-		valueDev(NULL), valueMatrixDev(count, DOF_PER_NODE),
+		xHost(dim * count), xDev(NULL), valueDev(NULL),
 		szxps(count), szxpsDev(NULL), szxpv(0), xpvDev(NULL)
 
 	{
-		CUDA_ERR_CHECK(cudaMalloc(&xDev, sizeof(double*) * count));
-		vector<double*> x(count);
-		for (int i = 0; i < count; i++)
-			x[i] = xMatrixDev.getData(i, 0);
-		CUDA_ERR_CHECK(cudaMemcpy(&xDev[0], &x[0], sizeof(double*) * count,
-			cudaMemcpyHostToDevice));
+		CUDA_ERR_CHECK(cudaMalloc(&xDev, sizeof(double) * count * DOF_PER_NODE));
 
-		CUDA_ERR_CHECK(cudaMalloc(&valueDev, sizeof(double*) * count));
-		vector<double*> value(count);
-		for (int i = 0; i < count; i++)
-			value[i] = valueMatrixDev.getData(i, 0);
-		CUDA_ERR_CHECK(cudaMemcpy(&valueDev[0], &value[0], sizeof(double*) * count,
-			cudaMemcpyHostToDevice));
+		CUDA_ERR_CHECK(cudaMalloc(&valueDev, sizeof(double) * count * DOF_PER_NODE));
 
 		CUDA_ERR_CHECK(cudaMalloc(&szxpsDev, sizeof(int) * count));
 		CUDA_ERR_CHECK(cudaMemcpy(&szxpsDev[0], &szxps_[0], sizeof(int) * count,
@@ -226,12 +213,9 @@ public :
 
 		CUDA_ERR_CHECK(cudaHostRegister(&xHost[0], sizeof(double) * dim * count, cudaHostRegisterDefault));
 
-		for (int i = 0; i < count; i++)
-			CUDA_ERR_CHECK(cudaMemcpyAsync(xMatrixDev.getData(i, 0), &xHost[i * dim], sizeof(double) * dim,
-				cudaMemcpyHostToDevice, stream));
+		CUDA_ERR_CHECK(cudaMemcpyAsync(xDev, &xHost[0], sizeof(double) * count * dim, cudaMemcpyHostToDevice, stream));
 
-		for (int i = 0; i < count; i++)
-			CUDA_ERR_CHECK(cudaMemsetAsync(valueMatrixDev.getData(i, 0), 0, sizeof(double) * DOF_PER_NODE, stream));
+		CUDA_ERR_CHECK(cudaMemsetAsync(valueDev, 0, sizeof(double) * count * DOF_PER_NODE, stream));
 
 		// Copy szxps, if different.
 		for (int i = 0; i < count; i++)
@@ -271,7 +255,7 @@ public :
 			cudaError_t cudaError = cudaHostRegister(value_[i], sizeof(double) * DOF_PER_NODE, cudaHostRegisterDefault);
 			if (cudaError != cudaErrorHostMemoryAlreadyRegistered)
 				CUDA_ERR_CHECK(cudaError);
-			CUDA_ERR_CHECK(cudaMemcpyAsync(value_[i], valueMatrixDev.getData(i, 0), sizeof(double) * DOF_PER_NODE,
+			CUDA_ERR_CHECK(cudaMemcpyAsync(value_[i], &valueDev[i * DOF_PER_NODE], sizeof(double) * DOF_PER_NODE,
 				cudaMemcpyDeviceToHost, stream));
 		}
 
