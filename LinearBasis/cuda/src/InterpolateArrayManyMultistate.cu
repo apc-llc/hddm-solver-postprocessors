@@ -49,8 +49,15 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 	const double* x_,
 #endif
 	const int* nfreqs_, const XPS::Device* xps_, const int* szxps_, double** xpv_, const Chains::Device* chains_,
-	const Matrix<double>::Device* surplus_, double* value_)
+	const Matrix<double>::Device* surplus_, double* value_, double* value_next_)
 {
+	// Set the next values array to zero.
+	if (blockIdx.x == 0)
+	{
+		for (int i = threadIdx.x, e = DIM * COUNT; i < e; i += blockDim.x)
+			value_next_[i] = 0.0;
+	}
+
 	extern __shared__ double temps[];
 
 	for (int many = 0; many < COUNT; many++)
@@ -67,7 +74,7 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 		const Chains::Device& chains = chains_[many];
 		const Matrix<double>::Device& surplus = surplus_[many];
 		double* value = value_ + many * DOF_PER_NODE;
-
+		
 #ifdef XPV_IN_GLOBAL_MEMORY
 		double* xpv = xpv_[blockIdx.x];
 #else
@@ -159,7 +166,8 @@ public :
 
 	vector<double> xHost;
 	double* xDev;
-	double* valueDev;
+	double* valueDev1;
+	double* valueDev2;
 	vector<int> szxps;
 	int* szxpsDev;
 #ifdef XPV_IN_GLOBAL_MEMORY
@@ -176,13 +184,18 @@ public :
 	InterpolateArrayManyMultistate(int dim, int nno, int DofPerNode, int count, const int* szxps_) :
 		dim(dim), nno(nno), DofPerNode(DOF_PER_NODE), count(count),
 		nblocks(nno / nnoPerBlock + (nno % nnoPerBlock ? 1 : 0)),
-		xHost(dim * count), xDev(NULL), valueDev(NULL),
+		xHost(dim * count), xDev(NULL), valueDev1(NULL), valueDev2(NULL),
 		szxps(count), szxpsDev(NULL), szxpv(0), xpvDev(NULL)
 
 	{
 		CUDA_ERR_CHECK(cudaMalloc(&xDev, sizeof(double) * count * DOF_PER_NODE));
 
-		CUDA_ERR_CHECK(cudaMalloc(&valueDev, sizeof(double) * count * DOF_PER_NODE));
+		// To save on memset-ing output values array to zero, we
+		// deploy two output values arrays. Initially, first is zered.
+		// Then, second is zeroed during the kernel call. Then arrays
+		// are swapped.
+		CUDA_ERR_CHECK(cudaMalloc(&valueDev1, sizeof(double) * count * DOF_PER_NODE));
+		CUDA_ERR_CHECK(cudaMalloc(&valueDev2, sizeof(double) * count * DOF_PER_NODE));
 
 		CUDA_ERR_CHECK(cudaMalloc(&szxpsDev, sizeof(int) * count));
 		CUDA_ERR_CHECK(cudaMemcpy(&szxpsDev[0], &szxps_[0], sizeof(int) * count,
@@ -204,6 +217,7 @@ public :
 			cudaMemcpyHostToDevice));
 
 		CUDA_ERR_CHECK(cudaStreamCreate(&stream));
+		CUDA_ERR_CHECK(cudaMemsetAsync(valueDev1, 0, sizeof(double) * count * DOF_PER_NODE, stream));
 	}
 
 	template<class T>
@@ -238,8 +252,6 @@ public :
 
 		CUDA_ERR_CHECK(cudaMemcpyAsync(xDev, &xHost[0], sizeof(double) * count * dim, cudaMemcpyHostToDevice, stream));
 #endif
-
-		CUDA_ERR_CHECK(cudaMemsetAsync(valueDev, 0, sizeof(double) * count * DOF_PER_NODE, stream));
 
 		// Copy szxps, if different.
 		for (int i = 0; i < count; i++)
@@ -279,7 +291,7 @@ public :
 			cudaError_t cudaError = cudaHostRegister(value_[i], sizeof(double) * DOF_PER_NODE, cudaHostRegisterDefault);
 			if (cudaError != cudaErrorHostMemoryAlreadyRegistered)
 				CUDA_ERR_CHECK(cudaError);
-			CUDA_ERR_CHECK(cudaMemcpyAsync(value_[i], &valueDev[i * DOF_PER_NODE], sizeof(double) * DOF_PER_NODE,
+			CUDA_ERR_CHECK(cudaMemcpyAsync(value_[i], &valueDev1[i * DOF_PER_NODE], sizeof(double) * DOF_PER_NODE,
 				cudaMemcpyDeviceToHost, stream));
 		}
 
@@ -298,12 +310,18 @@ public :
 #ifdef XPV_IN_GLOBAL_MEMORY
 		CUDA_ERR_CHECK(cudaHostUnregister(&xpv[0]));
 #endif
+
+		// Swap values arrays
+		double* swap = valueDev1;
+		valueDev1 = valueDev2;
+		valueDev2 = swap;
 	}
 
 	~InterpolateArrayManyMultistate()
 	{
 		CUDA_ERR_CHECK(cudaFree(xDev));
-		CUDA_ERR_CHECK(cudaFree(valueDev));
+		CUDA_ERR_CHECK(cudaFree(valueDev1));
+		CUDA_ERR_CHECK(cudaFree(valueDev2));
 		CUDA_ERR_CHECK(cudaFree(szxpsDev));
 #ifdef XPV_IN_GLOBAL_MEMORY		
 		CUDA_ERR_CHECK(cudaFree(xpvDev));
@@ -346,7 +364,7 @@ extern "C" void FUNCNAME(
 #else		
 		interp->xDev,
 #endif
-		nfreqs_, xps_, interp->szxpsDev, interp->xpvDev, chains_, surplus_, interp->valueDev);
+		nfreqs_, xps_, interp->szxpsDev, interp->xpvDev, chains_, surplus_, interp->valueDev1, interp->valueDev2);
 
 	interp->save(value_);
 }
