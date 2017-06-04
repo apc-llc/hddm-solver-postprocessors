@@ -3,8 +3,12 @@
 
 #include <algorithm> // min & max
 
-#define CAT(kernel, name) name##_kernel
-#define KERNEL(name) CAT(kernel, name)
+#define KERNEL_CAT(name) name##_kernel
+#define KERNEL(name) KERNEL_CAT(name)
+#define STR1(val) #val
+#define STR2(val) STR1(val)
+#define STRPARAM_CAT(name, index) STR2(name##_kernel_param_##index)
+#define STRPARAM(name, index) STRPARAM_CAT(name, index)
 
 // CUDA 8.0 introduces sm_60_atomic_functions.h with atomicAdd(double*, double)
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
@@ -30,8 +34,20 @@ using namespace std;
 
 class Device;
 
-__global__ void KERNEL(FUNCNAME)(
-	const int dim, const int nno, const int nnoPerBlock, const int DofPerNode, const int count, const double* x_,
+#if defined(DEFERRED)
+union X
+{
+	double x[DIM * COUNT];
+};
+#endif
+
+extern "C" __global__ void KERNEL(FUNCNAME)(
+	const int dim, const int nno, const int nnoPerBlock, const int DofPerNode, const int count,
+#if defined(DEFERRED)
+	const X x_,
+#else	
+	const double* x_,
+#endif
 	const int* nfreqs_, const XPS::Device* xps_, const int* szxps_, double** xpv_, const Chains::Device* chains_,
 	const Matrix<double>::Device* surplus_, double* value_)
 {
@@ -39,7 +55,13 @@ __global__ void KERNEL(FUNCNAME)(
 
 	for (int many = 0; many < COUNT; many++)
 	{
+#if defined(DEFERRED)
+		double* x;
+		asm("mov.b64 %0, " STRPARAM(FUNCNAME, 5) ";" : "=l"(x));
+		x += many * dim;
+#else
 		const double* x = x_ + many * dim;
+#endif
 		const int& nfreqs = nfreqs_[many];
 		const XPS::Device& xps = xps_[many];
 		const Chains::Device& chains = chains_[many];
@@ -211,9 +233,11 @@ public :
 		for (int i = 0; i < count; i++)
 			memcpy(&xHost[i * dim], x_[i], sizeof(double) * dim);
 
+#if !defined(DEFERRED)
 		CUDA_ERR_CHECK(cudaHostRegister(&xHost[0], sizeof(double) * dim * count, cudaHostRegisterDefault));
 
 		CUDA_ERR_CHECK(cudaMemcpyAsync(xDev, &xHost[0], sizeof(double) * count * dim, cudaMemcpyHostToDevice, stream));
+#endif
 
 		CUDA_ERR_CHECK(cudaMemsetAsync(valueDev, 0, sizeof(double) * count * DOF_PER_NODE, stream));
 
@@ -261,7 +285,9 @@ public :
 
 		CUDA_ERR_CHECK(cudaStreamSynchronize(stream));
 
+#if !defined(DEFERRED)
 		CUDA_ERR_CHECK(cudaHostUnregister(&xHost[0]));
+#endif
 		for (int i = 0; i < count; i++)
 		{
 			cudaError_t cudaError = cudaHostUnregister(value_[i]);
@@ -314,7 +340,12 @@ extern "C" void FUNCNAME(
 #else
 	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, (interp->szxpv + interp->nnoPerBlock) * sizeof(double), interp->stream>>>(
 #endif
-		dim, nno, interp->nnoPerBlock, DOF_PER_NODE, count, interp->xDev,
+		dim, nno, interp->nnoPerBlock, DOF_PER_NODE, count,
+#if defined(DEFERRED)
+		*(X*)&interp->xHost[0],
+#else		
+		interp->xDev,
+#endif
 		nfreqs_, xps_, interp->szxpsDev, interp->xpvDev, chains_, surplus_, interp->valueDev);
 
 	interp->save(value_);
