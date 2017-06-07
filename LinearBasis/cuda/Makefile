@@ -78,8 +78,8 @@ $(BUILD)/supported.o: src/supported.cpp
 $(BUILD)/reset.o: src/reset.cpp
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
 
-$(BUILD)/Device.o: src/Device.cpp
-	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
+$(BUILD)/Device.o: src/Device.cu
+	$(CDIR) && $(NVCC) $(CINC) $(NVCCOPT) $(addprefix -Xcompiler=, $(OMPFLAGS)) -c $< -o $@
 
 $(BUILD)/Devices.o: src/Devices.cu
 	$(CDIR) && $(NVCC) $(CINC) $(NVCCOPT) $(addprefix -Xcompiler=, $(OMPFLAGS)) -c $< -o $@

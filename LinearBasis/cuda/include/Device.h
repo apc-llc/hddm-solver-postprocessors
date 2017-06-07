@@ -15,12 +15,16 @@ class Device
 	Postprocessor* post;
 
 	long long id;
+	int blockSize;
+	int blockCount;
 	int warpSize;
 	int cc;
 
 public :
 
 	long long getID() const;
+	int getBlockSize() const;
+	int getBlockCount() const;
 	int getWarpSize() const;
 	int getCC() const;
 		

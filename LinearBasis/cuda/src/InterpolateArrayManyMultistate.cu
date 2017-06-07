@@ -1,5 +1,6 @@
-#include "LinearBasis.h"
 #include "Data.h"
+#include "Device.h"
+#include "LinearBasis.h"
 
 #include <algorithm> // min & max
 
@@ -31,8 +32,6 @@ inline __attribute__((always_inline)) __device__ double atomicAdd(double* addres
 
 using namespace NAMESPACE;
 using namespace std;
-
-class Device;
 
 #if defined(DEFERRED)
 union X
@@ -160,8 +159,8 @@ public :
 	int DofPerNode;
 	int count;
 
-	static const int szblock = 128;
-	static const int nnoPerBlock = 64;
+	const int szblock;
+	const int nnoPerBlock;
 	int nblocks;
 
 	vector<double> xHost;
@@ -181,9 +180,11 @@ public :
 
 	cudaStream_t stream;
 
-	InterpolateArrayManyMultistate(int dim, int nno, int DofPerNode, int count, const int* szxps_) :
+	InterpolateArrayManyMultistate(Device* device, int dim, int nno, int DofPerNode, int count, const int* szxps_) :
+		szblock(device->getBlockSize()),
+		nnoPerBlock(nno / device->getBlockCount() + ((nno % device->getBlockCount()) ? 1 : 0)),
 		dim(dim), nno(nno), DofPerNode(DOF_PER_NODE), count(count),
-		nblocks(nno / nnoPerBlock + (nno % nnoPerBlock ? 1 : 0)),
+		nblocks(device->getBlockCount()),
 		xHost(dim * count), xDev(NULL), valueDev1(NULL), valueDev2(NULL),
 		szxps(count), szxpsDev(NULL), szxpv(0), xpvDev(NULL)
 
@@ -348,7 +349,7 @@ extern "C" void FUNCNAME(
 			rebuild = true;
 	
 	if (rebuild)
-		interp.reset(new InterpolateArrayManyMultistate(dim, nno, DOF_PER_NODE, count, szxps_));
+		interp.reset(new InterpolateArrayManyMultistate(device, dim, nno, DOF_PER_NODE, count, szxps_));
 
 	interp->load(x_, szxps_);
 
