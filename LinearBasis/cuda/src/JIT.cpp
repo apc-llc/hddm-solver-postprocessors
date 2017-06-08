@@ -248,7 +248,7 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 			// Map X vector onto formal parameter constant memory space, if smaller than
 			// DEVICE_CONST_X_MAX_SIZE, and the size is runtime-constant.
 			bool useConstMemoryForX = false;
-			if (dim * count < DEVICE_CONST_X_MAX_SIZE)
+			if (dim * count * sizeof(double) < DEVICE_CONST_X_MAX_SIZE)
 				useConstMemoryForX = true;
 
 			const char* format = "%s -arch=sm_%d -lineinfo -DDEFERRED %s -DFUNCNAME=%s -DDIM=%d "
