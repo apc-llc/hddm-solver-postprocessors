@@ -245,28 +245,35 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 			for (long i = 0; i < length; i++)
 				if (sh[i] == '\n') sh[i] = ' ';
 
-			const char* format = "%s -arch=sm_%d -lineinfo -DDEFERRED -DFUNCNAME=%s -DDIM=%d "
-				"-DCOUNT=%d -DNNO=%d -DVDIM8=%d -DDOF_PER_NODE=%d -o %s";
+			// Map X vector onto formal parameter constant memory space, if smaller than
+			// DEVICE_CONST_X_MAX_SIZE, and the size is runtime-constant.
+			bool useConstMemoryForX = false;
+			if (dim * count < DEVICE_CONST_X_MAX_SIZE)
+				useConstMemoryForX = true;
+
+			const char* format = "%s -arch=sm_%d -lineinfo -DDEFERRED %s -DFUNCNAME=%s -DDIM=%d "
+				"-DCOUNT=%d -DNNO=%d -DVDIM8=%d -DDOF_PER_NODE=%d -o %s %s";
 
 			bool keepCache = false;
 			const char* keepCacheValue = getenv("KEEP_CACHE");
 			if (keepCacheValue)
 				keepCache = atoi(keepCacheValue);
-			if (keepCache)
-				format = "%s -arch=sm_%d -lineinfo -DDEFERRED -DFUNCNAME=%s -DDIM=%d "
-					"-DCOUNT=%d -DNNO=%d -DVDIM8=%d -DDOF_PER_NODE=%d -o %s -keep";
 
 			// Add arch specification based on CC of the given device.
 			int cc = device->getCC();
 
 			size_t szcmd = snprintf(NULL, 0, format,
-				&sh[0], cc, funcname.c_str(), dim, count, nno, vdim8, DofPerNode, tmp.filename.c_str());
+				&sh[0], cc, useConstMemoryForX ? "-DX_IN_CONSTANT_MEMORY" : "",
+				funcname.c_str(), dim, count, nno, vdim8, DofPerNode, tmp.filename.c_str(),
+				keepCache ? "-keep" : "");
 
 			cmd.resize(szcmd + 2);
 			cmd[szcmd + 1] = '\0';
 
 			snprintf(&cmd[0], szcmd + 1, format,
-				&sh[0], cc, funcname.c_str(), dim, count, nno, vdim8, DofPerNode, tmp.filename.c_str());
+				&sh[0], cc, useConstMemoryForX ? "-DX_IN_CONSTANT_MEMORY" : "",
+				funcname.c_str(), dim, count, nno, vdim8, DofPerNode, tmp.filename.c_str(),
+				keepCache ? "-keep" : "");
 
 			if (keepCache)
 				printf("cmd = %s\n", &cmd[0]);

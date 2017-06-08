@@ -76,6 +76,8 @@ int Device::getBlockCount() const { return blockCount; }
 int Device::getWarpSize() const { return warpSize; }
 int Device::getCC() const { return cc; }
 
+const SM* Device::getSM() const { return &sm; }
+
 Device::Device() : available(1)
 {
 	maxConcurrentBlockEval<<<1024, getBlockSize()>>>();
@@ -85,4 +87,11 @@ Device::Device() : available(1)
 
 	CUDA_ERR_CHECK(cudaMemcpyFromSymbol(&blockCount, maxConcurrentBlocksVar, sizeof(int)));
 }
+
+int SM::getCount() const { return count; }
+int SM::getSharedMemorySize() const { return szshmem; }
+
+SM::SM() : count(0), szshmem(0) { }
+
+SM::SM(int count_, int szshmem_) : count(count_), szshmem(szshmem) { }
 

@@ -33,7 +33,7 @@ inline __attribute__((always_inline)) __device__ double atomicAdd(double* addres
 using namespace NAMESPACE;
 using namespace std;
 
-#if defined(DEFERRED)
+#ifdef X_IN_CONSTANT_MEMORY
 union X
 {
 	double x[DIM * COUNT];
@@ -42,7 +42,7 @@ union X
 
 extern "C" __global__ void KERNEL(FUNCNAME)(
 	const int dim, const int nno, const int nnoPerBlock, const int DofPerNode, const int count,
-#if defined(DEFERRED)
+#ifdef X_IN_CONSTANT_MEMORY
 	const X x_,
 #else	
 	const double* x_,
@@ -61,7 +61,7 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 
 	for (int many = 0; many < COUNT; many++)
 	{
-#if defined(DEFERRED)
+#ifdef X_IN_CONSTANT_MEMORY
 		double* x;
 		asm("mov.b64 %0, " STRPARAM(FUNCNAME, 5) ";" : "=l"(x));
 		x += many * dim;
@@ -74,11 +74,7 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 		const Matrix<double>::Device& surplus = surplus_[many];
 		double* value = value_ + many * DOF_PER_NODE;
 		
-#ifdef XPV_IN_GLOBAL_MEMORY
-		double* xpv = xpv_[blockIdx.x];
-#else
-		double* xpv = temps + nnoPerBlock;
-#endif
+		double* xpv = xpv_ ? xpv_[blockIdx.x] : temps + nnoPerBlock;
 
 		// Loop to calculate all unique xp values.
 		for (int i = threadIdx.x, e = szxps_[many]; i < e; i += blockDim.x)
@@ -248,7 +244,7 @@ public :
 		for (int i = 0; i < count; i++)
 			memcpy(&xHost[i * dim], x_[i], sizeof(double) * dim);
 
-#if !defined(DEFERRED)
+#ifndef X_IN_CONSTANT_MEMORY
 		CUDA_ERR_CHECK(cudaHostRegister(&xHost[0], sizeof(double) * dim * count, cudaHostRegisterDefault));
 
 		CUDA_ERR_CHECK(cudaMemcpyAsync(xDev, &xHost[0], sizeof(double) * count * dim, cudaMemcpyHostToDevice, stream));
@@ -298,7 +294,7 @@ public :
 
 		CUDA_ERR_CHECK(cudaStreamSynchronize(stream));
 
-#if !defined(DEFERRED)
+#ifndef X_IN_CONSTANT_MEMORY
 		CUDA_ERR_CHECK(cudaHostUnregister(&xHost[0]));
 #endif
 		for (int i = 0; i < count; i++)
@@ -353,19 +349,31 @@ extern "C" void FUNCNAME(
 
 	interp->load(x_, szxps_);
 
-	// Launch the kernel.
-#ifdef XPV_IN_GLOBAL_MEMORY
-	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, interp->nnoPerBlock * sizeof(double), interp->stream>>>(
-#else
-	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, (interp->szxpv + interp->nnoPerBlock) * sizeof(double), interp->stream>>>(
+	// Calculate the size of shared memory.
+	// Use shared memory for the XPV vector, if it fits.
+	int szshmem = interp->nnoPerBlock * sizeof(double);
+	bool useSharedMemoryForXPV = false;
+#ifndef XPV_IN_GLOBAL_MEMORY
+	int nblocksPerSM = device->getBlockCount() / device->getSM()->getCount();
+	int szxpvb = interp->szxpv * sizeof(double);
+	if (device->getSM()->getSharedMemorySize() / nblocksPerSM > szshmem + szxpvb)
+	{
+		szshmem += szxpvb;
+		useSharedMemoryForXPV = true;
+	}
 #endif
+
+	// Launch the kernel.
+	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, szshmem, interp->stream>>>(
 		dim, nno, interp->nnoPerBlock, DOF_PER_NODE, count,
-#if defined(DEFERRED)
+#ifdef X_IN_CONSTANT_MEMORY
 		*(X*)&interp->xHost[0],
-#else		
+#else
 		interp->xDev,
 #endif
-		nfreqs_, xps_, interp->szxpsDev, interp->xpvDev, chains_, surplus_, interp->valueDev1, interp->valueDev2);
+		nfreqs_, xps_, interp->szxpsDev,
+		useSharedMemoryForXPV ? NULL : interp->xpvDev,
+		chains_, surplus_, interp->valueDev1, interp->valueDev2);
 
 	interp->save(value_);
 }

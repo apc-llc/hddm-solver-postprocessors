@@ -7,6 +7,21 @@ class Devices;
 
 class Postprocessor;
 
+class SM
+{
+	int count;
+	int szshmem;
+
+public :
+
+	int getCount() const;
+	int getSharedMemorySize() const;
+
+	SM();
+
+	SM(int count_, int szshmem_);
+};
+
 // Defines device-specific parameters of interpolator.
 class Device
 {
@@ -19,6 +34,8 @@ class Device
 	int blockCount;
 	int warpSize;
 	int cc;
+	
+	SM sm;
 
 public :
 
@@ -27,6 +44,8 @@ public :
 	int getBlockCount() const;
 	int getWarpSize() const;
 	int getCC() const;
+
+	const SM* getSM() const;
 		
 	Device();
 	

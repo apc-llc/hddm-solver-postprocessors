@@ -24,12 +24,15 @@ Devices::Devices()
 		ngpus = 0;
 	}
 	else
+	{
 		CUDA_ERR_CHECK(cudaError);
+		CUDA_ERR_CHECK(cudaDeviceReset());
+	}
 	devices.resize(ngpus);
 	
-	struct cudaDeviceProp props;
 	for (int igpu = 0; igpu < ngpus; igpu++)
 	{
+		struct cudaDeviceProp props;
 		CUDA_ERR_CHECK(cudaGetDeviceProperties(&props, igpu));
 		int id[2];
 		id[0] = props.pciBusID;
@@ -37,6 +40,7 @@ Devices::Devices()
 		devices[igpu].id = *(long long*)id;
 		devices[igpu].warpSize = props.warpSize;
 		devices[igpu].cc = props.major * 10 + props.minor;
+		devices[igpu].sm = SM(props.multiProcessorCount, props.sharedMemPerMultiprocessor);
 	}
 }
 
