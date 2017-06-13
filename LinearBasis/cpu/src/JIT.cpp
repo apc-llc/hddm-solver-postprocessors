@@ -281,25 +281,29 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 			kernel.func = fallbackFunc;
 
 			kernels_tls[signature] = kernel;
-			PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
-			return kernel;
 		}
+		else
+		{
+			process->cout("JIT-compiled CPU kernel for dim = %d, count = %d, nno = %d, DofPerNode = %d\n",
+				dim, count, nno, DofPerNode);
 
-		process->cout("JIT-compiled CPU kernel for dim = %d, count = %d, nno = %d, DofPerNode = %d\n",
-			dim, count, nno, DofPerNode);
-
-		kernel.dim = dim;
-		kernel.count = count;
-		kernel.nno = nno;
-		kernel.DofPerNode = DofPerNode;
-		kernel.filename = tmp.filename;
-		kernel.fileowner = true;
-		kernel.funcname = funcname;
+			kernel.dim = dim;
+			kernel.count = count;
+			kernel.nno = nno;
+			kernel.DofPerNode = DofPerNode;
+			kernel.filename = tmp.filename;
+			kernel.fileowner = true;
+			kernel.funcname = funcname;
+		}
 
 		// Convert filename to char array.
 		vector<char> vfilename;
-		vfilename.resize(tmp.filename.length() + 1);
-		memcpy(&vfilename[0], tmp.filename.c_str(), vfilename.size());
+		if (!kernel.compilationFailed)
+		{
+			// Keep zero filename vector size, if runtime compilation has failed.
+			vfilename.resize(tmp.filename.length() + 1);
+			memcpy(&vfilename[0], tmp.filename.c_str(), vfilename.size());
+		}
 
 		// Send filename to everyone.
 		vector<MPI_Request> vrequests;
@@ -331,17 +335,37 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 		MPI_ERR_CHECK(MPI_Recv(&vfilename[0], length, MPI_BYTE,
 			process->getRoot(), 2 * id, process->getComm(), MPI_STATUS_IGNORE));
 
-		kernel.dim = dim;
-		kernel.count = count;
-		kernel.nno = nno;
-		kernel.DofPerNode = DofPerNode;
-		kernel.filename = string(&vfilename[0], vfilename.size());
-		kernel.fileowner = false;
-		kernel.funcname = funcname;
+		// Zero filename is an indication of failed runtime compilation.
+		if (vfilename.size())
+		{
+			kernel.dim = dim;
+			kernel.count = count;
+			kernel.nno = nno;
+			kernel.DofPerNode = DofPerNode;
+			kernel.filename = string(&vfilename[0], vfilename.size());
+			kernel.fileowner = false;
+			kernel.funcname = funcname;
+		}
+		else
+		{
+			kernel.compilationFailed = true;
+			kernel.dim = dim;
+			kernel.count = count;
+			kernel.nno = nno;
+			kernel.DofPerNode = DofPerNode;
+			kernel.fileowner = false;
+			kernel.func = fallbackFunc;
+
+			kernels_tls[signature] = kernel;
+		}
 	}
 
-	kernel.func = kernel.getFunc();
-	kernels_tls[signature] = kernel;
+	if (!kernel.compilationFailed)
+	{
+		kernel.func = kernel.getFunc();
+		kernels_tls[signature] = kernel;
+	}
+
 	PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
 	return kernel;
 }
