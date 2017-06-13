@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #if defined(__sun)
 # include <sys/filio.h> // for FIONREAD on Solaris 2.5
 #endif
-#include <unistd.h>     // for pipe() fork() exec() and filedes functions
+#include <unistd.h>     // for pipe() clone() exec() and filedes functions
 #include <signal.h>     // for kill()
 #include <fcntl.h>      // for fcntl()
 #if REDI_EVISCERATE_PSTREAMS
@@ -213,9 +213,9 @@ namespace redi
       /// Enumerated type to indicate whether stdout or stderr is to be read.
       enum buf_read_src { rsrc_out = 0, rsrc_err = 1 };
 
-      /// Initialise pipes and fork process.
+      /// Initialise pipes and clone process.
       pid_t
-      fork(pmode mode);
+      clone(const std::string& command, pmode mode);
 
       /// Wait for the child process to exit.
       int
@@ -269,7 +269,23 @@ namespace redi
       /// Index into rpipe_[] to indicate active source for read operations.
       buf_read_src  rsrc_;
       int           status_;      // hold exit status of child process
-      int           error_;       // hold errno if fork() or exec() fails
+      int           error_;       // hold errno if clone() or exec() fails
+
+      struct cloneFuncArgs
+      {
+        const std::string& command;
+        pmode mode;
+        fd_type* const pin;
+        fd_type* const pout;
+        fd_type* const perr;
+
+        cloneFuncArgs(const std::string& command_, pmode mode_,
+          fd_type* const pin_, fd_type* const pout_, fd_type* const perr_) :
+        command(command_), mode(mode_), pin(pin_), pout(pout_), perr(perr_) { }
+      };
+
+      static int
+      cloneFunc(void *arg);
     };
 
   /// Class template for common base class.
@@ -1112,29 +1128,14 @@ namespace redi
     basic_pstreambuf<C,T>*
     basic_pstreambuf<C,T>::open(const std::string& command, pmode mode)
     {
-      const char * shell_path = "/bin/sh";
-#if 0
-      const std::string argv[] = { "sh", "-c", command };
-      return this->open(shell_path, argv_type(argv, argv+3), mode);
-#else
       basic_pstreambuf<C,T>* ret = NULL;
 
       if (!is_open())
       {
-        switch(fork(mode))
+        switch(clone(command, mode))
         {
-        case 0 :
-          // this is the new process, exec command
-          ::execl(shell_path, "sh", "-c", command.c_str(), (char*)NULL);
-
-          // can only reach this point if exec() failed
-
-          // parent can get exit code from waitpid()
-          ::_exit(errno);
-          // using std::exit() would make static dtors run twice
-
         case -1 :
-          // couldn't fork, error already handled in pstreambuf::fork()
+          // couldn't clone, error already handled in pstreambuf::clone()
           break;
 
         default :
@@ -1145,7 +1146,6 @@ namespace redi
         }
       }
       return ret;
-#endif
     }
 
   /**
@@ -1234,7 +1234,7 @@ namespace redi
         }
         else
         {
-          switch(fork(mode))
+          switch(clone(mode))
           {
           case 0 :
             // this is the new process, exec command
@@ -1268,7 +1268,7 @@ namespace redi
             }
 
           case -1 :
-            // couldn't fork, error already handled in pstreambuf::fork()
+            // couldn't clone, error already handled in pstreambuf::clone()
             close_fd_array(ck_exec);
             break;
 
@@ -1300,14 +1300,70 @@ namespace redi
       return ret;
     }
 
+  template <typename C, typename T>
+    int
+    basic_pstreambuf<C,T>::cloneFunc(void *arg)
+    {
+      cloneFuncArgs* args = (cloneFuncArgs*)arg;
+
+      const std::string& command = args->command;
+      pmode mode = args->mode;
+      fd_type* const pin = args->pin;
+      fd_type* const pout = args->pout;
+      fd_type* const perr = args->perr;
+    
+      // constants for read/write ends of pipe
+      enum { RD, WR };
+
+      // for each open pipe close one end and redirect the
+      // respective standard stream to the other end
+
+      if (*pin >= 0)
+      {
+        ::close(pin[WR]);
+        ::dup2(pin[RD], STDIN_FILENO);
+        ::close(pin[RD]);
+      }
+      if (*pout >= 0)
+      {
+        ::close(pout[RD]);
+        ::dup2(pout[WR], STDOUT_FILENO);
+        ::close(pout[WR]);
+      }
+      if (*perr >= 0)
+      {
+        ::close(perr[RD]);
+        ::dup2(perr[WR], STDERR_FILENO);
+        ::close(perr[WR]);
+      }
+
+#ifdef _POSIX_JOB_CONTROL
+      if (mode&newpg)
+        ::setpgid(0, 0); // Change to a new process group
+#endif
+
+      const char * shell_path = "/bin/sh";
+
+      // this is the new process, exec command
+      ::execl(shell_path, "sh", "-c", command.c_str(), (char*)NULL);
+
+      // can only reach this point if exec() failed
+
+      // parent can get exit code from waitpid()
+      ::_exit(errno);
+      // using std::exit() would make static dtors run twice
+
+      return 0;
+    }
+
   /**
-   * Creates pipes as specified by @a mode and calls @c fork() to create
-   * a new process. If the fork is successful the parent process stores
+   * Creates pipes as specified by @a mode and calls @c clone() to create
+   * a new process. If the clone is successful the parent process stores
    * the child's PID and the opened pipes and the child process replaces
    * its standard streams with the opened pipes.
    *
    * If an error occurs the error code will be set to one of the possible
-   * errors for @c pipe() or @c fork().
+   * errors for @c pipe() or @c clone().
    * See your system's documentation for these error codes.
    *
    * @param   mode  an OR of pmodes specifying which of the child's
@@ -1318,7 +1374,7 @@ namespace redi
    */
   template <typename C, typename T>
     pid_t
-    basic_pstreambuf<C,T>::fork(pmode mode)
+    basic_pstreambuf<C,T>::clone(const std::string& command, pmode mode)
     {
       pid_t pid = -1;
 
@@ -1348,45 +1404,19 @@ namespace redi
 
       if (!error_)
       {
-        pid = ::fork();
+        cloneFuncArgs args(command, mode, pin, pout, perr);
+
+#define STACK_SIZE (1024 * 1024)    /* Stack size for cloned child */
+
+        char* stack = (char*)malloc(STACK_SIZE);
+        char* stackTop = stack + STACK_SIZE;  /* Assume stack grows downward */
+
+        pid = ::clone(cloneFunc, stackTop, SIGCHLD, &args);
         switch (pid)
         {
-          case 0 :
-          {
-            // this is the new process
-
-            // for each open pipe close one end and redirect the
-            // respective standard stream to the other end
-
-            if (*pin >= 0)
-            {
-              ::close(pin[WR]);
-              ::dup2(pin[RD], STDIN_FILENO);
-              ::close(pin[RD]);
-            }
-            if (*pout >= 0)
-            {
-              ::close(pout[RD]);
-              ::dup2(pout[WR], STDOUT_FILENO);
-              ::close(pout[WR]);
-            }
-            if (*perr >= 0)
-            {
-              ::close(perr[RD]);
-              ::dup2(perr[WR], STDERR_FILENO);
-              ::close(perr[WR]);
-            }
-
-#ifdef _POSIX_JOB_CONTROL
-            if (mode&newpg)
-              ::setpgid(0, 0); // Change to a new process group
-#endif
-
-            break;
-          }
           case -1 :
           {
-            // couldn't fork for some reason
+            // couldn't clone for some reason
             error_ = errno;
             // close any open pipes
             close_fd_array(fd);
