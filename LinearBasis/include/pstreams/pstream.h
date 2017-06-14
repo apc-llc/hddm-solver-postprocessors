@@ -18,6 +18,11 @@ You should have received a copy of the GNU Lesser General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/*
+This is a modified version of PStreams, which uses clone() instead of fork()
+to overcome problems with fork() invocation from the MPI application context.
+*/
+
 /**
  * @file pstream.h
  * @brief Declares all PStreams classes.
