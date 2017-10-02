@@ -8,7 +8,7 @@ NVCC := $(shell which nvcc 2>/dev/null)
 
 CINC += -I. -I../include -I../../include -DDEVICE_CONST_X_MAX_SIZE=3968 -I$(shell dirname $(NVCC) 2>/dev/null)/../include
 
-NVCCOPT := -gencode=arch=compute_30,code=sm_30 -gencode=arch=compute_35,code=sm_35 -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_60,code=sm_60 -std=c++11
+NVCCOPT := -gencode=arch=compute_60,code=sm_60 -gencode=arch=compute_61,code=sm_61 -std=c++11
 
 ifeq (,$(DEBUG))
 NVCCOPT += -use_fast_math
