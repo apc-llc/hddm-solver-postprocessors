@@ -33,7 +33,6 @@ Parameters::Parameters(const string& targetSuffix, const string& configFile) :
 
 ASSIGN(priority),
 ASSIGN(nagents),
-ASSIGN(binaryio),
 ASSIGN(surplusCutoff),
 ASSIGN(surplusCutoffDefined)
 
@@ -56,7 +55,6 @@ ASSIGN(surplusCutoffDefined)
 
 	undefParams["priority"] = true;
 	undefParams["nagents"] = true;
-	undefParams["binaryio"] = true;
 	undefParams["surplusCutoff"] = true;
 
 	// Read the configuration file.
@@ -101,30 +99,6 @@ ASSIGN(surplusCutoffDefined)
 			if (process->isMaster())
 				process->cout("nagents : %d\n", nagents);
 			undefParams["nagents"] = false;
-		}
-		else if ((string)name == "binaryio")
-		{
-			if (process->isMaster())
-				process->cout("binary i/o : ");
-			if (((string)value == "yes") || ((string)value == "y") || ((string)value == "true"))
-			{
-				binaryio = true;
-				if (process->isMaster())
-					process->cout("%s\n", value);
-			}
-			else if (((string)value == "no") || ((string)value == "n") || ((string)value == "false"))
-			{
-				binaryio = false;
-				if (process->isMaster())
-					process->cout("%s\n", value);
-			}
-			else
-			{
-				if (process->isMaster())
-					process->cout("unknown\n");
-				process->abort();
-			}
-			undefParams["binaryio"] = false;
 		}
 		else if ((string)name == "surplusCutoff")
 		{
