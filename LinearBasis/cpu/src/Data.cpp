@@ -348,7 +348,7 @@ void Data::load(const char* filename, int istate)
 	if (!infile)
 	{
 		process->cerr("Error opening file: %s\n", filename);
-		exit(1);
+		process->abort();
 	}  
 
 	int dim, vdim, nno, TotalDof, Level;

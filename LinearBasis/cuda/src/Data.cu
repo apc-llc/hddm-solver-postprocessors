@@ -44,7 +44,7 @@ static bool isCompressed(const char* filename)
 	if (!infile)
 	{
 		process->cerr("Error opening file: %s\n", filename);
-		exit(1);
+		process->abort();
 	}  
 
 	bool compressed = false;
