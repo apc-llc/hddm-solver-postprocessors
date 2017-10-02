@@ -339,17 +339,10 @@ void Data::load(const char* filename, int istate)
 
 	bool compressed = isCompressed(filename);
 
+	// First try to read file as binary.
+	bool binaryio = true;
 	FILE* infile = NULL;
-	if (params.binaryio || compressed)
-		infile = fopen(filename, "rb");
-	else
-		infile = fopen(filename, "r");
-
-	if (!infile)
-	{
-		process->cerr("Error opening file: %s\n", filename);
-		process->abort();
-	}  
+	infile = fopen(filename, "rb");
 
 	int dim, vdim, nno, TotalDof, Level;
 
@@ -370,7 +363,7 @@ void Data::load(const char* filename, int istate)
 	}
 	else
 	{
-		if (params.binaryio)
+		// Guess text/binary format by comparing dim with nagents.
 		{
 			size_t nbytes = 0;
 			nbytes += fread(reinterpret_cast<void*>(&dim), 1, sizeof(dim), infile);
@@ -383,8 +376,14 @@ void Data::load(const char* filename, int istate)
 				process->abort();
 			}
 		}
-		else
+
+		if (dim != params.nagents)
 		{
+			// Reopen file for text-mode reading.
+			fclose(infile);
+			infile = fopen(filename, "r");
+			binaryio = false;
+
 			int nbytes = 0;
 			nbytes += fscanf(infile, "%d", &dim);
 			nbytes += fscanf(infile, "%d", &nno);
@@ -426,7 +425,7 @@ void Data::load(const char* filename, int istate)
 
 			{
 				vector<int> values(2 * dim);
-				if (params.binaryio)
+				if (binaryio)
 				{
 					size_t nbytes = 0;
 					nbytes += fread(reinterpret_cast<int*>(&values[0]), 1, sizeof(int) * 2 * dim, infile);
@@ -467,7 +466,7 @@ void Data::load(const char* filename, int istate)
 
 			{
 				vector<double> values(TotalDof);
-				if (params.binaryio)
+				if (binaryio)
 				{
 					size_t nbytes = 0;
 					nbytes += fread(reinterpret_cast<double*>(&values[0]), 1, sizeof(double) * TotalDof, infile);
