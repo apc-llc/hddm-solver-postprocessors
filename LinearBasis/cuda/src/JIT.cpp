@@ -251,8 +251,14 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 			if (dim * count * sizeof(double) < DEVICE_CONST_X_MAX_SIZE)
 				useConstMemoryForX = true;
 
-			const char* format = "%s -arch=sm_%d -lineinfo -DDEFERRED %s -DFUNCNAME=%s -DDIM=%d "
-				"-DCOUNT=%d -DNNO=%d -DVDIM8=%d -DDOF_PER_NODE=%d -o %s %s";
+			// Add option for including line-number information for device code in release mode only
+			// - debug more already implies it is enabled (compiler warning).
+			const char* format = "%s -arch=sm_%d -DDEFERRED %s -DFUNCNAME=%s -DDIM=%d "
+				"-DCOUNT=%d -DNNO=%d -DVDIM8=%d -DDOF_PER_NODE=%d -o %s %s"
+#if defined(NDEBUG)
+				" -lineinfo"
+#endif
+				;
 
 			bool keepCache = false;
 			const char* keepCacheValue = getenv("KEEP_CACHE");
