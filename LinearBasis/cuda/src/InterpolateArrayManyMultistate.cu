@@ -74,6 +74,7 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 		const Matrix<double>::Device& surplus = surplus_[many];
 		double* value = value_ + many * DOF_PER_NODE;
 		
+		// Select memory space for the xpv array.
 		double* xpv = xpv_ ? xpv_[blockIdx.x] : temps + nnoPerBlock;
 
 		// Loop to calculate all unique xp values.
@@ -81,6 +82,8 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 			xpv[i] = LinearBasis(x, (uint32_t*)&xps(i));
 
 		__syncthreads();
+
+		// TODO Store only non-zero temps, store non-zero temp indexes into shared memory as well!
 
 		for (int i = blockIdx.x * nnoPerBlock + threadIdx.x, ii = threadIdx.x,
 			e = min(i + nnoPerBlock - threadIdx.x, NNO); i < e; i += blockDim.x, ii += blockDim.x)
@@ -132,13 +135,12 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 		// Loop to calculate scaled surplus product.
 		for (int i = blockIdx.x * nnoPerBlock, e = min(i + nnoPerBlock, NNO), ii = 0; i < e; i++, ii++)
 		{
-			//for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
-			cache += temps[ii] * surplus(i, threadIdx.x);
+			for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
+				cache += temps[ii] * surplus(i, Dof_choice);
 		}
 
-		//for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
-		if (threadIdx.x < DOF_PER_NODE)
-			atomicAdd(&value[threadIdx.x], cache);
+		for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
+			atomicAdd(&value[Dof_choice], cache);
 	}
 }
 

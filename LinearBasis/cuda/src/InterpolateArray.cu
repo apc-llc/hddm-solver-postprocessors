@@ -72,17 +72,16 @@ __global__ void KERNEL(FUNCNAME)(
 			temp *= xp;
 		}
 
-		//for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
-		cache += temp * surplus(i, threadIdx.x);				
+		for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
+			cache += temp * surplus(i, Dof_choice);				
 	
 	next :
 
 		continue;
 	}
 
-	//for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
-	if (threadIdx.x < DOF_PER_NODE)
-		atomicAdd(&value[threadIdx.x], cache);
+	for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
+		atomicAdd(&value[Dof_choice], cache);
 }
 
 namespace {
