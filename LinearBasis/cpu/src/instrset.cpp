@@ -62,15 +62,15 @@ InstrSet InstrSetDetect()
 	cpuid(abcd, 7);                                        // call cpuid leaf 7 for feature flags
 	if ((abcd[1] & (1 <<  5)) == 0) return iset;           // no AVX2
 	iset = InstrSetAVX2;                                   // 8: AVX2 supported
-    if ((abcd[1] & (1 << 16)) == 0) return iset;           // no AVX512
-    cpuid(abcd, 0xD);                                      // call cpuid leaf 0xD for feature flags
-    if ((abcd[0] & 0x60) != 0x60)   return iset;           // no AVX512
-    iset = InstrSetAVX512F;                                // 9: AVX512F supported
-    cpuid(abcd, 7);                                        // call cpuid leaf 7 for feature flags
-    if ((abcd[1] & (1 << 31)) == 0) return iset;           // no AVX512VL
-    iset = InstrSetAVX512VL;                               // 10: AVX512VL supported
-    if ((abcd[1] & 0x40020000) != 0x40020000) return iset; // no AVX512BW, AVX512DQ
-    iset = InstrSetAVX512BW_DQ;                            // 11: AVX512BW, AVX512DQ supported
+	if ((abcd[1] & (1 << 16)) == 0) return iset;           // no AVX512
+	cpuid(abcd, 0xD);                                      // call cpuid leaf 0xD for feature flags
+	if ((abcd[0] & 0x60) != 0x60)   return iset;           // no AVX512
+	iset = InstrSetAVX512F;                                // 9: AVX512F supported
+	cpuid(abcd, 7);                                        // call cpuid leaf 7 for feature flags
+	if ((abcd[1] & (1 << 31)) == 0) return iset;           // no AVX512VL
+	iset = InstrSetAVX512VL;                               // 10: AVX512VL supported
+	if ((abcd[1] & 0x40020000) != 0x40020000) return iset; // no AVX512BW, AVX512DQ
+	iset = InstrSetAVX512BW_DQ;                            // 11: AVX512BW, AVX512DQ supported
 
 	return iset;
 }
