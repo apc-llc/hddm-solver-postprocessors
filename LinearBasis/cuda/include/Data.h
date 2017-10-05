@@ -6,8 +6,10 @@
 #include <cstddef>
 #include <cstdlib>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <string.h>
+#include <utility> // pair
 #include <vector>
 
 #include "check.h"
@@ -272,6 +274,34 @@ public :
 	inline __attribute__((always_inline)) void fill(T value)
 	{
 		std::fill(data.begin(), data.end(), value);
+	}
+
+	// Calculate the maximum number of non-zero values across individual rows.
+	inline __attribute__((always_inline)) int maxRowPopulation() const
+	{
+		int result = 0;
+		int vdim = dimX / 2;
+
+		const std::pair<T, T> zero = std::make_pair((T)0, (T)0);
+
+		std::map<int, int> freqs;
+		for (int i = 0; i < dimY; i++)
+			for (int j = 0; j < vdim; j++)
+			{
+				// Get pair.
+				std::pair<T, T> value = std::make_pair(operator()(i, j), operator()(i, j + vdim));
+
+				// If both indexes are zeros, do nothing.
+				if (value == zero)
+					continue;
+			
+				freqs[i]++;
+			}
+
+		for (std::map<int, int>::iterator i = freqs.begin(), e = freqs.end(); i != e; i++)
+			result = std::max(result, i->second);
+		
+		return result;
 	}
 };
 

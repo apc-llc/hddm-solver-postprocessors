@@ -597,26 +597,8 @@ void Data::load(int dim, int vdim, int nno, int TotalDof, int Level, const Matri
 	}
 	state(host.data->xps[istate], host.data->szxps[istate], host.data->chains[istate]);
 
-	// Calculate maximum frequency across row indexes.
-	state.nfreqs = 0;
-	{
-		map<int, int> freqs;
-		for (int i = 0; i < nno; i++)
-			for (int j = 0; j < dim; j++)
-			{
-				// Get pair.
-				pair<int, int> value = make_pair(index(i, j), index(i, j + vdim));
-
-				// If both indexes are zeros, do nothing.
-				if (value == zero)
-					continue;
-			
-				freqs[i]++;
-			}
-
-		for (map<int, int>::iterator i = freqs.begin(), e = freqs.end(); i != e; i++)
-			state.nfreqs = max(state.nfreqs, i->second);
-	}
+	// Calculate the maximum number of non-zero values across individual rows.
+	state.nfreqs = index.maxRowPopulation();
 
 	vector<map<uint32_t, uint32_t> > transMaps(state.nfreqs);
 	vector<AVXIndexes> avxinds(state.nfreqs);
