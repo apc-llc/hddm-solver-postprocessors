@@ -325,12 +325,6 @@ void Data::load(const char* filename, int istate)
 	MPI_ERR_CHECK(MPI_Process_get(&process));
 	const Parameters& params = Interpolator::getInstance()->getParameters();
 
-	bool showDataAnalysis = false;
-	const char* iShowDataAnalysis = getenv("SHOW_DATA_ANALYSIS");
-	if (iShowDataAnalysis)
-		if (atoi(iShowDataAnalysis))
-			showDataAnalysis = true;
-
 	if (loadedStates[istate])
 	{
 		process->cerr("State %d data is already loaded\n", istate);
@@ -551,6 +545,21 @@ void Data::load(const char* filename, int istate)
 		process->cout("\n");
 	}
 #endif
+
+	load(dim, vdim, nno, TotalDof, Level, index, istate);
+}
+
+void Data::load(int dim, int vdim, int nno, int TotalDof, int Level, const Matrix<int>& index, int istate)
+{
+	MPI_Process* process;
+	MPI_ERR_CHECK(MPI_Process_get(&process));
+	const Parameters& params = Interpolator::getInstance()->getParameters();
+
+	bool showDataAnalysis = false;
+	const char* iShowDataAnalysis = getenv("SHOW_DATA_ANALYSIS");
+	if (iShowDataAnalysis)
+		if (atoi(iShowDataAnalysis))
+			showDataAnalysis = true;
 
 	const pair<int, int> zero = make_pair(0, 0);
 
@@ -868,29 +877,6 @@ void Data::load(const char* filename, int istate)
 			process->cout(" -> %d", state.chains[i * state.nfreqs + ifreq]);
 		process->cout("\n");
 	}
-#endif
-
-#if 0	
-	int n1e7 = 0, n1e6 = 0, n1e5 = 0, n1e3 = 0;
-	for (int i = 0; i < nno; i++)
-	{
-		for (int j = 0; j < surplus[istate].dimx(); j++)
-		{
-			if (fabs(surplus[istate](i, j)) > 1e-7)
-				n1e7++;
-			if (fabs(surplus[istate](i, j)) > 1e-6)
-				n1e6++;
-			if (fabs(surplus[istate](i, j)) > 1e-5)
-				n1e5++;
-			if (fabs(surplus[istate](i, j)) > 1e-3)
-				n1e3++;
-		}
-	}
-	
-	process->cout("1e-7 cutoff: %d (%f%%)\n", n1e7, (double)n1e7 / (surplus[istate].dimx() * nno) * 100);
-	process->cout("1e-6 cutoff: %d (%f%%)\n", n1e6, (double)n1e6 / (surplus[istate].dimx() * nno) * 100);
-	process->cout("1e-5 cutoff: %d (%f%%)\n", n1e5, (double)n1e5 / (surplus[istate].dimx() * nno) * 100);
-	process->cout("1e-3 cutoff: %d (%f%%)\n", n1e3, (double)n1e3 / (surplus[istate].dimx() * nno) * 100);
 #endif
 
 	nfreqs[istate] = state.nfreqs;

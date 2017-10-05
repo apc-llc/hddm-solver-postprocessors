@@ -238,6 +238,8 @@ public :
 
 	virtual void load(const char* filename, int istate);
 	
+	virtual void load(int dim, int vdim, int nno, int TotalDof, int Level, const Matrix<int>& index, int istate);
+	
 	virtual void clear();
 
 	Data(int nstates);

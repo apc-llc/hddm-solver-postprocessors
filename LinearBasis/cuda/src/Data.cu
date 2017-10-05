@@ -350,12 +350,6 @@ void Data::load(const char* filename, int istate)
 	MPI_ERR_CHECK(MPI_Process_get(&process));
 	const Parameters& params = Interpolator::getInstance()->getParameters();
 
-	bool showDataAnalysis = false;
-	const char* iShowDataAnalysis = getenv("SHOW_DATA_ANALYSIS");
-	if (iShowDataAnalysis)
-		if (atoi(iShowDataAnalysis))
-			showDataAnalysis = true;
-
 	if (loadedStates[istate])
 	{
 		process->cerr("State %d data is already loaded\n", istate);
@@ -438,7 +432,7 @@ void Data::load(const char* filename, int istate)
 	index.resize(nno, nsd);
 	index.fill(0);
 
-	std::vector<Matrix<real>::Host>& surplus = host.data->surplus;
+	vector<Matrix<real>::Host>& surplus = host.data->surplus;
 	surplus[istate].resize(nno, TotalDof);
 	surplus[istate].fill(0.0);
 
@@ -568,7 +562,21 @@ void Data::load(const char* filename, int istate)
 	}
 	
 	fclose(infile);
+	
+	load(dim, vdim, nno, TotalDof, Level, index, istate);
+}
 
+void Data::load(int dim, int vdim, int nno, int TotalDof, int Level, const Matrix<int>::Host& index, int istate)
+{
+	MPI_Process* process;
+	MPI_ERR_CHECK(MPI_Process_get(&process));
+	const Parameters& params = Interpolator::getInstance()->getParameters();
+
+	bool showDataAnalysis = false;
+	const char* iShowDataAnalysis = getenv("SHOW_DATA_ANALYSIS");
+	if (iShowDataAnalysis)
+		if (atoi(iShowDataAnalysis))
+			showDataAnalysis = true;
 	const pair<int, int> zero = make_pair(0, 0);
 
 	vdim *= AVX_VECTOR_SIZE;
@@ -696,6 +704,8 @@ void Data::load(const char* filename, int istate)
 	
 		avxindsFreq.calculateLengths();
 	}
+
+	vector<Matrix<real>::Host>& surplus = host.data->surplus;
 
 	// Reorder surpluses.
 	if (state.nfreqs)
