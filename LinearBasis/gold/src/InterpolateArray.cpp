@@ -6,8 +6,8 @@ using namespace NAMESPACE;
 class Device;
 
 extern "C" void FUNCNAME(
-	Device* device,	const int dim, 
-	const int Dof_choice_start, const int Dof_choice_end, const double* x,
+	Device* device,
+	const int dim, const int DofPerNode, const double* x,
 	const Matrix<int>* index_, const Matrix<double>* surplus_, double* value)
 {
 	const Matrix<int>& index = *index_;
@@ -21,8 +21,7 @@ extern "C" void FUNCNAME(
 	if (dim % AVX_VECTOR_SIZE) vdim++;
 	vdim *= AVX_VECTOR_SIZE;
 
-	for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
-		value[Dof_choice - b] = 0;
+	memset(value, 0, sizeof(double) * DOF_PER_NODE);
 
 	for (int i = 0; i < nno; i++)
 	{
@@ -34,8 +33,9 @@ extern "C" void FUNCNAME(
 				goto zero;
 			temp *= xp;
 		}
-		for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
-			value[Dof_choice - b] += temp * surplus(i, Dof_choice);
+
+		for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE; Dof_choice++)
+			value[Dof_choice] += temp * surplus(i, Dof_choice);
 
 		zero: continue;
 	}

@@ -6,8 +6,8 @@ using namespace NAMESPACE;
 class Device;
 
 extern "C" void FUNCNAME(
-	Device* device,	const int dim,
-	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
+	Device* device,
+	const int dim, const int DofPerNode, const int count, const double* const* x_,
 	const Matrix<int>* index_, const Matrix<double>* surplus_, double** value_)
 {
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
@@ -25,8 +25,7 @@ extern "C" void FUNCNAME(
 
 		int nno = surplus.dimy();
 
-		for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
-			value[Dof_choice - b] = 0;
+		memset(value, 0, sizeof(double) * DOF_PER_NODE);
 
 		for (int i = 0; i < nno; i++)
 		{
@@ -40,8 +39,8 @@ extern "C" void FUNCNAME(
 				temp *= xp;
 			}
 
-			for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
-				value[Dof_choice - b] += temp * surplus(i, Dof_choice);
+			for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE; Dof_choice++)
+				value[Dof_choice] += temp * surplus(i, Dof_choice);
 
 			zero : continue;
 		}
