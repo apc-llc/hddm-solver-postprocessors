@@ -27,10 +27,10 @@ $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
 	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(MPILD) $(CINC) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ $(MPILDFLAGS)
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.cpp
-	$(CDIR) && $(CXX) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArray -DDIM=dim -DNNO=nno -DDOF_PER_NODE=DofPerNode $(CINC) $(COPT) -c $< -o $@
+	$(CDIR) && $(CXX) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArray -DDIM=dim -DDOF_PER_NODE=DofPerNode $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/InterpolateArrayManyMultistate.o: src/InterpolateArrayManyMultistate.cpp
-	$(CDIR) && $(CXX) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArrayManyMultistate -DDIM=dim -DCOUNT=count -DNNO=nno -DDOF_PER_NODE=DofPerNode $(CINC) $(COPT) -c $< -o $@
+	$(CDIR) && $(CXX) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArrayManyMultistate -DDIM=dim -DCOUNT=count -DDOF_PER_NODE=DofPerNode $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/libInterpolateArray.sh: src/InterpolateArray.cpp
 	$(CDIR) && echo cd $(shell pwd) \&\& $(CXX) $(CINC) $(COPT) -shared $^  > $@

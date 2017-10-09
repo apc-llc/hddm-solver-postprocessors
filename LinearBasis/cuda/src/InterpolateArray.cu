@@ -31,7 +31,7 @@ using namespace std;
 class Device;
 
 __global__ void KERNEL(FUNCNAME)(
-	const int dim, const int nno, const int nnoPerBlock, const int DofPerNode, const double* x,
+	const int dim, const int nnoPerBlock, const int DofPerNode, const double* x,
 	const int nfreqs, const XPS::Device* xps_, const int szxps, double** xpv_, const Chains::Device* chains_,
 	const Matrix<double>::Device* surplus_, double* value)
 {
@@ -43,6 +43,8 @@ __global__ void KERNEL(FUNCNAME)(
 #endif
 	const Chains::Device& chains = *chains_;
 	const Matrix<double>::Device& surplus = *surplus_;
+
+	int nno = surplus.dimy();
 
 	// Loop to calculate all unique xp values.
 	for (int i = threadIdx.x, e = szxps; i < e; i += blockDim.x)
@@ -57,7 +59,7 @@ __global__ void KERNEL(FUNCNAME)(
 	__syncthreads();
 
 	// Loop to calculate scaled surplus product.
-	for (int i = blockIdx.x * nnoPerBlock, e = min(i + nnoPerBlock, NNO); i < e; i++)
+	for (int i = blockIdx.x * nnoPerBlock, e = min(i + nnoPerBlock, nno); i < e; i++)
 	{
 		double temp = 1.0;
 		for (int ifreq = 0; ifreq < nfreqs; ifreq++)
@@ -250,7 +252,7 @@ extern "C" void FUNCNAME(
 #else
 	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, interp->szxps * sizeof(double), interp->stream>>>(
 #endif
-		dim, nno, interp->nnoPerBlock, DofPerNode, interp->xDev,
+		dim, interp->nnoPerBlock, DofPerNode, interp->xDev,
 		nfreqs, xps_, szxps, interp->xpvDev, chains_, surplus_, interp->valueDev);
 
 	interp->save(value);

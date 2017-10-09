@@ -20,7 +20,7 @@ params(targetSuffix, configFile)
 { }
 
 extern "C" void INTERPOLATE_ARRAY(
-	Device* device, const int dim, const int nno, int DofPerNode, const double* x,
+	Device* device, const int dim, int DofPerNode, const double* x,
 	const Matrix<int>* index, const Matrix<double>* surplus, double* value);
 
 // Interpolate array of values.
@@ -40,15 +40,13 @@ void Interpolator::interpolate(Device* device, Data* data_,
 		process->abort();
 	}
 
-	int nno = data->surplus[istate].dimy();
-
 	INTERPOLATE_ARRAY(
-		device, data->dim, nno, DofPerNode, x,
+		device, data->dim, DofPerNode, x,
 		&data->index[istate], &data->surplus[istate], value);
 }
 
 extern "C" void INTERPOLATE_ARRAY_MANY_MULTISTATE(
-	Device* device, const int dim, const int nno, int DofPerNode, const int count, const double* const* x_,
+	Device* device, const int dim, int DofPerNode, const int count, const double* const* x_,
 	const Matrix<int>* index, const Matrix<double>* surplus, double** value);
 
 // Interpolate multiple arrays of values, with multiple surplus states.
@@ -68,10 +66,8 @@ void Interpolator::interpolate(Device* device, Data* data_,
 		process->abort();
 	}
 
-	int nno = data->surplus[0].dimy();
-
 	INTERPOLATE_ARRAY_MANY_MULTISTATE(
-		device, data->dim, nno, DofPerNode, data->nstates, x,
+		device, data->dim, DofPerNode, data->nstates, x,
 		&data->index[0], &data->surplus[0], value);
 }
 

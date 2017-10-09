@@ -43,10 +43,10 @@ $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
 	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(CXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -L$(CUDA_LIBRARY_PATH) -lcudart_static -Wl,-rpath=$(CUDA_LIBRARY_PATH)
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.cu ../include/LinearBasis.h
-	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArray -DDIM=dim -DNNO=nno -DDOF_PER_NODE=DofPerNode $(CINC) $(NVCCOPT) -c $< -o $@
+	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArray -DDIM=dim -DDOF_PER_NODE=DofPerNode $(CINC) $(NVCCOPT) -c $< -o $@
 
 $(BUILD)/InterpolateArrayManyMultistate.o: src/InterpolateArrayManyMultistate.cu ../include/LinearBasis.h
-	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArrayManyMultistate -DDIM=dim -DCOUNT=count -DNNO=nno -DDOF_PER_NODE=DofPerNode $(CINC) $(NVCCOPT) -c $< -o $@
+	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArrayManyMultistate -DDIM=dim -DCOUNT=count -DDOF_PER_NODE=DofPerNode $(CINC) $(NVCCOPT) -c $< -o $@
 
 $(BUILD)/libInterpolateArray.sh: src/InterpolateArray.cu
 	$(CDIR) && echo cd $(shell pwd) \&\& $(NVCC) $(CINC) $(filter-out -gencode%,$(NVCCOPT)) -shared $< > $@

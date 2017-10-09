@@ -6,8 +6,7 @@ using namespace NAMESPACE;
 class Device;
 
 extern "C" void FUNCNAME(
-	Device* device,
-	const int dim, const int nno,
+	Device* device,	const int dim,
 	const int Dof_choice_start, const int Dof_choice_end, const int count, const double* const* x_,
 	const Matrix<int>* index_, const Matrix<double>* surplus_, double** value_)
 {
@@ -23,6 +22,8 @@ extern "C" void FUNCNAME(
 		const Matrix<int>& index = index_[many];
 		const Matrix<double>& surplus = surplus_[many];
 		double* value = value_[many];
+
+		int nno = surplus.dimy();
 
 		for (int b = Dof_choice_start, Dof_choice = b, e = Dof_choice_end; Dof_choice <= e; Dof_choice++)
 			value[Dof_choice - b] = 0;

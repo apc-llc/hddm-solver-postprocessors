@@ -6,13 +6,14 @@ using namespace NAMESPACE;
 class Device;
 
 extern "C" void FUNCNAME(
-	Device* device,
-	const int dim, const int nno,
+	Device* device,	const int dim, 
 	const int Dof_choice_start, const int Dof_choice_end, const double* x,
 	const Matrix<int>* index_, const Matrix<double>* surplus_, double* value)
 {
 	const Matrix<int>& index = *index_;
 	const Matrix<double>& surplus = *surplus_;
+
+	int nno = surplus.dimy();
 
 	// Index arrays shall be padded to AVX_VECTOR_SIZE-element
 	// boundary to keep up the required alignment.

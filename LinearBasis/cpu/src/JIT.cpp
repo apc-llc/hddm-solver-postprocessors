@@ -24,18 +24,17 @@ struct KSignature
 {
 	int dim;
 	int count;
-	int nno;
 	int DofPerNode;
 	
 	KSignature() : 
 	
-	dim(0), count(0), nno(0), DofPerNode(0)
+	dim(0), count(0), DofPerNode(0)
 	
 	{ }
 	
-	KSignature(int dim_, int count_, int nno_, int DofPerNode_) :
+	KSignature(int dim_, int count_, int DofPerNode_) :
 	
-	dim(dim_), count(count_), nno(nno_), DofPerNode(DofPerNode_)
+	dim(dim_), count(count_), DofPerNode(DofPerNode_)
 	
 	{ }
 	
@@ -51,7 +50,6 @@ struct KSignature
 		size_t seed = 0;
 		hashCombine(seed, dim);
 		hashCombine(seed, count);
-		hashCombine(seed, nno);
 		hashCombine(seed, DofPerNode);
 		return seed;
 	}
@@ -63,7 +61,7 @@ struct KSignature
 };
 
 template<typename K, typename F>
-K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
+K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 	const string& funcnameTemplate, F fallbackFunc)
 {
 	int vdim = dim / AVX_VECTOR_SIZE;
@@ -88,7 +86,7 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 
 	map<KSignature, K, KSignature>& kernels_tls = *kernels_tls_;
 
-	KSignature signature(dim, count, nno, DofPerNode);
+	KSignature signature(dim, count, DofPerNode);
 
 	{
 		K& kernel = kernels_tls[signature];
@@ -102,7 +100,6 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 		{
 			kernel.dim = dim;
 			kernel.count = count;
-			kernel.nno = nno;
 			kernel.DofPerNode = DofPerNode;
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
@@ -133,7 +130,6 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 	{
 		kernel.dim = dim;
 		kernel.count = count;
-		kernel.nno = nno;
 		kernel.DofPerNode = DofPerNode;
 		kernel.fileowner = false;
 		kernel.func = fallbackFunc;
@@ -153,8 +149,8 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 	MPI_ERR_CHECK(MPI_Process_get(&process));
 	if (process->isMaster())
 	{
-		process->cout("Performing deferred CPU kernel compilation for dim = %d, count = %d, nno = %d, DofPerNode = %d ...\n",
-			dim, count, nno, DofPerNode);
+		process->cout("Performing deferred CPU kernel compilation for dim = %d, count = %d, DofPerNode = %d ...\n",
+			dim, count, DofPerNode);
 
 		char* cwd = get_current_dir_name();
 		string dir = (string)cwd + "/.cache";
@@ -189,7 +185,6 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 			kernel.compilationFailed = true;
 			kernel.dim = dim;
 			kernel.count = count;
-			kernel.nno = nno;
 			kernel.DofPerNode = DofPerNode;
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
@@ -211,7 +206,6 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 				kernel.compilationFailed = true;
 				kernel.dim = dim;
 				kernel.count = count;
-				kernel.nno = nno;
 				kernel.DofPerNode = DofPerNode;
 				kernel.fileowner = false;
 				kernel.func = fallbackFunc;
@@ -234,15 +228,15 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 			for (long i = 0; i < length; i++)
 				if (sh[i] == '\n') sh[i] = ' ';
 
-			const char* format = "%s -DDEFERRED -DFUNCNAME=%s -DDIM=%d -DCOUNT=%d -DNNO=%d -DVDIM8=%d -DDOF_PER_NODE=%d -o %s";
+			const char* format = "%s -DDEFERRED -DFUNCNAME=%s -DDIM=%d -DCOUNT=%d -DVDIM8=%d -DDOF_PER_NODE=%d -o %s";
 			size_t szcmd = snprintf(NULL, 0, format,
-				&sh[0], funcname.c_str(), dim, count, nno, vdim8, DofPerNode, tmp.filename.c_str());
+				&sh[0], funcname.c_str(), dim, count, vdim8, DofPerNode, tmp.filename.c_str());
 
 			cmd.resize(szcmd + 2);
 			cmd[szcmd + 1] = '\0';
 
 			snprintf(&cmd[0], szcmd + 1, format,
-				&sh[0], funcname.c_str(), dim, count, nno, vdim8, DofPerNode, tmp.filename.c_str());
+				&sh[0], funcname.c_str(), dim, count, vdim8, DofPerNode, tmp.filename.c_str());
 
 			bool keepCache = false;
 			const char* keepCacheValue = getenv("KEEP_CACHE");
@@ -275,7 +269,6 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 			kernel.compilationFailed = true;
 			kernel.dim = dim;
 			kernel.count = count;
-			kernel.nno = nno;
 			kernel.DofPerNode = DofPerNode;
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
@@ -284,12 +277,11 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 		}
 		else
 		{
-			process->cout("JIT-compiled CPU kernel for dim = %d, count = %d, nno = %d, DofPerNode = %d\n",
-				dim, count, nno, DofPerNode);
+			process->cout("JIT-compiled CPU kernel for dim = %d, count = %d, DofPerNode = %d\n",
+				dim, count, DofPerNode);
 
 			kernel.dim = dim;
 			kernel.count = count;
-			kernel.nno = nno;
 			kernel.DofPerNode = DofPerNode;
 			kernel.filename = tmp.filename;
 			kernel.fileowner = true;
@@ -340,7 +332,6 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 		{
 			kernel.dim = dim;
 			kernel.count = count;
-			kernel.nno = nno;
 			kernel.DofPerNode = DofPerNode;
 			kernel.filename = string(&vfilename[0], vfilename.size());
 			kernel.fileowner = false;
@@ -351,7 +342,6 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 			kernel.compilationFailed = true;
 			kernel.dim = dim;
 			kernel.count = count;
-			kernel.nno = nno;
 			kernel.DofPerNode = DofPerNode;
 			kernel.fileowner = false;
 			kernel.func = fallbackFunc;
@@ -371,17 +361,17 @@ K& JIT::jitCompile(Device* device, int dim, int count, int nno, int DofPerNode,
 }
 
 InterpolateArrayKernel& JIT::jitCompile(
-	Device* device, int dim, int nno, int DofPerNode,
+	Device* device, int dim, int DofPerNode,
 	const string& funcnameTemplate, InterpolateArrayFunc fallbackFunc)
 {
 	return JIT::jitCompile<InterpolateArrayKernel, InterpolateArrayFunc>(
-		device, dim, 1, nno, DofPerNode, funcnameTemplate, fallbackFunc);
+		device, dim, 1, DofPerNode, funcnameTemplate, fallbackFunc);
 }
 
 InterpolateArrayManyMultistateKernel& JIT::jitCompile(
-	Device* device, int dim, int count, int nno, int DofPerNode,
+	Device* device, int dim, int count, int DofPerNode,
 	const string& funcnameTemplate, InterpolateArrayManyMultistateFunc fallbackFunc)
 {
 	return JIT::jitCompile<InterpolateArrayManyMultistateKernel, InterpolateArrayManyMultistateFunc>(
-		device, dim, count, nno, DofPerNode, funcnameTemplate, fallbackFunc);
+		device, dim, count, DofPerNode, funcnameTemplate, fallbackFunc);
 }

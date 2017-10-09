@@ -41,7 +41,7 @@ union X
 #endif
 
 extern "C" __global__ void KERNEL(FUNCNAME)(
-	const int dim, const int nno, const int nnoPerBlock, const int DofPerNode, const int count,
+	const int dim, const int nnoPerBlock, const int DofPerNode, const int count,
 #ifdef X_IN_CONSTANT_MEMORY
 	const X x_,
 #else	
@@ -73,6 +73,8 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 		const Chains::Device& chains = chains_[many];
 		const Matrix<double>::Device& surplus = surplus_[many];
 		double* value = value_ + many * DOF_PER_NODE;
+
+		int nno = surplus.dimy();
 		
 		// Select memory space for the xpv array.
 		double* xpv = xpv_ ? xpv_[blockIdx.x] : temps + nnoPerBlock;
@@ -86,7 +88,7 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 		// TODO Store only non-zero temps, store non-zero temp indexes into shared memory as well!
 
 		for (int i = blockIdx.x * nnoPerBlock + threadIdx.x, ii = threadIdx.x,
-			e = min(i + nnoPerBlock - threadIdx.x, NNO); i < e; i += blockDim.x, ii += blockDim.x)
+			e = min(i + nnoPerBlock - threadIdx.x, nno); i < e; i += blockDim.x, ii += blockDim.x)
 		{
 			double temp = 1.0;
 
@@ -133,7 +135,7 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 		double cache = 0.0;
 
 		// Loop to calculate scaled surplus product.
-		for (int i = blockIdx.x * nnoPerBlock, e = min(i + nnoPerBlock, NNO), ii = 0; i < e; i++, ii++)
+		for (int i = blockIdx.x * nnoPerBlock, e = min(i + nnoPerBlock, nno), ii = 0; i < e; i++, ii++)
 		{
 			for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
 				cache += temps[ii] * surplus(i, Dof_choice);
@@ -335,19 +337,23 @@ unique_ptr<InterpolateArrayManyMultistate> interp;
 
 extern "C" void FUNCNAME(
 	Device* device,
-	const int dim, const int nno, const int DofPerNode, const int count, const double* const* x_,
+	const int dim, const int* nnos, const int DofPerNode, const int count, const double* const* x_,
 	const int* nfreqs_, const XPS::Device* xps_, const int* szxps_, const Chains::Device* chains_,
 	const Matrix<double>::Device* surplus_, double** value_)
 {
+	int nnoMax = 0;
+	for (int i = 0; i < count; i++)
+		nnoMax = max(nnoMax, nnos[i]);
+
 	bool rebuild = false;
 	if (!interp.get())
 		rebuild = true;
 	else
-		if (interp->hash() != InterpolateArrayManyMultistate::hash(dim, nno, DOF_PER_NODE, count))
+		if (interp->hash() != InterpolateArrayManyMultistate::hash(dim, nnoMax, DOF_PER_NODE, count))
 			rebuild = true;
 	
 	if (rebuild)
-		interp.reset(new InterpolateArrayManyMultistate(device, dim, nno, DOF_PER_NODE, count, szxps_));
+		interp.reset(new InterpolateArrayManyMultistate(device, dim, nnoMax, DOF_PER_NODE, count, szxps_));
 
 	interp->load(x_, szxps_);
 
@@ -367,7 +373,7 @@ extern "C" void FUNCNAME(
 
 	// Launch the kernel.
 	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, szshmem, interp->stream>>>(
-		dim, nno, interp->nnoPerBlock, DOF_PER_NODE, count,
+		dim, interp->nnoPerBlock, DOF_PER_NODE, count,
 #ifdef X_IN_CONSTANT_MEMORY
 		*(X*)&interp->xHost[0],
 #else
