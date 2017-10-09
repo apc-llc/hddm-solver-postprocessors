@@ -29,6 +29,17 @@ void Interpolator::interpolate(Device* device, Data* data_,
 {
 	Data::Sparse* data = dynamic_cast<Data::Sparse*>(data_);
 
+	if (DofPerNode != data->TotalDof)
+	{
+		MPI_Process* process;
+		MPI_ERR_CHECK(MPI_Process_get(&process));
+		const Parameters& params = Interpolator::getInstance()->getParameters();
+
+		process->cerr("Requested DofPerNode (%d) mismatches actual data TotalDof (%d)\n",
+			DofPerNode, data->TotalDof);
+		process->abort();
+	}
+
 	typedef void (*Func)(
 		Device* device, const int dim, const int nno, int DofPerNode, const double* x,
 		const int nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double* value);
@@ -55,6 +66,17 @@ void Interpolator::interpolate(Device* device, Data* data_,
 	const real** x, int DofPerNode, real** value)
 {
 	Data::Sparse* data = dynamic_cast<Data::Sparse*>(data_);
+
+	if (DofPerNode != data->TotalDof)
+	{
+		MPI_Process* process;
+		MPI_ERR_CHECK(MPI_Process_get(&process));
+		const Parameters& params = Interpolator::getInstance()->getParameters();
+
+		process->cerr("Requested DofPerNode (%d) mismatches actual data TotalDof (%d)\n",
+			DofPerNode, data->TotalDof);
+		process->abort();
+	}
 
 	typedef void (*Func)(
 		Device* device, const int dim, const int nno, int DofPerNode, const int count, const double* const* x_,

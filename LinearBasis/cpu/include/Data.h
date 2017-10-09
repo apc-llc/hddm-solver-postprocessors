@@ -253,23 +253,14 @@ struct Index
 typedef std::vector<Index<uint16_t> > XPS;
 typedef std::vector<uint32_t> Chains;
 
-struct DataStateInfo
-{
-	int dim, vdim;
-	int nno;
-	int TotalDof;
-	int Level;
-};
-
 class DataDense
 {
 protected :
 
-	int nstates;
+	int nstates, dim, TotalDof;
 	std::vector<Matrix<int> > index;
 	std::vector<Matrix<real> > surplus;
 	std::vector<bool> loadedStates;
-	std::vector<DataStateInfo> statesInfo;
 	
 	friend class Interpolator;
 

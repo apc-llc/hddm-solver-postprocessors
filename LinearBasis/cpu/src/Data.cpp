@@ -397,6 +397,37 @@ void DataDense::load(const char* filename, int istate)
 			filename, dim, params.nagents);
 		process->abort();
 	}
+	
+	// Check is the current state the first loaded state.
+	bool firstLoadedState = true;
+	for (int i = 0; i < nstates; i++)
+	{
+		if (loadedStates[i])
+		{
+			firstLoadedState = false;
+			break;
+		}
+	}
+	if (firstLoadedState)
+	{
+		this->dim = dim;
+		this->TotalDof = TotalDof;
+	}
+	else
+	{
+		if (dim != this->dim)
+		{
+			process->cerr("File \"%s\" # of dimensions (%d) mismatches another state (%d)\n",
+				dim, this->dim);
+			process->abort();
+		}
+		if (TotalDof != this->TotalDof)
+		{
+			process->cerr("File \"%s\" TotalDof (%d) mismatches another state (%d)\n",
+				TotalDof, this->TotalDof);
+			process->abort();
+		}
+	}
 
 	// Pad all indexes to 4-element boundary.
 	vdim = dim / AVX_VECTOR_SIZE;
@@ -545,13 +576,6 @@ void DataDense::load(const char* filename, int istate)
 	}
 #endif
 
-	DataStateInfo& si = statesInfo[istate];
-	si.dim = dim;
-	si.vdim = vdim;
-	si.nno = nno;
-	si.TotalDof = TotalDof;
-	si.Level = Level;
-
 	loadedStates[istate] = true;
 }
 
@@ -561,12 +585,10 @@ void DataSparse::load(const char* filename, int istate)
 
 	loadedStates[istate] = false;
 
-	DataStateInfo& si = statesInfo[istate];
-	int dim = si.dim;
-	int vdim = si.vdim;
-	int nno = si.nno;
-	int TotalDof = si.TotalDof;
-	int Level = si.Level;
+	int vdim = dim / AVX_VECTOR_SIZE;
+	if (dim % AVX_VECTOR_SIZE) vdim++;
+
+	int nno = surplus[istate].dimy();
 
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
@@ -897,7 +919,6 @@ DataDense::DataDense(int nstates_) : nstates(nstates_)
 	surplus.resize(nstates);
 	loadedStates.resize(nstates);
 	fill(loadedStates.begin(), loadedStates.end(), false);
-	statesInfo.resize(nstates);
 }
 
 DataSparse::DataSparse(int nstates_) : DataDense(nstates_)

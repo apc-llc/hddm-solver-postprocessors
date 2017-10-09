@@ -29,6 +29,17 @@ void Interpolator::interpolate(Device* device, Data* data_,
 {
 	Data::Dense* data = dynamic_cast<Data::Dense*>(data_);
 
+	if (DofPerNode != data->TotalDof)
+	{
+		MPI_Process* process;
+		MPI_ERR_CHECK(MPI_Process_get(&process));
+		const Parameters& params = Interpolator::getInstance()->getParameters();
+
+		process->cerr("Requested DofPerNode (%d) mismatches actual data TotalDof (%d)\n",
+			DofPerNode, data->TotalDof);
+		process->abort();
+	}
+
 	int dim = data->surplus[istate].dimx();
 	int nno = data->surplus[istate].dimy();
 
@@ -46,6 +57,17 @@ void Interpolator::interpolate(Device* device, Data* data_,
 	const real** x, int DofPerNode, real** value)
 {
 	Data::Sparse* data = dynamic_cast<Data::Sparse*>(data_);
+
+	if (DofPerNode != data->TotalDof)
+	{
+		MPI_Process* process;
+		MPI_ERR_CHECK(MPI_Process_get(&process));
+		const Parameters& params = Interpolator::getInstance()->getParameters();
+
+		process->cerr("Requested DofPerNode (%d) mismatches actual data TotalDof (%d)\n",
+			DofPerNode, data->TotalDof);
+		process->abort();
+	}
 
 	int dim = data->surplus[0].dimx();
 	int nno = data->surplus[0].dimy();
