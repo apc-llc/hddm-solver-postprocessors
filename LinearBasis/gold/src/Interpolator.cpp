@@ -40,11 +40,10 @@ void Interpolator::interpolate(Device* device, Data* data_,
 		process->abort();
 	}
 
-	int dim = data->surplus[istate].dimx();
 	int nno = data->surplus[istate].dimy();
 
 	INTERPOLATE_ARRAY(
-		device, dim, nno, DofPerNode, x,
+		device, data->dim, nno, DofPerNode, x,
 		&data->index[istate], &data->surplus[istate], value);
 }
 
@@ -69,11 +68,10 @@ void Interpolator::interpolate(Device* device, Data* data_,
 		process->abort();
 	}
 
-	int dim = data->surplus[0].dimx();
 	int nno = data->surplus[0].dimy();
 
 	INTERPOLATE_ARRAY_MANY_MULTISTATE(
-		device, dim, nno, DofPerNode, data->nstates, x,
+		device, data->dim, nno, DofPerNode, data->nstates, x,
 		&data->index[0], &data->surplus[0], value);
 }
 

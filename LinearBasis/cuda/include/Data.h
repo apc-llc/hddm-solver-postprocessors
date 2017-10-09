@@ -481,7 +481,7 @@ class Interpolator;
 
 class Data
 {
-	int nstates;
+	int nstates, dim, TotalDof;
 	
 	class Host
 	{

@@ -423,6 +423,37 @@ void Data::load(const char* filename, int istate)
 		process->abort();
 	}
 
+	// Check is the current state the first loaded state.
+	bool firstLoadedState = true;
+	for (int i = 0; i < nstates; i++)
+	{
+		if (loadedStates[i])
+		{
+			firstLoadedState = false;
+			break;
+		}
+	}
+	if (firstLoadedState)
+	{
+		this->dim = dim;
+		this->TotalDof = TotalDof;
+	}
+	else
+	{
+		if (dim != this->dim)
+		{
+			process->cerr("File \"%s\" # of dimensions (%d) mismatches another state (%d)\n",
+				dim, this->dim);
+			process->abort();
+		}
+		if (TotalDof != this->TotalDof)
+		{
+			process->cerr("File \"%s\" TotalDof (%d) mismatches another state (%d)\n",
+				TotalDof, this->TotalDof);
+			process->abort();
+		}
+	}
+
 	// Pad all indexes to 4-element boundary.
 	vdim = dim / AVX_VECTOR_SIZE;
 	if (dim % AVX_VECTOR_SIZE) vdim++;
