@@ -1,5 +1,7 @@
+#include "check.h"
 #include "Devices.h"
 #include "interpolator.h"
+#include "process.h"
 
 #include <iostream>
 #include <memory>

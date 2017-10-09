@@ -1,6 +1,8 @@
 #ifndef HDDM_MPI_PROCESS
 #define HDDM_MPI_PROCESS 
 
+#include <mpi.h>
+
 class MPI_Process
 {
 public :
