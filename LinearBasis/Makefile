@@ -7,7 +7,7 @@ CDIR = mkdir -p $(shell dirname $@)
 
 NVCC := $(shell which nvcc 2>/dev/null)
 
-TARGETS = x86
+TARGETS = gold x86
 ifneq (,$(AVX))
 TARGETS += avx
 else
@@ -33,6 +33,9 @@ endif
 
 all: $(TARGETS)
 
+gold:
+	cd $@ && $(MAKE) -j$(NJOBS)
+
 x86:
 	cd $@ && $(MAKE) -j$(NJOBS)
 
@@ -50,6 +53,7 @@ cuda:
 
 clean:
 	rm -rf $(BUILD) && \
+	cd gold && $(MAKE) clean && cd .. && \
 	cd x86 && $(MAKE) clean && cd .. && \
 	cd avx && $(MAKE) clean && cd .. && \
 	cd avx2 && $(MAKE) clean && cd .. && \

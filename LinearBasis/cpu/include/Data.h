@@ -253,14 +253,23 @@ struct Index
 typedef std::vector<Index<uint16_t> > XPS;
 typedef std::vector<uint32_t> Chains;
 
-class Data
+struct DataStateInfo
 {
+	int dim, vdim;
+	int nno;
+	int TotalDof;
+	int Level;
+};
+
+class DataDense
+{
+protected :
+
 	int nstates;
-	std::vector<int> nfreqs;
-	std::vector<XPS> xps;
-	std::vector<Chains> chains;
+	std::vector<Matrix<int> > index;
 	std::vector<Matrix<real> > surplus;
 	std::vector<bool> loadedStates;
+	std::vector<DataStateInfo> statesInfo;
 	
 	friend class Interpolator;
 
@@ -268,13 +277,36 @@ public :
 
 	virtual void load(const char* filename, int istate);
 	
-	virtual void load(int dim, int vdim, int nno, int TotalDof, int Level, const Matrix<int>& index, int istate);
-	
 	virtual void clear();
 
-	Data(int nstates);
+	DataDense(int nstates);
 	
-	virtual ~Data();
+	virtual ~DataDense();
+};
+
+class DataSparse : public DataDense
+{
+	std::vector<int> nfreqs;
+	std::vector<XPS> xps;
+	std::vector<Chains> chains;
+	
+	friend class Interpolator;
+
+public :
+
+	virtual void load(const char* filename, int istate);
+	
+	DataSparse(int nstates);
+	
+	virtual ~DataSparse();
+};
+
+struct Data
+{
+	typedef DataDense Dense;
+	typedef DataSparse Sparse;
+
+	virtual ~Data() { }
 };
 
 } // namespace NAMESPACE

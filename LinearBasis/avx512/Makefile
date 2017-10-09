@@ -23,7 +23,7 @@ $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
 	$(BUILD)/libInterpolateArray.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
 	$(BUILD)/parameters.o $(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o \
 	$(BUILD)/priority.o $(BUILD)/instrset.o $(BUILD)/supported.o $(BUILD)/reset.o \
-	$(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o
+	$(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o $(BUILD)/getData.o \
 	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(MPILD) $(CINC) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ $(MPILDFLAGS)
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.cpp

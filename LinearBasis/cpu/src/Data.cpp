@@ -1,6 +1,6 @@
 #include "check.h"
-#include "Data.h"
 #include "interpolator.h"
+#include "Data.h"
 
 #include <cstdlib>
 #include <map>
@@ -319,7 +319,7 @@ public :
 	}
 };
 
-void Data::load(const char* filename, int istate)
+void DataDense::load(const char* filename, int istate)
 {
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
@@ -403,9 +403,8 @@ void Data::load(const char* filename, int istate)
 	if (dim % AVX_VECTOR_SIZE) vdim++;
 	int nsd = 2 * vdim * AVX_VECTOR_SIZE;
 
-	Matrix<int> index;
-	index.resize(nno, nsd);
-	index.fill(0);
+	index[istate].resize(nno, nsd);
+	index[istate].fill(0);
 
 	surplus[istate].resize(nno, TotalDof);
 	surplus[istate].fill(0.0);
@@ -441,7 +440,7 @@ void Data::load(const char* filename, int istate)
 					{
 						int value = values[i];
 						value = 2 << (value - 2);
-						index(j, i) = value;
+						index[istate](j, i) = value;
 					}
 				}
 				for (int i = 0; i < dim; )
@@ -452,8 +451,8 @@ void Data::load(const char* filename, int istate)
 						value--;
 						// Precompute "j" to merge two cases into one:
 						// (((i) == 0) ? (1) : (1 - fabs((x) * (i) - (j)))).
-						if (!index(j, i)) value = 0;
-						index(j, i + vdim * AVX_VECTOR_SIZE) = value;
+						if (!index[istate](j, i)) value = 0;
+						index[istate](j, i + vdim * AVX_VECTOR_SIZE) = value;
 					}
 				}
 			}
@@ -501,13 +500,13 @@ void Data::load(const char* filename, int istate)
 		switch (szt)
 		{
 		case 1 :
-			read_index<unsigned char>(infile, nno, dim, vdim, index);
+			read_index<unsigned char>(infile, nno, dim, vdim, index[istate]);
 			break;
 		case 2 :
-			read_index<unsigned short>(infile, nno, dim, vdim, index);
+			read_index<unsigned short>(infile, nno, dim, vdim, index[istate]);
 			break;
 		case 4 :
-			read_index<unsigned int>(infile, nno, dim, vdim, index);
+			read_index<unsigned int>(infile, nno, dim, vdim, index[istate]);
 			break;
 		}
 
@@ -546,11 +545,29 @@ void Data::load(const char* filename, int istate)
 	}
 #endif
 
-	load(dim, vdim, nno, TotalDof, Level, index, istate);
+	DataStateInfo& si = statesInfo[istate];
+	si.dim = dim;
+	si.vdim = vdim;
+	si.nno = nno;
+	si.TotalDof = TotalDof;
+	si.Level = Level;
+
+	loadedStates[istate] = true;
 }
 
-void Data::load(int dim, int vdim, int nno, int TotalDof, int Level, const Matrix<int>& index, int istate)
+void DataSparse::load(const char* filename, int istate)
 {
+	DataDense::load(filename, istate);
+
+	loadedStates[istate] = false;
+
+	DataStateInfo& si = statesInfo[istate];
+	int dim = si.dim;
+	int vdim = si.vdim;
+	int nno = si.nno;
+	int TotalDof = si.TotalDof;
+	int Level = si.Level;
+
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
 	const Parameters& params = Interpolator::getInstance()->getParameters();
@@ -576,11 +593,14 @@ void Data::load(int dim, int vdim, int nno, int TotalDof, int Level, const Matri
 	state(xps[istate], chains[istate]);
 
 	// Calculate the maximum number of non-zero values across individual rows.
-	state.nfreqs = index.maxRowPopulation();
+	state.nfreqs = index[istate].maxRowPopulation();
 
 	vector<map<uint32_t, uint32_t> > transMaps(state.nfreqs);
 	vector<AVXIndexes> avxinds(state.nfreqs);
 
+	// Split single dense index matrix into a set of sparse index matrices.
+	// Each sparse matrix shall contain no more than a single element from
+	// each dense matrix row.
 	for (int ifreq = 0; ifreq < state.nfreqs; ifreq++)
 	{
 		vector<Index<uint32_t> > indexes;
@@ -593,7 +613,7 @@ void Data::load(int dim, int vdim, int nno, int TotalDof, int Level, const Matri
 			for (int j = 0; j < dim; j++)
 			{
 				// Get pair.
-				pair<int, int> value = make_pair(index(i, j), index(i, j + vdim));
+				pair<int, int> value = make_pair(index[istate](i, j), index[istate](i, j + vdim));
 
 				// If both indexes are zeros, do nothing.
 				if (value == zero)
@@ -866,27 +886,32 @@ void Data::load(int dim, int vdim, int nno, int TotalDof, int Level, const Matri
 	loadedStates[istate] = true;
 }
 
-void Data::clear()
+void DataDense::clear()
 {
 	fill(loadedStates.begin(), loadedStates.end(), false);
 }
 
-Data::Data(int nstates_) : nstates(nstates_)
+DataDense::DataDense(int nstates_) : nstates(nstates_)
+{
+	index.resize(nstates);
+	surplus.resize(nstates);
+	loadedStates.resize(nstates);
+	fill(loadedStates.begin(), loadedStates.end(), false);
+	statesInfo.resize(nstates);
+}
+
+DataSparse::DataSparse(int nstates_) : DataDense(nstates_)
 {
 	nfreqs.resize(nstates);
 	xps.resize(nstates);
 	chains.resize(nstates);
-	surplus.resize(nstates);
-	loadedStates.resize(nstates);
-	fill(loadedStates.begin(), loadedStates.end(), false);
 }
 
-Data::~Data()
+DataDense::~DataDense()
 {
 }
 
-extern "C" Data* getData(int nstates)
+DataSparse::~DataSparse()
 {
-	return new Data(nstates);
 }
 

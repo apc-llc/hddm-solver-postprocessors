@@ -15,7 +15,7 @@ $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
 	$(BUILD)/libInterpolateArray.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
 	$(BUILD)/parameters.o $(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o \
 	$(BUILD)/priority.o $(BUILD)/instrset.o $(BUILD)/supported.o $(BUILD)/reset.o \
-	$(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o
+	$(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o $(BUILD)/getData.o \
 	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(MPILD) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ $(MPILDFLAGS)
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.cpp
@@ -61,6 +61,9 @@ $(BUILD)/Devices.o: src/Devices.cpp
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/DeviceProperties.o: src/DeviceProperties.cpp
+	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
+
+$(BUILD)/getData.o: src/getData.cpp
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
 
 clean:

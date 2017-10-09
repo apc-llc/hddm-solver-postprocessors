@@ -1,7 +1,6 @@
 #ifndef INTERPOLATOR_H
 #define INTERPOLATOR_H
 
-#include "Data.h"
 #include "parameters.h"
 
 namespace NAMESPACE {
@@ -13,6 +12,8 @@ enum BasisType
 	LinearBasisType,
 	PolynomialBasisType
 };
+
+class Data;
 
 class Interpolator
 {

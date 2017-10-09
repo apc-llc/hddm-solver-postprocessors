@@ -21,34 +21,25 @@ params(targetSuffix, configFile)
 
 extern "C" void INTERPOLATE_ARRAY(
 	Device* device, const int dim, const int nno, int DofPerNode, const double* x,
-	const int nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double* value);
+	const Matrix<int>* index, const Matrix<double>* surplus, double* value);
 
 // Interpolate array of values.
 void Interpolator::interpolate(Device* device, Data* data_,
 	const int istate, const real* x, int DofPerNode, real* value)
 {
-	Data::Sparse* data = dynamic_cast<Data::Sparse*>(data_);
-
-	typedef void (*Func)(
-		Device* device, const int dim, const int nno, int DofPerNode, const double* x,
-		const int nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double* value);
+	Data::Dense* data = dynamic_cast<Data::Dense*>(data_);
 
 	int dim = data->surplus[istate].dimx();
 	int nno = data->surplus[istate].dimy();
 
-	Func INTERPOLATE_ARRAY_RUNTIME_OPT =
-		JIT::jitCompile(device, dim, nno, DofPerNode,
-			stringize(INTERPOLATE_ARRAY_RUNTIME_OPT) "_",
-			(Func)INTERPOLATE_ARRAY).getFunc();
-	
-	INTERPOLATE_ARRAY_RUNTIME_OPT(
+	INTERPOLATE_ARRAY(
 		device, dim, nno, DofPerNode, x,
-		data->nfreqs[istate], &data->xps[istate], &data->chains[istate], &data->surplus[istate], value);
+		&data->index[istate], &data->surplus[istate], value);
 }
 
 extern "C" void INTERPOLATE_ARRAY_MANY_MULTISTATE(
 	Device* device, const int dim, const int nno, int DofPerNode, const int count, const double* const* x_,
-	const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
+	const Matrix<int>* index, const Matrix<double>* surplus, double** value);
 
 // Interpolate multiple arrays of values, with multiple surplus states.
 void Interpolator::interpolate(Device* device, Data* data_,
@@ -56,21 +47,12 @@ void Interpolator::interpolate(Device* device, Data* data_,
 {
 	Data::Sparse* data = dynamic_cast<Data::Sparse*>(data_);
 
-	typedef void (*Func)(
-		Device* device, const int dim, const int nno, int DofPerNode, const int count, const double* const* x_,
-		const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
-
 	int dim = data->surplus[0].dimx();
 	int nno = data->surplus[0].dimy();
 
-	Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
-		JIT::jitCompile(device, dim, data->nstates, nno, DofPerNode,
-			stringize(INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT) "_",
-			(Func)INTERPOLATE_ARRAY_MANY_MULTISTATE).getFunc();
-
-	INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
+	INTERPOLATE_ARRAY_MANY_MULTISTATE(
 		device, dim, nno, DofPerNode, data->nstates, x,
-		&data->nfreqs[0], &data->xps[0], &data->chains[0], &data->surplus[0], value);
+		&data->index[0], &data->surplus[0], value);
 }
 
 namespace NAMESPACE
