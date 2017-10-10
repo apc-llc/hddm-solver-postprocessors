@@ -3,8 +3,15 @@
 
 #include <mpi.h>
 
+class GoogleTest;
+
 class MPI_Process
 {
+	// Empty process loader for Google Tests.
+	static MPI_Process* GoogleTest(int argc, char* argv[]);
+	
+	friend class GoogleTest;
+
 public :
 	bool isMaster() const;
 	int getRoot() const;
