@@ -253,6 +253,8 @@ struct Index
 typedef std::vector<Index<uint16_t> > XPS;
 typedef std::vector<uint32_t> Chains;
 
+class GoogleTest;
+
 class DataDense
 {
 protected :
@@ -263,6 +265,7 @@ protected :
 	std::vector<bool> loadedStates;
 	
 	friend class Interpolator;
+	friend class GoogleTest;
 
 public :
 
@@ -282,6 +285,7 @@ class DataSparse : public DataDense
 	std::vector<Chains> chains;
 	
 	friend class Interpolator;
+	friend class GoogleTest;
 
 public :
 

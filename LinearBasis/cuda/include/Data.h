@@ -534,6 +534,7 @@ class Data
 	std::vector<bool> loadedStates;
 	
 	friend class Interpolator;
+	friend class GoogleTest;	
 
 public :
 
