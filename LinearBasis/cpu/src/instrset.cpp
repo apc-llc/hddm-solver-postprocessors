@@ -75,3 +75,11 @@ InstrSet InstrSetDetect()
 	return iset;
 }
 
+bool isSupported(InstrSet iset)
+{
+	if (iset == InstrSetUnknown) return false;
+
+	InstrSet isetMax = InstrSetDetect();
+	return (iset <= isetMax);
+}
+

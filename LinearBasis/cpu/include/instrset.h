@@ -20,5 +20,7 @@ enum InstrSet
 
 InstrSet InstrSetDetect();
 
+bool isSupported(InstrSet iset);
+
 #endif // INSTRSET_H
 
