@@ -31,7 +31,7 @@ endif
 
 .PHONY: $(TARGETS)
 
-all: $(TARGETS)
+all: $(TARGETS) tests
 
 gold:
 	cd $@ && $(MAKE) -j$(NJOBS)
@@ -51,6 +51,9 @@ avx512:
 cuda:
 	cd $@ && $(MAKE) -j$(NJOBS)
 
+tests:
+	cd $@ && $(MAKE) -j$(NJOBS)
+
 clean:
 	rm -rf $(BUILD) && \
 	cd gold && $(MAKE) clean && cd .. && \
@@ -58,5 +61,6 @@ clean:
 	cd avx && $(MAKE) clean && cd .. && \
 	cd avx2 && $(MAKE) clean && cd .. && \
 	cd avx512 && $(MAKE) clean && cd .. && \
-	cd cuda && $(MAKE) clean && cd ..
+	cd cuda && $(MAKE) clean && cd .. && \
+	cd tests && $(MAKE) clean && cd ..
 
