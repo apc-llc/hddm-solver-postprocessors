@@ -1047,7 +1047,8 @@ public :
 			// Set that matrix owns its underlying data buffer.
 			elements[i].disownData();
 
-			delete &elements[i];
+			// Each individual element is destroyed by vector destructor.
+			// delete &elements[i];
 		}
 
 		// Free device memory used for array elements.
