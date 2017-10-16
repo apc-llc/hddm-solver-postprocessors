@@ -15,6 +15,13 @@ CINC += -I../../../.. -I../../../../../include -I$(LOCATION)/postprocess/include
 
 COPT += -DAVX_VECTOR_SIZE=8
 
+NVCC := $(shell which nvcc 2>/dev/null)
+
+ifneq (,$(NVCC))
+CINC += -I$(shell dirname $(NVCC) 2>/dev/null)/../include
+COPT += -DNVCC
+endif
+
 CDIR = mkdir -p $(shell dirname $@)
 FDIR = mkdir -p $(shell dirname $@)
 

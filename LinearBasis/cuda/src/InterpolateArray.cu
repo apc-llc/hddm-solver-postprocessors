@@ -90,9 +90,9 @@ namespace {
 
 class InterpolateArray
 {
-	Vector<double>::Device xVectorDev;
-	Vector<double>::Device valueVectorDev;
-	Matrix<double>::Device xpvMatrixDev;
+	Vector<double>::Device *xVectorDev_, &xVectorDev;
+	Vector<double>::Device *valueVectorDev_, &valueVectorDev;
+	Matrix<double>::Device *xpvMatrixDev_, &xpvMatrixDev;
 
 public :
 
@@ -119,10 +119,11 @@ public :
 	cudaStream_t stream;
 
 	InterpolateArray(int dim, int nno, int DofPerNode, const int szxps) :
+		xDev(NULL), xVectorDev_(new Vector<double>::Device(dim)), xVectorDev(*xVectorDev_),
+		valueDev(NULL), valueVectorDev_(new Vector<double>::Device(DOF_PER_NODE)), valueVectorDev(*valueVectorDev_),
+		xpvMatrixDev_(new Matrix<double>::Device()), xpvMatrixDev(*xpvMatrixDev_),
 		dim(dim), nno(nno), DofPerNode(DOF_PER_NODE),
 		nblocks(nno / nnoPerBlock + (nno % nnoPerBlock ? 1 : 0)),
-		xDev(NULL), xVectorDev(dim),
-		valueDev(NULL), valueVectorDev(DOF_PER_NODE),
 		szxps(szxps), xpvDev(NULL)
 
 	{
@@ -215,12 +216,19 @@ public :
 #endif
 	}
 
-	~InterpolateArray()
+	virtual ~InterpolateArray()
 	{
+		cudaError_t cudaError = cudaStreamDestroy(stream);
+		if (cudaError != cudaErrorCudartUnloading)
+		{
+			CUDA_ERR_CHECK(cudaError);
 #ifdef XPV_IN_GLOBAL_MEMORY
-		CUDA_ERR_CHECK(cudaFree(xpvDev));
+			CUDA_ERR_CHECK(cudaFree(xpvDev));
 #endif
-		CUDA_ERR_CHECK(cudaStreamDestroy(stream));
+			delete xVectorDev_;
+			delete valueVectorDev_;
+			delete xpvMatrixDev_;
+		}
 	}
 };
 

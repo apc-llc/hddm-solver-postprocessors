@@ -150,7 +150,7 @@ namespace {
 
 class InterpolateArrayManyMultistate
 {
-	Matrix<double>::Device xpvMatrixDev;
+	Matrix<double>::Device *xpvMatrixDev_, &xpvMatrixDev;
 
 public :
 
@@ -181,6 +181,7 @@ public :
 	cudaStream_t stream;
 
 	InterpolateArrayManyMultistate(Device* device, int dim, int nno, int DofPerNode, int count, const int* szxps_) :
+		xpvMatrixDev_(new Matrix<double>::Device()), xpvMatrixDev(*xpvMatrixDev_),
 		szblock(device->getBlockSize()),
 		nnoPerBlock(nno / device->getBlockCount() + ((nno % device->getBlockCount()) ? 1 : 0)),
 		dim(dim), nno(nno), DofPerNode(DOF_PER_NODE), count(count),
@@ -318,16 +319,21 @@ public :
 		valueDev2 = swap;
 	}
 
-	~InterpolateArrayManyMultistate()
+	virtual ~InterpolateArrayManyMultistate()
 	{
-		CUDA_ERR_CHECK(cudaFree(xDev));
-		CUDA_ERR_CHECK(cudaFree(valueDev1));
-		CUDA_ERR_CHECK(cudaFree(valueDev2));
-		CUDA_ERR_CHECK(cudaFree(szxpsDev));
+		cudaError_t cudaError = cudaStreamDestroy(stream);
+		if (cudaError != cudaErrorCudartUnloading)
+		{
+			CUDA_ERR_CHECK(cudaError);
+			CUDA_ERR_CHECK(cudaFree(xDev));
+			CUDA_ERR_CHECK(cudaFree(valueDev1));
+			CUDA_ERR_CHECK(cudaFree(valueDev2));
+			CUDA_ERR_CHECK(cudaFree(szxpsDev));
 #ifdef XPV_IN_GLOBAL_MEMORY		
-		CUDA_ERR_CHECK(cudaFree(xpvDev));
+			CUDA_ERR_CHECK(cudaFree(xpvDev));
 #endif
-		CUDA_ERR_CHECK(cudaStreamDestroy(stream));
+			delete xpvMatrixDev_;
+		}
 	}
 };
 

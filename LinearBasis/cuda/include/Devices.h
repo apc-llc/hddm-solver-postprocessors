@@ -30,5 +30,9 @@ public :
 
 } // namespace NAMESPACE
 
+extern "C" NAMESPACE::Device* tryAcquireDevice();
+
+extern "C" void releaseDevice(NAMESPACE::Device* device);
+
 #endif // DEVICES_H
 

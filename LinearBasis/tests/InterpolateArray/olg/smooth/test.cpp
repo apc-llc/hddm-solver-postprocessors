@@ -353,7 +353,7 @@ namespace avx2
 
 		GoogleTest()
 		{
-			using namespace avx;
+			using namespace avx2;
 
 			Data::Sparse data(1);
 			data.load("surplus.plt", 0);
@@ -378,6 +378,103 @@ TEST(InterpolateArray, avx2)
 	avx2::GoogleTest();
 }
 
+#undef NAMESPACE
+#define NAMESPACE avx512
+#undef DATA_H
+#include "cpu/include/Data.h"
+
+namespace avx512
+{
+	class Device;
+
+	extern "C" void LinearBasis_avx512_Generic_InterpolateArray(
+		Device* device,
+		const int dim, const int DofPerNode, const double* x,
+		const int nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double* value);
+
+	class GoogleTest
+	{
+	public :
+
+		GoogleTest()
+		{
+			using namespace avx512;
+
+			Data::Sparse data(1);
+			data.load("surplus.plt", 0);
+
+			Vector<double> x(data.dim);
+			init(&x(0), data.dim);
+
+			Vector<double> result(data.TotalDof);
+
+			Device* device = NULL;
+
+			LinearBasis_avx512_Generic_InterpolateArray(device, data.dim, data.TotalDof, &x(0),
+				data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &result(0));
+
+			check(&result(0), data.TotalDof);
+		}
+	};
+}
+
+TEST(InterpolateArray, avx512)
+{
+	avx512::GoogleTest();
+}
+
+#if defined(NVCC)
+#undef NAMESPACE
+#define NAMESPACE cuda
+#undef DATA_H
+#include "cuda/include/Data.h"
+#include "cuda/include/Devices.h"
+
+namespace cuda
+{
+	extern "C" void LinearBasis_cuda_Generic_InterpolateArray(
+		Device* device,
+		const int dim, const int nno, const int DofPerNode, const double* x,
+		const int nfreqs, const XPS::Device* xps_, const int szxps, const Chains::Device* chains_,
+		const Matrix<double>::Device* surplus_, double* value);
+
+	class GoogleTest
+	{
+	public :
+
+		GoogleTest()
+		{
+			using namespace cuda;
+
+			Vector<double>::Host result;
+
+			Device* device = tryAcquireDevice();
+			{
+				Data data(1);
+				data.load("surplus.plt", 0);
+				result.resize(data.TotalDof);
+
+				Vector<double>::Host x(data.dim);
+				init(&x(0), data.dim);
+
+				LinearBasis_cuda_Generic_InterpolateArray(device, data.dim,
+					data.host.getSurplus(0)->dimy(), data.TotalDof, &x(0),
+					*data.host.getNfreqs(0), data.device.getXPS(0), *data.host.getSzXPS(0),
+					data.device.getChains(0), data.device.getSurplus(0), &result(0));
+			}
+			releaseDevice(device);
+
+			check(&result(0), result.length());
+		}
+	};
+}
+
+TEST(InterpolateArray, cuda)
+{
+	cuda::GoogleTest();
+}
+#endif // NVCC
+
 #include "Postprocessors.h"
 
 class GoogleTest
@@ -391,10 +488,16 @@ public :
 		Postprocessors* posts = Postprocessors::getInstance(1, "LinearBasis");
 
 		string filters = "*.x86:*.gold";
+		if (isSupported(InstrSetAVX512F))
+			filters += ":*.avx512";
 		if (isSupported(InstrSetAVX2))
 			filters += ":*.avx2";
 		if (isSupported(InstrSetAVX))
 			filters += ":*.avx";
+#if defined(NVCC)
+		if (tryAcquireDevice())
+			filters += ":*.cuda";
+#endif
 
 		testing::GTEST_FLAG(filter) = filters;
 	}
