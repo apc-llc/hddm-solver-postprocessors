@@ -1,4 +1,0 @@
-LOCATION = ../../../../..
-
-include ../../Makefile.inc
-
