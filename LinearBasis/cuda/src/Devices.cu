@@ -94,21 +94,31 @@ void Devices::release(Device* device)
 namespace NAMESPACE
 {
 	unique_ptr<Devices> devices;
+
+	NAMESPACE::Device* tryAcquireDevice()
+	{
+		if (!devices)
+			devices.reset(new Devices());
+
+		return devices->tryAcquire();
+	}
+
+	void releaseDevice(NAMESPACE::Device* device)
+	{
+		if (!devices)
+			devices.reset(new Devices());
+
+		devices->release(device);
+	}
 }
 
 extern "C" Device* tryAcquireDevice()
 {
-	if (!devices)
-		devices.reset(new Devices());
-
-	return devices->tryAcquire();
+	return NAMESPACE::tryAcquireDevice();
 }
 
 extern "C" void releaseDevice(Device* device)
 {
-	if (!devices)
-		devices.reset(new Devices());
-
-	devices->release(device);
+	NAMESPACE::releaseDevice(device);
 }
 

@@ -448,7 +448,9 @@ namespace cuda
 
 			Vector<double>::Host result;
 
-			Device* device = tryAcquireDevice();
+			Device* device = cuda::tryAcquireDevice();
+			EXPECT_TRUE(device != NULL);
+			if (!device) return;
 			{
 				Data data(1);
 				data.load("surplus.plt", 0);
@@ -495,8 +497,12 @@ public :
 		if (isSupported(InstrSetAVX))
 			filters += ":*.avx";
 #if defined(NVCC)
-		if (tryAcquireDevice())
+		cuda::Device* device = cuda::tryAcquireDevice();
+		if (device)
+		{
 			filters += ":*.cuda";
+			cuda::releaseDevice(device);
+		}
 #endif
 
 		testing::GTEST_FLAG(filter) = filters;

@@ -28,11 +28,11 @@ public :
 	friend class DeviceProperties;
 };
 
+NAMESPACE::Device* tryAcquireDevice();
+
+void releaseDevice(NAMESPACE::Device* device);
+
 } // namespace NAMESPACE
-
-extern "C" NAMESPACE::Device* tryAcquireDevice();
-
-extern "C" void releaseDevice(NAMESPACE::Device* device);
 
 #endif // DEVICES_H
 
