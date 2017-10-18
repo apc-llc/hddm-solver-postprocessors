@@ -1,4 +1,6 @@
+#include <iostream>
 #include <sstream>
+#include <time.h>
 
 #include "cpu/include/instrset.h"
 #include "gtest/gtest.h"
@@ -6,6 +8,14 @@
 using namespace std;
 
 #define EPSILON 0.001
+
+// Get the timer value.
+static void get_time(double* ret)
+{
+	volatile struct timespec val;
+	clock_gettime(CLOCK_REALTIME, (struct timespec*)&val);
+	*ret = (double)0.000000001 * val.tv_nsec + val.tv_sec;
+}
 
 static void init(double* input, int dim)
 {
@@ -629,9 +639,14 @@ namespace gold
 
 			Device* device = NULL;
 
+			double start, finish;
+			get_time(&start);
 			LinearBasis_gold_Generic_InterpolateArrayManyMultistate(
 				device, data.dim, data.TotalDof, 4, &x[0],
 				&data.index[0], &data.surplus[0], &results[0]);
+			get_time(&finish);
+			
+			cout << "time = " << (finish - start) << " sec" << endl;
 
 			check_0(results[0], data.TotalDof);
 			check_1(results[1], data.TotalDof);
@@ -693,9 +708,14 @@ namespace x86
 
 			Device* device = NULL;
 
+			double start, finish;
+			get_time(&start);
 			LinearBasis_x86_Generic_InterpolateArrayManyMultistate(
 				device, data.dim, data.TotalDof, 4, &x[0],
 				&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+			get_time(&finish);
+			
+			cout << "time = " << (finish - start) << " sec" << endl;
 
 			check_0(results[0], data.TotalDof);
 			check_1(results[1], data.TotalDof);
@@ -757,9 +777,14 @@ namespace avx
 
 			Device* device = NULL;
 
+			double start, finish;
+			get_time(&start);
 			LinearBasis_avx_Generic_InterpolateArrayManyMultistate(
 				device, data.dim, data.TotalDof, 4, &x[0],
 				&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+			get_time(&finish);
+			
+			cout << "time = " << (finish - start) << " sec" << endl;
 
 			check_0(results[0], data.TotalDof);
 			check_1(results[1], data.TotalDof);
@@ -821,9 +846,14 @@ namespace avx2
 
 			Device* device = NULL;
 
+			double start, finish;
+			get_time(&start);
 			LinearBasis_avx2_Generic_InterpolateArrayManyMultistate(
 				device, data.dim, data.TotalDof, 4, &x[0],
 				&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+			get_time(&finish);
+			
+			cout << "time = " << (finish - start) << " sec" << endl;
 
 			check_0(results[0], data.TotalDof);
 			check_1(results[1], data.TotalDof);
@@ -885,9 +915,14 @@ namespace avx512
 
 			Device* device = NULL;
 
+			double start, finish;
+			get_time(&start);
 			LinearBasis_avx512_Generic_InterpolateArrayManyMultistate(
 				device, data.dim, data.TotalDof, 4, &x[0],
 				&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+			get_time(&finish);
+			
+			cout << "time = " << (finish - start) << " sec" << endl;
 
 			check_0(results[0], data.TotalDof);
 			check_1(results[1], data.TotalDof);
@@ -957,10 +992,21 @@ namespace cuda
 				for (int i = 0; i < data.nstates; i++)
 					nnos[i] = data.host.getSurplus(i)->dimy();
 
+				// Run once without timing to do all CUDA-specific internal initializations.
 				LinearBasis_cuda_Generic_InterpolateArrayManyMultistate(device, data.dim,
 					&nnos[0], data.TotalDof, 4, &x[0],
 					data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
 					data.device.getChains(0), data.device.getSurplus(0), &results[0]);
+
+				double start, finish;
+				get_time(&start);
+				LinearBasis_cuda_Generic_InterpolateArrayManyMultistate(device, data.dim,
+					&nnos[0], data.TotalDof, 4, &x[0],
+					data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
+					data.device.getChains(0), data.device.getSurplus(0), &results[0]);
+				get_time(&finish);
+			
+				cout << "time = " << (finish - start) << " sec" << endl;
 			}
 			releaseDevice(device);
 
