@@ -959,7 +959,7 @@ namespace cuda
 
 				LinearBasis_cuda_Generic_InterpolateArrayManyMultistate(device, data.dim,
 					&nnos[0], data.TotalDof, 4, &x[0],
-					data.host.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
+					data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
 					data.device.getChains(0), data.device.getSurplus(0), &results[0]);
 			}
 			releaseDevice(device);
