@@ -568,10 +568,19 @@ void DataDense::load(const char* filename, int istate)
 	fclose(infile);
 
 #if 0
-	for (int i = 0; i < nno; i++)
+	for (int i = 0; i < surplus[istate].dimy(); i++)
 	{
 		for (int j = 0; j < surplus[istate].dimx(); j++)
 			process->cout("%e ", surplus[istate](i, j));
+		process->cout("\n");
+	}
+#endif
+
+#if 0
+	for (int j = 0; j < index[istate].dimy(); j++)
+	{
+		for (int i = 0; i < index[istate].dimx() / 2; i++)
+			process->cout("(%d, %d) ", index[istate](j, i), index[istate](j, i + vdim));
 		process->cout("\n");
 	}
 #endif
@@ -620,7 +629,7 @@ void DataSparse::load(const char* filename, int istate)
 	vector<map<uint32_t, uint32_t> > transMaps(state.nfreqs);
 	vector<AVXIndexes> avxinds(state.nfreqs);
 
-	// Split single dense index matrix into a set of sparse index matrices.
+	// Decompose single dense index matrix into a set of sparse index matrices.
 	// Each sparse matrix shall contain no more than a single element from
 	// each dense matrix row.
 	for (int ifreq = 0; ifreq < state.nfreqs; ifreq++)
@@ -690,6 +699,10 @@ void DataSparse::load(const char* filename, int istate)
 		AVXIndexes& avxindsFreq = avxinds[ifreq];
 		avxindsFreq.resize(nno, dim);
 
+		// Copy sparse indexes matrix for the current frequency
+		// into new AVX-aligned sparse matrix, omitting the original
+		// dense index matrix row index, which is no longer needed
+		// after renumbering.
 		for (int j = 0, length = indexes.size() / dim / AVX_VECTOR_SIZE; j < dim; j++)
 		{
 			for (int i = 0; i < length; i++)
@@ -774,7 +787,8 @@ void DataSparse::load(const char* filename, int istate)
 		}
 		freq(avxinds[ifreq], temps[ifreq]);
 
-		// Loop to calculate temps.
+		// In each frequency matrix avxinds, assign each element a global inter-frequency index XPS:
+		// either a new index for unseen value, or existing for already known.
 		for (int j = 0, itemp = 0; j < dim; j++)
 		{
 			for (int i = 0, e = freq.avxinds.getLength(j); i < e; i++)
@@ -794,6 +808,8 @@ void DataSparse::load(const char* filename, int istate)
 				}
 			}			
 
+			// Do not index tailing empty elements.
+			// TODO ???
 			if (freq.avxinds.getLength(j))
 			{
 				const AVXIndex& index = freq.avxinds(freq.avxinds.getLength(j) - 1, j);
@@ -804,6 +820,8 @@ void DataSparse::load(const char* filename, int istate)
 	}
 	if (showDataAnalysis)
 	{
+		// The size of XPS index denotes how many meaninful linear basis
+		// calculations to perform.
 		if (process->isMaster())
 			process->cout("%d unique xp(s) to compute\n", map.xps.size());
 	}

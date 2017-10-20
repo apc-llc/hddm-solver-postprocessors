@@ -1,6 +1,6 @@
 .PHONY: run
 
-LOCATION = ../../../..
+LOCATION = ../../../../..
 
 include $(LOCATION)/Makefile.inc
 
@@ -11,7 +11,7 @@ GTEST_DIR = $(LOCATION)/tests/googletest/googletest
 # the compiler doesn't generate warnings in Google Test headers.
 CINC += -isystem $(GTEST_DIR)/include
 
-CINC += -I../.. -I../../../include -I$(LOCATION)/postprocess/include
+CINC += -I../../.. -I../../../../include -I$(LOCATION)/postprocess/include
 
 COPT += -DAVX_VECTOR_SIZE=8
 
