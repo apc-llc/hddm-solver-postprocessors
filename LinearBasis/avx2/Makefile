@@ -4,8 +4,8 @@ LOCATION = ../../..
 
 include $(LOCATION)/Makefile.inc
 
-CINC += -I. -I../include -I../../include
-COPT += -DAVX_VECTOR_SIZE=8 -DNAMESPACE=$(NAME) -mavx -mavx2 -mfma
+CINC += -I. -I.. -I../include -I../../include
+COPT += -DAVX_VECTOR_SIZE=8 -DDOUBLE_VECTOR_SIZE=4 -DNAMESPACE=$(NAME) -mavx -mavx2 -mfma
 CDIR = mkdir -p $(shell dirname $@)
 
 all: $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so

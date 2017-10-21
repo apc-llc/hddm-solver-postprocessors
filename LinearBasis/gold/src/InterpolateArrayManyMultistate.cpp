@@ -1,5 +1,5 @@
 #include "LinearBasis.h"
-#include "Data.h"
+#include "gold/include/Data.h"
 
 using namespace NAMESPACE;
 

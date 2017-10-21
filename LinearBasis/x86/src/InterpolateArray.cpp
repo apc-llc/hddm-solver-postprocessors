@@ -1,5 +1,5 @@
 #include "LinearBasis.h"
-#include "Data.h"
+#include "x86/include/Data.h"
 
 using namespace NAMESPACE;
 using namespace std;

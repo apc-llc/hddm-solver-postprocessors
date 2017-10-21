@@ -4,7 +4,7 @@ LOCATION = ../../..
 
 include $(LOCATION)/Makefile.inc
 
-CINC += -I. -I../include -I../../include
+CINC += -I. -I.. -I../include -I../../include
 COPT += -DAVX_VECTOR_SIZE=8 -DNAMESPACE=$(NAME)
 CDIR = mkdir -p $(shell dirname $@)
 

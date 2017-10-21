@@ -211,7 +211,7 @@ static void check(double* result, int TotalDof)
 }
 
 #define NAMESPACE gold
-#include "cpu/include/Data.h"
+#include "gold/include/Data.h"
 
 namespace gold
 {
@@ -261,7 +261,7 @@ TEST(InterpolateArray, gold)
 #undef NAMESPACE
 #define NAMESPACE x86
 #undef DATA_H
-#include "cpu/include/Data.h"
+#include "x86/include/Data.h"
 
 namespace x86
 {
@@ -310,8 +310,10 @@ TEST(InterpolateArray, x86)
 
 #undef NAMESPACE
 #define NAMESPACE avx
+#undef DOUBLE_VECTOR_SIZE
+#define DOUBLE_VECTOR_SIZE 4
 #undef DATA_H
-#include "cpu/include/Data.h"
+#include "avx/include/Data.h"
 
 namespace avx
 {
@@ -360,8 +362,10 @@ TEST(InterpolateArray, avx)
 
 #undef NAMESPACE
 #define NAMESPACE avx2
+#undef DOUBLE_VECTOR_SIZE
+#define DOUBLE_VECTOR_SIZE 4
 #undef DATA_H
-#include "cpu/include/Data.h"
+#include "avx2/include/Data.h"
 
 namespace avx2
 {
@@ -410,8 +414,10 @@ TEST(InterpolateArray, avx2)
 
 #undef NAMESPACE
 #define NAMESPACE avx512
+#undef DOUBLE_VECTOR_SIZE
+#define DOUBLE_VECTOR_SIZE 8
 #undef DATA_H
-#include "cpu/include/Data.h"
+#include "avx512/include/Data.h"
 
 namespace avx512
 {
