@@ -664,7 +664,7 @@ namespace gold
 	};
 }
 
-TEST(InterpolateArray, gold)
+TEST(InterpolateArrayManyMultistate, gold)
 {
 	gold::GoogleTest();
 }
@@ -741,7 +741,7 @@ namespace x86
 	};
 }
 
-TEST(InterpolateArray, x86)
+TEST(InterpolateArrayManyMultistate, x86)
 {
 	x86::GoogleTest();
 }
@@ -820,7 +820,7 @@ namespace avx
 	};
 }
 
-TEST(InterpolateArray, avx)
+TEST(InterpolateArrayManyMultistate, avx)
 {
 	avx::GoogleTest();
 }
@@ -899,7 +899,7 @@ namespace avx2
 	};
 }
 
-TEST(InterpolateArray, avx2)
+TEST(InterpolateArrayManyMultistate, avx2)
 {
 	avx2::GoogleTest();
 }
@@ -978,7 +978,7 @@ namespace avx512
 	};
 }
 
-TEST(InterpolateArray, avx512)
+TEST(InterpolateArrayManyMultistate, avx512)
 {
 	avx512::GoogleTest();
 }
@@ -1072,7 +1072,7 @@ namespace cuda
 	};
 }
 
-TEST(InterpolateArray, cuda)
+TEST(InterpolateArrayManyMultistate, cuda)
 {
 	cuda::GoogleTest();
 }
