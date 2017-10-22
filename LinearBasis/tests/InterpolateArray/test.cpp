@@ -10,7 +10,7 @@ using namespace std;
 #define EPSILON 0.001
 
 // Get the timer value.
-static void get_time(double* ret)
+static void get_time(volatile double* ret)
 {
 	volatile struct timespec val;
 	clock_gettime(CLOCK_REALTIME, (struct timespec*)&val);
@@ -240,7 +240,7 @@ namespace gold
 
 			Device* device = NULL;
 
-			double start, finish;
+			volatile double start, finish;
 			get_time(&start);
 			LinearBasis_gold_Generic_InterpolateArray(device, data.dim, data.TotalDof, &x(0),
 				&data.index[0], &data.surplus[0], &result(0));
@@ -290,7 +290,7 @@ namespace x86
 
 			Device* device = NULL;
 
-			double start, finish;
+			volatile double start, finish;
 			get_time(&start);
 			LinearBasis_x86_Generic_InterpolateArray(device, data.dim, data.TotalDof, &x(0),
 				data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &result(0));
@@ -342,7 +342,7 @@ namespace avx
 
 			Device* device = NULL;
 
-			double start, finish;
+			volatile double start, finish;
 			get_time(&start);
 			LinearBasis_avx_Generic_InterpolateArray(device, data.dim, data.TotalDof, &x(0),
 				data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &result(0));
@@ -394,7 +394,7 @@ namespace avx2
 
 			Device* device = NULL;
 
-			double start, finish;
+			volatile double start, finish;
 			get_time(&start);
 			LinearBasis_avx2_Generic_InterpolateArray(device, data.dim, data.TotalDof, &x(0),
 				data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &result(0));
@@ -446,7 +446,7 @@ namespace avx512
 
 			Device* device = NULL;
 
-			double start, finish;
+			volatile double start, finish;
 			get_time(&start);
 			LinearBasis_avx512_Generic_InterpolateArray(device, data.dim, data.TotalDof, &x(0),
 				data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &result(0));
@@ -506,7 +506,7 @@ namespace cuda
 					*data.host.getNfreqs(0), data.device.getXPS(0), *data.host.getSzXPS(0),
 					data.device.getChains(0), data.device.getSurplus(0), &result(0));
 
-				double start, finish;
+				volatile double start, finish;
 				get_time(&start);
 				LinearBasis_cuda_Generic_InterpolateArray(device, data.dim,
 					data.host.getSurplus(0)->dimy(), data.TotalDof, &x(0),

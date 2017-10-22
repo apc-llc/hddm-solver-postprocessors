@@ -15,7 +15,7 @@ using namespace std;
 static bool runopt = true;
 
 // Get the timer value.
-static void get_time(double* ret)
+static void get_time(volatile double* ret)
 {
 	volatile struct timespec val;
 	clock_gettime(CLOCK_REALTIME, (struct timespec*)&val);
@@ -650,7 +650,7 @@ namespace gold
 
 			Device* device = NULL;
 
-			double start, finish;
+			volatile double start, finish;
 			get_time(&start);
 			INTERPOLATE_ARRAY_MANY_MULTISTATE(
 				device, data.dim, data.TotalDof, nstates, &x[0],
@@ -744,7 +744,7 @@ namespace x86
 						stringize(LinearBasis_x86_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 						(Func)NULL).getFunc();
 
-				double start, finish;
+				volatile double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
 					device, data.dim, data.TotalDof, nstates, &x[0],
@@ -755,7 +755,7 @@ namespace x86
 			}
 			else
 			{
-				double start, finish;
+				volatile double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE(
 					device, data.dim, data.TotalDof, nstates, &x[0],
@@ -852,7 +852,7 @@ namespace avx
 						stringize(LinearBasis_avx_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 						(Func)NULL).getFunc();
 
-				double start, finish;
+				volatile double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
 					device, data.dim, data.TotalDof, nstates, &x[0],
@@ -863,7 +863,7 @@ namespace avx
 			}
 			else
 			{
-				double start, finish;
+				volatile double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE(
 					device, data.dim, data.TotalDof, nstates, &x[0],
@@ -960,7 +960,7 @@ namespace avx2
 						stringize(LinearBasis_avx2_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 						(Func)NULL).getFunc();
 
-				double start, finish;
+				volatile double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
 					device, data.dim, data.TotalDof, nstates, &x[0],
@@ -971,7 +971,7 @@ namespace avx2
 			}
 			else
 			{
-				double start, finish;
+				volatile double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE(
 					device, data.dim, data.TotalDof, nstates, &x[0],
@@ -1068,7 +1068,7 @@ namespace avx512
 						stringize(LinearBasis_avx512_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 						(Func)NULL).getFunc();
 
-				double start, finish;
+				volatile double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
 					device, data.dim, data.TotalDof, nstates, &x[0],
@@ -1079,7 +1079,7 @@ namespace avx512
 			}
 			else
 			{
-				double start, finish;
+				volatile double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE(
 					device, data.dim, data.TotalDof, nstates, &x[0],
@@ -1189,7 +1189,7 @@ namespace cuda
 						data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
 						data.device.getChains(0), data.device.getSurplus(0), &results[0]);
 
-					double start, finish;
+					volatile double start, finish;
 					get_time(&start);
 					INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
 						device, data.dim, &nnos[0], data.TotalDof, nstates, &x[0],
@@ -1207,7 +1207,7 @@ namespace cuda
 						data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
 						data.device.getChains(0), data.device.getSurplus(0), &results[0]);
 
-					double start, finish;
+					volatile double start, finish;
 					get_time(&start);
 					INTERPOLATE_ARRAY_MANY_MULTISTATE(
 						device, data.dim, &nnos[0], data.TotalDof, nstates, &x[0],
