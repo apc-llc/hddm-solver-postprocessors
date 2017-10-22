@@ -4,7 +4,7 @@ LOCATION = ../../../../..
 
 include $(LOCATION)/Makefile.inc
 
-GTEST_DIR = $(LOCATION)/tests/googletest/googletest
+GTEST_DIR = ../../googletest/googletest
 
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that
@@ -33,7 +33,7 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 all: $(BUILD)/test
 
 $(GTEST_DIR)/$(BUILD)/libgtest.a:
-	cd $(LOCATION)/tests && $(MAKE) googletest
+	cd ../.. && $(MAKE) googletest
 
 $(BUILD)/test: test.cpp $(GTEST_HEADERS) \
 	$(GTEST_DIR)/$(BUILD)/libgtest.a
