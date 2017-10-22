@@ -64,11 +64,6 @@ template<typename K, typename F>
 K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 	const string& funcnameTemplate, F fallbackFunc)
 {
-	int vdim = dim / AVX_VECTOR_SIZE;
-	if (dim % AVX_VECTOR_SIZE) vdim++;
-	vdim *= AVX_VECTOR_SIZE;
-	int vdim8 = vdim / AVX_VECTOR_SIZE;
-
 	map<KSignature, K, KSignature>* kernels_tls_ = NULL;
 
 	// Already in TLS cache?
@@ -228,15 +223,15 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 			for (long i = 0; i < length; i++)
 				if (sh[i] == '\n') sh[i] = ' ';
 
-			const char* format = "%s -DDEFERRED -DFUNCNAME=%s -DDIM=%d -DCOUNT=%d -DVDIM8=%d -DDOF_PER_NODE=%d -o %s";
+			const char* format = "%s -DFUNCNAME=%s -DDIM=%d -DCOUNT=%d -DDOF_PER_NODE=%d -o %s";
 			size_t szcmd = snprintf(NULL, 0, format,
-				&sh[0], funcname.c_str(), dim, count, vdim8, DofPerNode, tmp.filename.c_str());
+				&sh[0], funcname.c_str(), dim, count, DofPerNode, tmp.filename.c_str());
 
 			cmd.resize(szcmd + 2);
 			cmd[szcmd + 1] = '\0';
 
 			snprintf(&cmd[0], szcmd + 1, format,
-				&sh[0], funcname.c_str(), dim, count, vdim8, DofPerNode, tmp.filename.c_str());
+				&sh[0], funcname.c_str(), dim, count, DofPerNode, tmp.filename.c_str());
 
 			bool keepCache = false;
 			const char* keepCacheValue = getenv("KEEP_CACHE");

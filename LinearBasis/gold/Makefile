@@ -13,7 +13,7 @@ all: $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so
 $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
 	$(BUILD)/InterpolateArray.o $(BUILD)/InterpolateArrayManyMultistate.o \
 	$(BUILD)/libInterpolateArray.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
-	$(BUILD)/parameters.o $(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o \
+	$(BUILD)/parameters.o $(BUILD)/Interpolator.o $(BUILD)/Data.o \
 	$(BUILD)/priority.o $(BUILD)/instrset.o $(BUILD)/supported.o $(BUILD)/reset.o \
 	$(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o $(BUILD)/getData.o
 	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(MPILD) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ $(MPILDFLAGS)
@@ -33,14 +33,11 @@ $(BUILD)/libInterpolateArrayManyMultistate.sh: src/InterpolateArrayManyMultistat
 $(BUILD)/parameters.o: src/parameters.cpp $(LOCATION)/include/check.h include/parameters.h include/parameters.c
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
 
-$(BUILD)/Interpolator.o: src/Interpolator.cpp include/JIT.h include/Data.h
+$(BUILD)/Interpolator.o: src/Interpolator.cpp include/Data.h
 	$(CDIR) && $(CXX) -DNAME=$(NAME) -DINTERPOLATE_ARRAY=LinearBasis_$(NAME)_Generic_InterpolateArray -DINTERPOLATE_ARRAY_RUNTIME_OPT=LinearBasis_$(NAME)_RuntimeOpt_InterpolateArray -DINTERPOLATE_ARRAY_MANY_MULTISTATE=LinearBasis_$(NAME)_Generic_InterpolateArrayManyMultistate -DINTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT=LinearBasis_$(NAME)_RuntimeOpt_InterpolateArrayManyMultistate $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/Data.o: src/Data.cpp include/Data.h
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
-
-$(BUILD)/JIT.o: src/JIT.cpp include/InterpolateKernel.h
-	$(CDIR) && $(CXX) -DINTERPOLATE_ARRAY_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArray.sh\" -DINTERPOLATE_ARRAY_MANY_MULTISTATE_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArrayManyMultistate.sh\" $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/priority.o: src/priority.cpp
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@

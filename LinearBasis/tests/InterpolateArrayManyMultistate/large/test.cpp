@@ -4,10 +4,14 @@
 
 #include "cpu/include/instrset.h"
 #include "gtest/gtest.h"
-
-using namespace std;
+#include "JIT.h"
 
 #define EPSILON 0.001
+
+#define str(x) #x
+#define stringize(x) str(x)
+
+using namespace std;
 
 // Get the timer value.
 static void get_time(double* ret)

@@ -64,9 +64,9 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 #ifdef X_IN_CONSTANT_MEMORY
 		double* x;
 		asm("mov.b64 %0, " STRPARAM(FUNCNAME, 5) ";" : "=l"(x));
-		x += many * dim;
+		x += many * DIM;
 #else
-		const double* x = x_ + many * dim;
+		const double* x = x_ + many * DIM;
 #endif
 		const int& nfreqs = nfreqs_[many];
 		const XPS::Device& xps = xps_[many];
@@ -357,11 +357,11 @@ extern "C" void FUNCNAME(
 	if (!interp.get())
 		rebuild = true;
 	else
-		if (interp->hash() != InterpolateArrayManyMultistate::hash(dim, nnoMax, DOF_PER_NODE, count))
+		if (interp->hash() != InterpolateArrayManyMultistate::hash(DIM, nnoMax, DOF_PER_NODE, count))
 			rebuild = true;
 	
 	if (rebuild)
-		interp.reset(new InterpolateArrayManyMultistate(device, dim, nnoMax, DOF_PER_NODE, count, szxps_));
+		interp.reset(new InterpolateArrayManyMultistate(device, DIM, nnoMax, DOF_PER_NODE, count, szxps_));
 
 	interp->load(x_, szxps_);
 
@@ -381,7 +381,7 @@ extern "C" void FUNCNAME(
 
 	// Launch the kernel.
 	KERNEL(FUNCNAME)<<<interp->nblocks, interp->szblock, szshmem, interp->stream>>>(
-		dim, interp->nnoPerBlock, DOF_PER_NODE, count,
+		DIM, interp->nnoPerBlock, DOF_PER_NODE, count,
 #ifdef X_IN_CONSTANT_MEMORY
 		*(X*)&interp->xHost[0],
 #else

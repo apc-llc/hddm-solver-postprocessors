@@ -75,11 +75,6 @@ template<typename K, typename F>
 K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 	const string& funcnameTemplate, F fallbackFunc)
 {
-	int vdim = dim / AVX_VECTOR_SIZE;
-	if (dim % AVX_VECTOR_SIZE) vdim++;
-	vdim *= AVX_VECTOR_SIZE;
-	int vdim8 = vdim / AVX_VECTOR_SIZE;
-
 	map<KSignature, K, KSignature>* kernels_tls_ = NULL;
 
 	// Already in TLS cache?
@@ -247,8 +242,8 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 
 			// Add option for including line-number information for device code in release mode only
 			// - debug more already implies it is enabled (compiler warning).
-			const char* format = "%s -arch=sm_%d -DDEFERRED %s -DFUNCNAME=%s -DDIM=%d "
-				"-DCOUNT=%d -DVDIM8=%d -DDOF_PER_NODE=%d -o %s %s"
+			const char* format = "%s -arch=sm_%d %s -DFUNCNAME=%s -DDIM=%d "
+				"-DCOUNT=%d -DDOF_PER_NODE=%d -o %s %s"
 #if defined(NDEBUG)
 				" -lineinfo"
 #endif
@@ -264,7 +259,7 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 
 			size_t szcmd = snprintf(NULL, 0, format,
 				&sh[0], cc, useConstMemoryForX ? "-DX_IN_CONSTANT_MEMORY" : "",
-				funcname.c_str(), dim, count, vdim8, DofPerNode, tmp.filename.c_str(),
+				funcname.c_str(), dim, count, DofPerNode, tmp.filename.c_str(),
 				keepCache ? "-keep" : "");
 
 			cmd.resize(szcmd + 2);
@@ -272,7 +267,7 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 
 			snprintf(&cmd[0], szcmd + 1, format,
 				&sh[0], cc, useConstMemoryForX ? "-DX_IN_CONSTANT_MEMORY" : "",
-				funcname.c_str(), dim, count, vdim8, DofPerNode, tmp.filename.c_str(),
+				funcname.c_str(), dim, count, DofPerNode, tmp.filename.c_str(),
 				keepCache ? "-keep" : "");
 
 			if (keepCache)

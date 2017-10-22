@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "interpolator.h"
-#include "JIT.h"
+#include "Data.h"
 
 #define str(x) #x
 #define stringize(x) str(x)
