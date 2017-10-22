@@ -620,24 +620,26 @@ namespace gold
 		{
 			using namespace gold;
 
-			Data::Dense data(4);
+			int nstates = 4;
+
+			Data::Dense data(nstates);
 			data.load("surplus_1.plt", 0);
 			data.load("surplus_2.plt", 1);
 			data.load("surplus_3.plt", 2);
 			data.load("surplus_4.plt", 3);
 
-			vector<Vector<double> > vx(4);
-			vector<double*> x(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vx(nstates);
+			vector<double*> x(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vx[i].resize(data.dim);
 				x[i] = vx[i].getData();
 				init(x[i], data.dim);
 			}
 
-			vector<Vector<double> > vresults(4);
-			vector<double*> results(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vresults(nstates);
+			vector<double*> results(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vresults[i].resize(data.TotalDof);
 				results[i] = vresults[i].getData();
@@ -648,7 +650,7 @@ namespace gold
 			double start, finish;
 			get_time(&start);
 			INTERPOLATE_ARRAY_MANY_MULTISTATE(
-				device, data.dim, data.TotalDof, 4, &x[0],
+				device, data.dim, data.TotalDof, nstates, &x[0],
 				&data.index[0], &data.surplus[0], &results[0]);
 			get_time(&finish);
 			
@@ -695,24 +697,26 @@ namespace x86
 		{
 			using namespace x86;
 
-			Data::Sparse data(4);
+			int nstates = 4;
+
+			Data::Sparse data(nstates);
 			data.load("surplus_1.plt", 0);
 			data.load("surplus_2.plt", 1);
 			data.load("surplus_3.plt", 2);
 			data.load("surplus_4.plt", 3);
 
-			vector<Vector<double> > vx(4);
-			vector<double*> x(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vx(nstates);
+			vector<double*> x(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vx[i].resize(data.dim);
 				x[i] = vx[i].getData();
 				init(x[i], data.dim);
 			}
 
-			vector<Vector<double> > vresults(4);
-			vector<double*> results(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vresults(nstates);
+			vector<double*> results(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vresults[i].resize(data.TotalDof);
 				results[i] = vresults[i].getData();
@@ -727,14 +731,14 @@ namespace x86
 					const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
 
 				Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
-					JIT::jitCompile(device, data.dim, 4, data.TotalDof,
+					JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
 						stringize(LinearBasis_x86_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 						(Func)NULL).getFunc();
 
 				double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
-					device, data.dim, data.TotalDof, 4, &x[0],
+					device, data.dim, data.TotalDof, nstates, &x[0],
 					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
 				get_time(&finish);
 			
@@ -745,7 +749,7 @@ namespace x86
 				double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE(
-					device, data.dim, data.TotalDof, 4, &x[0],
+					device, data.dim, data.TotalDof, nstates, &x[0],
 					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
 				get_time(&finish);
 			
@@ -795,24 +799,26 @@ namespace avx
 		{
 			using namespace avx;
 
-			Data::Sparse data(4);
+			int nstates = 4;
+
+			Data::Sparse data(nstates);
 			data.load("surplus_1.plt", 0);
 			data.load("surplus_2.plt", 1);
 			data.load("surplus_3.plt", 2);
 			data.load("surplus_4.plt", 3);
 
-			vector<Vector<double> > vx(4);
-			vector<double*> x(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vx(nstates);
+			vector<double*> x(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vx[i].resize(data.dim);
 				x[i] = vx[i].getData();
 				init(x[i], data.dim);
 			}
 
-			vector<Vector<double> > vresults(4);
-			vector<double*> results(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vresults(nstates);
+			vector<double*> results(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vresults[i].resize(data.TotalDof);
 				results[i] = vresults[i].getData();
@@ -827,14 +833,14 @@ namespace avx
 					const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
 
 				Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
-					JIT::jitCompile(device, data.dim, 4, data.TotalDof,
+					JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
 						stringize(LinearBasis_avx_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 						(Func)NULL).getFunc();
 
 				double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
-					device, data.dim, data.TotalDof, 4, &x[0],
+					device, data.dim, data.TotalDof, nstates, &x[0],
 					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
 				get_time(&finish);
 
@@ -845,7 +851,7 @@ namespace avx
 				double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE(
-					device, data.dim, data.TotalDof, 4, &x[0],
+					device, data.dim, data.TotalDof, nstates, &x[0],
 					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
 				get_time(&finish);
 
@@ -895,24 +901,26 @@ namespace avx2
 		{
 			using namespace avx2;
 
-			Data::Sparse data(4);
+			int nstates = 4;
+
+			Data::Sparse data(nstates);
 			data.load("surplus_1.plt", 0);
 			data.load("surplus_2.plt", 1);
 			data.load("surplus_3.plt", 2);
 			data.load("surplus_4.plt", 3);
 
-			vector<Vector<double> > vx(4);
-			vector<double*> x(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vx(nstates);
+			vector<double*> x(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vx[i].resize(data.dim);
 				x[i] = vx[i].getData();
 				init(x[i], data.dim);
 			}
 
-			vector<Vector<double> > vresults(4);
-			vector<double*> results(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vresults(nstates);
+			vector<double*> results(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vresults[i].resize(data.TotalDof);
 				results[i] = vresults[i].getData();
@@ -927,14 +935,14 @@ namespace avx2
 					const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
 
 				Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
-					JIT::jitCompile(device, data.dim, 4, data.TotalDof,
+					JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
 						stringize(LinearBasis_avx2_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 						(Func)NULL).getFunc();
 
 				double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
-					device, data.dim, data.TotalDof, 4, &x[0],
+					device, data.dim, data.TotalDof, nstates, &x[0],
 					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
 				get_time(&finish);
 
@@ -945,7 +953,7 @@ namespace avx2
 				double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE(
-					device, data.dim, data.TotalDof, 4, &x[0],
+					device, data.dim, data.TotalDof, nstates, &x[0],
 					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
 				get_time(&finish);
 			
@@ -995,24 +1003,26 @@ namespace avx512
 		{
 			using namespace avx512;
 
-			Data::Sparse data(4);
+			int nstates = 4;
+
+			Data::Sparse data(nstates);
 			data.load("surplus_1.plt", 0);
 			data.load("surplus_2.plt", 1);
 			data.load("surplus_3.plt", 2);
 			data.load("surplus_4.plt", 3);
 
-			vector<Vector<double> > vx(4);
-			vector<double*> x(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vx(nstates);
+			vector<double*> x(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vx[i].resize(data.dim);
 				x[i] = vx[i].getData();
 				init(x[i], data.dim);
 			}
 
-			vector<Vector<double> > vresults(4);
-			vector<double*> results(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vresults(nstates);
+			vector<double*> results(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vresults[i].resize(data.TotalDof);
 				results[i] = vresults[i].getData();
@@ -1027,14 +1037,14 @@ namespace avx512
 					const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
 
 				Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
-					JIT::jitCompile(device, data.dim, 4, data.TotalDof,
+					JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
 						stringize(LinearBasis_avx512_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 						(Func)NULL).getFunc();
 
 				double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
-					device, data.dim, data.TotalDof, 4, &x[0],
+					device, data.dim, data.TotalDof, nstates, &x[0],
 					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
 				get_time(&finish);
 
@@ -1045,7 +1055,7 @@ namespace avx512
 				double start, finish;
 				get_time(&start);
 				INTERPOLATE_ARRAY_MANY_MULTISTATE(
-					device, data.dim, data.TotalDof, 4, &x[0],
+					device, data.dim, data.TotalDof, nstates, &x[0],
 					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
 				get_time(&finish);
 
@@ -1094,29 +1104,31 @@ namespace cuda
 		{
 			using namespace cuda;
 
-			vector<Vector<double>::Host > vresults(4);
-			vector<double*> results(4);
+			int nstates = 4;
+
+			vector<Vector<double>::Host > vresults(nstates);
+			vector<double*> results(nstates);
 
 			Device* device = cuda::tryAcquireDevice();
 			EXPECT_TRUE(device != NULL);
 			if (!device) return;
 			{
-				Data data(4);
+				Data data(nstates);
 				data.load("surplus_1.plt", 0);
 				data.load("surplus_2.plt", 1);
 				data.load("surplus_3.plt", 2);
 				data.load("surplus_4.plt", 3);
 
-				vector<Vector<double>::Host > vx(4);
-				vector<double*> x(4);
-				for (int i = 0; i < 4; i++)
+				vector<Vector<double>::Host > vx(nstates);
+				vector<double*> x(nstates);
+				for (int i = 0; i < nstates; i++)
 				{
 					vx[i].resize(data.dim);
 					x[i] = vx[i].getData();
 					init(x[i], data.dim);
 				}
 
-				for (int i = 0; i < 4; i++)
+				for (int i = 0; i < nstates; i++)
 				{
 					vresults[i].resize(data.TotalDof);
 					results[i] = vresults[i].getData();
@@ -1134,20 +1146,20 @@ namespace cuda
 						const Matrix<double>::Device* surplus, double** value);
 
 					Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
-						JIT::jitCompile(device, data.dim, 4, data.TotalDof,
+						JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
 							stringize(LinearBasis_cuda_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 							(Func)NULL).getFunc();
 
 					// Run once without timing to do all CUDA-specific internal initializations.
 					INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
-						device, data.dim, &nnos[0], data.TotalDof, 4, &x[0],
+						device, data.dim, &nnos[0], data.TotalDof, nstates, &x[0],
 						data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
 						data.device.getChains(0), data.device.getSurplus(0), &results[0]);
 
 					double start, finish;
 					get_time(&start);
 					INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
-						device, data.dim, &nnos[0], data.TotalDof, 4, &x[0],
+						device, data.dim, &nnos[0], data.TotalDof, nstates, &x[0],
 						data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
 						data.device.getChains(0), data.device.getSurplus(0), &results[0]);
 					get_time(&finish);
@@ -1158,14 +1170,14 @@ namespace cuda
 				{
 					// Run once without timing to do all CUDA-specific internal initializations.
 					INTERPOLATE_ARRAY_MANY_MULTISTATE(
-						device, data.dim, &nnos[0], data.TotalDof, 4, &x[0],
+						device, data.dim, &nnos[0], data.TotalDof, nstates, &x[0],
 						data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
 						data.device.getChains(0), data.device.getSurplus(0), &results[0]);
 
 					double start, finish;
 					get_time(&start);
 					INTERPOLATE_ARRAY_MANY_MULTISTATE(
-						device, data.dim, &nnos[0], data.TotalDof, 4, &x[0],
+						device, data.dim, &nnos[0], data.TotalDof, nstates, &x[0],
 						data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
 						data.device.getChains(0), data.device.getSurplus(0), &results[0]);
 					get_time(&finish);

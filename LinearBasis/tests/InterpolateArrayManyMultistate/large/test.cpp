@@ -4,7 +4,6 @@
 
 #include "cpu/include/instrset.h"
 #include "gtest/gtest.h"
-#include "JIT.h"
 
 #define EPSILON 0.001
 
@@ -12,6 +11,8 @@
 #define stringize(x) str(x)
 
 using namespace std;
+
+static bool runopt = true;
 
 // Get the timer value.
 static void get_time(double* ret)
@@ -600,12 +601,13 @@ static void check_3(double* result, int TotalDof)
 
 #define NAMESPACE gold
 #include "gold/include/Data.h"
+#define INTERPOLATE_ARRAY_MANY_MULTISTATE LinearBasis_gold_Generic_InterpolateArrayManyMultistate
 
 namespace gold
 {
 	class Device;
 
-	extern "C" void LinearBasis_gold_Generic_InterpolateArrayManyMultistate(
+	extern "C" void INTERPOLATE_ARRAY_MANY_MULTISTATE(
 		Device* device,
 		const int dim, int DofPerNode, const int count, const double* const* x_,
 		const Matrix<int>* index, const Matrix<double>* surplus, double** value);
@@ -650,7 +652,7 @@ namespace gold
 
 			double start, finish;
 			get_time(&start);
-			LinearBasis_gold_Generic_InterpolateArrayManyMultistate(
+			INTERPOLATE_ARRAY_MANY_MULTISTATE(
 				device, data.dim, data.TotalDof, nstates, &x[0],
 				&data.index[0], &data.surplus[0], &results[0]);
 			get_time(&finish);
@@ -677,12 +679,18 @@ TEST(InterpolateArrayManyMultistate, gold)
 #define NAMESPACE x86
 #undef DATA_H
 #include "x86/include/Data.h"
+#undef JIT_H
+#include "x86/include/JIT.h"
+#undef INTERPOLATE_ARRAY_MANY_MULTISTATE
+#define INTERPOLATE_ARRAY_MANY_MULTISTATE LinearBasis_x86_Generic_InterpolateArrayManyMultistate
+#undef INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT
+#define INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT LinearBasis_x86_RuntimeOpt_InterpolateArrayManyMultistate
 
 namespace x86
 {
 	class Device;
 
-	extern "C" void LinearBasis_x86_Generic_InterpolateArrayManyMultistate(
+	extern "C" void INTERPOLATE_ARRAY_MANY_MULTISTATE(
 		Device* device,
 		const int dim, int DofPerNode, const int count, const double* const* x_,
 		const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
@@ -725,14 +733,37 @@ namespace x86
 
 			Device* device = NULL;
 
-			double start, finish;
-			get_time(&start);
-			LinearBasis_x86_Generic_InterpolateArrayManyMultistate(
-				device, data.dim, data.TotalDof, nstates, &x[0],
-				&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
-			get_time(&finish);
+			if (runopt)
+			{
+				typedef void (*Func)(
+					Device* device, const int dim, int DofPerNode, const int count, const double* const* x_,
+					const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
+
+				Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
+					JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
+						stringize(LinearBasis_x86_RuntimeOpt_InterpolateArrayManyMultistate) "_",
+						(Func)NULL).getFunc();
+
+				double start, finish;
+				get_time(&start);
+				INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
+					device, data.dim, data.TotalDof, nstates, &x[0],
+					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+				get_time(&finish);
 			
-			cout << "time = " << (finish - start) << " sec" << endl;
+				cout << "time = " << (finish - start) << " sec" << endl;
+			}
+			else
+			{
+				double start, finish;
+				get_time(&start);
+				INTERPOLATE_ARRAY_MANY_MULTISTATE(
+					device, data.dim, data.TotalDof, nstates, &x[0],
+					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+				get_time(&finish);
+			
+				cout << "time = " << (finish - start) << " sec" << endl;
+			}
 
 			for (int i = 0; i < nstates; i += 4)
 			{
@@ -756,12 +787,18 @@ TEST(InterpolateArrayManyMultistate, x86)
 #define DOUBLE_VECTOR_SIZE 4
 #undef DATA_H
 #include "avx/include/Data.h"
+#undef JIT_H
+#include "avx/include/JIT.h"
+#undef INTERPOLATE_ARRAY_MANY_MULTISTATE
+#define INTERPOLATE_ARRAY_MANY_MULTISTATE LinearBasis_avx_Generic_InterpolateArrayManyMultistate
+#undef INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT
+#define INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT LinearBasis_avx_RuntimeOpt_InterpolateArrayManyMultistate
 
 namespace avx
 {
 	class Device;
 
-	extern "C" void LinearBasis_avx_Generic_InterpolateArrayManyMultistate(
+	extern "C" void INTERPOLATE_ARRAY_MANY_MULTISTATE(
 		Device* device,
 		const int dim, int DofPerNode, const int count, const double* const* x_,
 		const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
@@ -804,15 +841,38 @@ namespace avx
 
 			Device* device = NULL;
 
-			double start, finish;
-			get_time(&start);
-			LinearBasis_avx_Generic_InterpolateArrayManyMultistate(
-				device, data.dim, data.TotalDof, nstates, &x[0],
-				&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
-			get_time(&finish);
-			
-			cout << "time = " << (finish - start) << " sec" << endl;
+			if (runopt)
+			{
+				typedef void (*Func)(
+					Device* device, const int dim, int DofPerNode, const int count, const double* const* x_,
+					const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
 
+				Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
+					JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
+						stringize(LinearBasis_avx_RuntimeOpt_InterpolateArrayManyMultistate) "_",
+						(Func)NULL).getFunc();
+
+				double start, finish;
+				get_time(&start);
+				INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
+					device, data.dim, data.TotalDof, nstates, &x[0],
+					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+				get_time(&finish);
+
+				cout << "time = " << (finish - start) << " sec" << endl;
+			}
+			else
+			{
+				double start, finish;
+				get_time(&start);
+				INTERPOLATE_ARRAY_MANY_MULTISTATE(
+					device, data.dim, data.TotalDof, nstates, &x[0],
+					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+				get_time(&finish);
+
+				cout << "time = " << (finish - start) << " sec" << endl;
+			}
+			
 			for (int i = 0; i < nstates; i += 4)
 			{
 				check_0(results[i], data.TotalDof);
@@ -835,12 +895,18 @@ TEST(InterpolateArrayManyMultistate, avx)
 #define DOUBLE_VECTOR_SIZE 4
 #undef DATA_H
 #include "avx2/include/Data.h"
+#undef JIT_H
+#include "avx2/include/JIT.h"
+#undef INTERPOLATE_ARRAY_MANY_MULTISTATE
+#define INTERPOLATE_ARRAY_MANY_MULTISTATE LinearBasis_avx2_Generic_InterpolateArrayManyMultistate
+#undef INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT
+#define INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT LinearBasis_avx2_RuntimeOpt_InterpolateArrayManyMultistate
 
 namespace avx2
 {
 	class Device;
 
-	extern "C" void LinearBasis_avx2_Generic_InterpolateArrayManyMultistate(
+	extern "C" void INTERPOLATE_ARRAY_MANY_MULTISTATE(
 		Device* device,
 		const int dim, int DofPerNode, const int count, const double* const* x_,
 		const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
@@ -883,14 +949,37 @@ namespace avx2
 
 			Device* device = NULL;
 
-			double start, finish;
-			get_time(&start);
-			LinearBasis_avx2_Generic_InterpolateArrayManyMultistate(
-				device, data.dim, data.TotalDof, nstates, &x[0],
-				&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
-			get_time(&finish);
+			if (runopt)
+			{
+				typedef void (*Func)(
+					Device* device, const int dim, int DofPerNode, const int count, const double* const* x_,
+					const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
+
+				Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
+					JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
+						stringize(LinearBasis_avx2_RuntimeOpt_InterpolateArrayManyMultistate) "_",
+						(Func)NULL).getFunc();
+
+				double start, finish;
+				get_time(&start);
+				INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
+					device, data.dim, data.TotalDof, nstates, &x[0],
+					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+				get_time(&finish);
+
+				cout << "time = " << (finish - start) << " sec" << endl;
+			}
+			else
+			{
+				double start, finish;
+				get_time(&start);
+				INTERPOLATE_ARRAY_MANY_MULTISTATE(
+					device, data.dim, data.TotalDof, nstates, &x[0],
+					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+				get_time(&finish);
 			
-			cout << "time = " << (finish - start) << " sec" << endl;
+				cout << "time = " << (finish - start) << " sec" << endl;
+			}
 
 			for (int i = 0; i < nstates; i += 4)
 			{
@@ -914,12 +1003,18 @@ TEST(InterpolateArrayManyMultistate, avx2)
 #define DOUBLE_VECTOR_SIZE 8
 #undef DATA_H
 #include "avx512/include/Data.h"
+#undef JIT_H
+#include "avx512/include/JIT.h"
+#undef INTERPOLATE_ARRAY_MANY_MULTISTATE
+#define INTERPOLATE_ARRAY_MANY_MULTISTATE LinearBasis_avx512_Generic_InterpolateArrayManyMultistate
+#undef INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT
+#define INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT LinearBasis_avx512_RuntimeOpt_InterpolateArrayManyMultistate
 
 namespace avx512
 {
 	class Device;
 
-	extern "C" void LinearBasis_avx512_Generic_InterpolateArrayManyMultistate(
+	extern "C" void INTERPOLATE_ARRAY_MANY_MULTISTATE(
 		Device* device,
 		const int dim, int DofPerNode, const int count, const double* const* x_,
 		const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
@@ -962,15 +1057,38 @@ namespace avx512
 
 			Device* device = NULL;
 
-			double start, finish;
-			get_time(&start);
-			LinearBasis_avx512_Generic_InterpolateArrayManyMultistate(
-				device, data.dim, data.TotalDof, nstates, &x[0],
-				&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
-			get_time(&finish);
-			
-			cout << "time = " << (finish - start) << " sec" << endl;
+			if (runopt)
+			{
+				typedef void (*Func)(
+					Device* device, const int dim, int DofPerNode, const int count, const double* const* x_,
+					const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
 
+				Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
+					JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
+						stringize(LinearBasis_avx512_RuntimeOpt_InterpolateArrayManyMultistate) "_",
+						(Func)NULL).getFunc();
+
+				double start, finish;
+				get_time(&start);
+				INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
+					device, data.dim, data.TotalDof, nstates, &x[0],
+					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+				get_time(&finish);
+
+				cout << "time = " << (finish - start) << " sec" << endl;
+			}
+			else
+			{
+				double start, finish;
+				get_time(&start);
+				INTERPOLATE_ARRAY_MANY_MULTISTATE(
+					device, data.dim, data.TotalDof, nstates, &x[0],
+					&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+				get_time(&finish);
+
+				cout << "time = " << (finish - start) << " sec" << endl;
+			}
+			
 			for (int i = 0; i < nstates; i += 4)
 			{
 				check_0(results[i], data.TotalDof);
@@ -992,11 +1110,17 @@ TEST(InterpolateArrayManyMultistate, avx512)
 #define NAMESPACE cuda
 #undef DATA_H
 #include "cuda/include/Data.h"
+#undef JIT_H
+#include "cuda/include/JIT.h"
+#undef INTERPOLATE_ARRAY_MANY_MULTISTATE
+#define INTERPOLATE_ARRAY_MANY_MULTISTATE LinearBasis_cuda_Generic_InterpolateArrayManyMultistate
+#undef INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT
+#define INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT LinearBasis_cuda_RuntimeOpt_InterpolateArrayManyMultistate
 #include "cuda/include/Devices.h"
 
 namespace cuda
 {
-	extern "C" void LinearBasis_cuda_Generic_InterpolateArrayManyMultistate(
+	extern "C" void INTERPOLATE_ARRAY_MANY_MULTISTATE(
 		Device* device,
 		const int dim, const int* nnos, int DofPerNode, const int count, const double* const* x_,
 		const int* nfreqs, const XPS::Device* xps, const int* szxps, const Chains::Device* chains,
@@ -1047,30 +1171,61 @@ namespace cuda
 				for (int i = 0; i < data.nstates; i++)
 					nnos[i] = data.host.getSurplus(i)->dimy();
 
-				// Run once without timing to do all CUDA-specific internal initializations.
-				LinearBasis_cuda_Generic_InterpolateArrayManyMultistate(device, data.dim,
-					&nnos[0], data.TotalDof, nstates, &x[0],
-					data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
-					data.device.getChains(0), data.device.getSurplus(0), &results[0]);
+				if (runopt)
+				{
+					typedef void (*Func)(
+						Device* device, const int dim, const int* nnos, int DofPerNode, const int count, const double* const* x_,
+						const int* nfreqs, const XPS::Device* xps, const int* szxps, const Chains::Device* chains,
+						const Matrix<double>::Device* surplus, double** value);
 
-				double start, finish;
-				get_time(&start);
-				LinearBasis_cuda_Generic_InterpolateArrayManyMultistate(device, data.dim,
-					&nnos[0], data.TotalDof, nstates, &x[0],
-					data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
-					data.device.getChains(0), data.device.getSurplus(0), &results[0]);
-				get_time(&finish);
-			
-				cout << "time = " << (finish - start) << " sec" << endl;
+					Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
+						JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
+							stringize(LinearBasis_cuda_RuntimeOpt_InterpolateArrayManyMultistate) "_",
+							(Func)NULL).getFunc();
+
+					// Run once without timing to do all CUDA-specific internal initializations.
+					INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
+						device, data.dim, &nnos[0], data.TotalDof, nstates, &x[0],
+						data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
+						data.device.getChains(0), data.device.getSurplus(0), &results[0]);
+
+					double start, finish;
+					get_time(&start);
+					INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
+						device, data.dim, &nnos[0], data.TotalDof, nstates, &x[0],
+						data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
+						data.device.getChains(0), data.device.getSurplus(0), &results[0]);
+					get_time(&finish);
+
+					cout << "time = " << (finish - start) << " sec" << endl;
+				}
+				else
+				{
+					// Run once without timing to do all CUDA-specific internal initializations.
+					INTERPOLATE_ARRAY_MANY_MULTISTATE(
+						device, data.dim, &nnos[0], data.TotalDof, nstates, &x[0],
+						data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
+						data.device.getChains(0), data.device.getSurplus(0), &results[0]);
+
+					double start, finish;
+					get_time(&start);
+					INTERPOLATE_ARRAY_MANY_MULTISTATE(
+						device, data.dim, &nnos[0], data.TotalDof, nstates, &x[0],
+						data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
+						data.device.getChains(0), data.device.getSurplus(0), &results[0]);
+					get_time(&finish);
+
+					cout << "time = " << (finish - start) << " sec" << endl;
+				}
 			}
 			releaseDevice(device);
 
 			for (int i = 0; i < nstates; i += 4)
 			{
-				check_0(results[i], vresults[i].length());
-				check_1(results[i + 1], vresults[i + 1].length());
-				check_2(results[i + 2], vresults[i + 2].length());
-				check_3(results[i + 3], vresults[i + 3].length());
+				check_0(results[i], vresults[0].length());
+				check_1(results[i + 1], vresults[1].length());
+				check_2(results[i + 2], vresults[2].length());
+				check_3(results[i + 3], vresults[3].length());
 			}
 		}
 	};
@@ -1116,6 +1271,10 @@ public :
 
 extern "C" int __wrap_main(int argc, char* argv[])
 {
+	const char* crunopt = getenv("RUNTIME_OPTIMIZATION");
+	if (crunopt)
+		runopt = !!atoi(crunopt);
+
 	GoogleTest(argc, argv);
 
 	::testing::InitGoogleTest(&argc, argv);
