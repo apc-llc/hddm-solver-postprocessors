@@ -614,24 +614,29 @@ namespace gold
 		{
 			using namespace gold;
 
-			Data::Dense data(4);
-			data.load("surplus_1.plt", 0);
-			data.load("surplus_2.plt", 1);
-			data.load("surplus_3.plt", 2);
-			data.load("surplus_4.plt", 3);
+			int nstates = 16;
+			
+			Data::Dense data(nstates);
+			for (int i = 0; i < nstates; i += 4)
+			{
+				data.load("surplus_1.plt", i);
+				data.load("surplus_2.plt", i + 1);
+				data.load("surplus_3.plt", i + 2);
+				data.load("surplus_4.plt", i + 3);
+			}
 
-			vector<Vector<double> > vx(4);
-			vector<double*> x(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vx(nstates);
+			vector<double*> x(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vx[i].resize(data.dim);
 				x[i] = vx[i].getData();
 				init(x[i], data.dim);
 			}
 
-			vector<Vector<double> > vresults(4);
-			vector<double*> results(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vresults(nstates);
+			vector<double*> results(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vresults[i].resize(data.TotalDof);
 				results[i] = vresults[i].getData();
@@ -642,16 +647,19 @@ namespace gold
 			double start, finish;
 			get_time(&start);
 			LinearBasis_gold_Generic_InterpolateArrayManyMultistate(
-				device, data.dim, data.TotalDof, 4, &x[0],
+				device, data.dim, data.TotalDof, nstates, &x[0],
 				&data.index[0], &data.surplus[0], &results[0]);
 			get_time(&finish);
 			
 			cout << "time = " << (finish - start) << " sec" << endl;
 
-			check_0(results[0], data.TotalDof);
-			check_1(results[1], data.TotalDof);
-			check_2(results[2], data.TotalDof);
-			check_3(results[3], data.TotalDof);
+			for (int i = 0; i < nstates; i += 4)
+			{
+				check_0(results[i], data.TotalDof);
+				check_1(results[i + 1], data.TotalDof);
+				check_2(results[i + 2], data.TotalDof);
+				check_3(results[i + 3], data.TotalDof);
+			}
 		}
 	};
 }
@@ -683,24 +691,29 @@ namespace x86
 		{
 			using namespace x86;
 
-			Data::Sparse data(4);
-			data.load("surplus_1.plt", 0);
-			data.load("surplus_2.plt", 1);
-			data.load("surplus_3.plt", 2);
-			data.load("surplus_4.plt", 3);
+			int nstates = 16;
+			
+			Data::Sparse data(nstates);
+			for (int i = 0; i < nstates; i += 4)
+			{
+				data.load("surplus_1.plt", i);
+				data.load("surplus_2.plt", i + 1);
+				data.load("surplus_3.plt", i + 2);
+				data.load("surplus_4.plt", i + 3);
+			}
 
-			vector<Vector<double> > vx(4);
-			vector<double*> x(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vx(nstates);
+			vector<double*> x(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vx[i].resize(data.dim);
 				x[i] = vx[i].getData();
 				init(x[i], data.dim);
 			}
 
-			vector<Vector<double> > vresults(4);
-			vector<double*> results(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vresults(nstates);
+			vector<double*> results(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vresults[i].resize(data.TotalDof);
 				results[i] = vresults[i].getData();
@@ -711,16 +724,19 @@ namespace x86
 			double start, finish;
 			get_time(&start);
 			LinearBasis_x86_Generic_InterpolateArrayManyMultistate(
-				device, data.dim, data.TotalDof, 4, &x[0],
+				device, data.dim, data.TotalDof, nstates, &x[0],
 				&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
 			get_time(&finish);
 			
 			cout << "time = " << (finish - start) << " sec" << endl;
 
-			check_0(results[0], data.TotalDof);
-			check_1(results[1], data.TotalDof);
-			check_2(results[2], data.TotalDof);
-			check_3(results[3], data.TotalDof);
+			for (int i = 0; i < nstates; i += 4)
+			{
+				check_0(results[i], data.TotalDof);
+				check_1(results[i + 1], data.TotalDof);
+				check_2(results[i + 2], data.TotalDof);
+				check_3(results[i + 3], data.TotalDof);
+			}
 		}
 	};
 }
@@ -754,24 +770,29 @@ namespace avx
 		{
 			using namespace avx;
 
-			Data::Sparse data(4);
-			data.load("surplus_1.plt", 0);
-			data.load("surplus_2.plt", 1);
-			data.load("surplus_3.plt", 2);
-			data.load("surplus_4.plt", 3);
+			int nstates = 16;
+			
+			Data::Sparse data(nstates);
+			for (int i = 0; i < nstates; i += 4)
+			{
+				data.load("surplus_1.plt", i);
+				data.load("surplus_2.plt", i + 1);
+				data.load("surplus_3.plt", i + 2);
+				data.load("surplus_4.plt", i + 3);
+			}
 
-			vector<Vector<double> > vx(4);
-			vector<double*> x(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vx(nstates);
+			vector<double*> x(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vx[i].resize(data.dim);
 				x[i] = vx[i].getData();
 				init(x[i], data.dim);
 			}
 
-			vector<Vector<double> > vresults(4);
-			vector<double*> results(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vresults(nstates);
+			vector<double*> results(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vresults[i].resize(data.TotalDof);
 				results[i] = vresults[i].getData();
@@ -782,16 +803,19 @@ namespace avx
 			double start, finish;
 			get_time(&start);
 			LinearBasis_avx_Generic_InterpolateArrayManyMultistate(
-				device, data.dim, data.TotalDof, 4, &x[0],
+				device, data.dim, data.TotalDof, nstates, &x[0],
 				&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
 			get_time(&finish);
 			
 			cout << "time = " << (finish - start) << " sec" << endl;
 
-			check_0(results[0], data.TotalDof);
-			check_1(results[1], data.TotalDof);
-			check_2(results[2], data.TotalDof);
-			check_3(results[3], data.TotalDof);
+			for (int i = 0; i < nstates; i += 4)
+			{
+				check_0(results[i], data.TotalDof);
+				check_1(results[i + 1], data.TotalDof);
+				check_2(results[i + 2], data.TotalDof);
+				check_3(results[i + 3], data.TotalDof);
+			}
 		}
 	};
 }
@@ -825,24 +849,29 @@ namespace avx2
 		{
 			using namespace avx2;
 
-			Data::Sparse data(4);
-			data.load("surplus_1.plt", 0);
-			data.load("surplus_2.plt", 1);
-			data.load("surplus_3.plt", 2);
-			data.load("surplus_4.plt", 3);
+			int nstates = 16;
+			
+			Data::Sparse data(nstates);
+			for (int i = 0; i < nstates; i += 4)
+			{
+				data.load("surplus_1.plt", i);
+				data.load("surplus_2.plt", i + 1);
+				data.load("surplus_3.plt", i + 2);
+				data.load("surplus_4.plt", i + 3);
+			}
 
-			vector<Vector<double> > vx(4);
-			vector<double*> x(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vx(nstates);
+			vector<double*> x(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vx[i].resize(data.dim);
 				x[i] = vx[i].getData();
 				init(x[i], data.dim);
 			}
 
-			vector<Vector<double> > vresults(4);
-			vector<double*> results(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vresults(nstates);
+			vector<double*> results(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vresults[i].resize(data.TotalDof);
 				results[i] = vresults[i].getData();
@@ -853,16 +882,19 @@ namespace avx2
 			double start, finish;
 			get_time(&start);
 			LinearBasis_avx2_Generic_InterpolateArrayManyMultistate(
-				device, data.dim, data.TotalDof, 4, &x[0],
+				device, data.dim, data.TotalDof, nstates, &x[0],
 				&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
 			get_time(&finish);
 			
 			cout << "time = " << (finish - start) << " sec" << endl;
 
-			check_0(results[0], data.TotalDof);
-			check_1(results[1], data.TotalDof);
-			check_2(results[2], data.TotalDof);
-			check_3(results[3], data.TotalDof);
+			for (int i = 0; i < nstates; i += 4)
+			{
+				check_0(results[i], data.TotalDof);
+				check_1(results[i + 1], data.TotalDof);
+				check_2(results[i + 2], data.TotalDof);
+				check_3(results[i + 3], data.TotalDof);
+			}
 		}
 	};
 }
@@ -896,24 +928,29 @@ namespace avx512
 		{
 			using namespace avx512;
 
-			Data::Sparse data(4);
-			data.load("surplus_1.plt", 0);
-			data.load("surplus_2.plt", 1);
-			data.load("surplus_3.plt", 2);
-			data.load("surplus_4.plt", 3);
+			int nstates = 16;
+			
+			Data::Sparse data(nstates);
+			for (int i = 0; i < nstates; i += 4)
+			{
+				data.load("surplus_1.plt", i);
+				data.load("surplus_2.plt", i + 1);
+				data.load("surplus_3.plt", i + 2);
+				data.load("surplus_4.plt", i + 3);
+			}
 
-			vector<Vector<double> > vx(4);
-			vector<double*> x(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vx(nstates);
+			vector<double*> x(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vx[i].resize(data.dim);
 				x[i] = vx[i].getData();
 				init(x[i], data.dim);
 			}
 
-			vector<Vector<double> > vresults(4);
-			vector<double*> results(4);
-			for (int i = 0; i < 4; i++)
+			vector<Vector<double> > vresults(nstates);
+			vector<double*> results(nstates);
+			for (int i = 0; i < nstates; i++)
 			{
 				vresults[i].resize(data.TotalDof);
 				results[i] = vresults[i].getData();
@@ -924,16 +961,19 @@ namespace avx512
 			double start, finish;
 			get_time(&start);
 			LinearBasis_avx512_Generic_InterpolateArrayManyMultistate(
-				device, data.dim, data.TotalDof, 4, &x[0],
+				device, data.dim, data.TotalDof, nstates, &x[0],
 				&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
 			get_time(&finish);
 			
 			cout << "time = " << (finish - start) << " sec" << endl;
 
-			check_0(results[0], data.TotalDof);
-			check_1(results[1], data.TotalDof);
-			check_2(results[2], data.TotalDof);
-			check_3(results[3], data.TotalDof);
+			for (int i = 0; i < nstates; i += 4)
+			{
+				check_0(results[i], data.TotalDof);
+				check_1(results[i + 1], data.TotalDof);
+				check_2(results[i + 2], data.TotalDof);
+				check_3(results[i + 3], data.TotalDof);
+			}
 		}
 	};
 }
@@ -966,29 +1006,34 @@ namespace cuda
 		{
 			using namespace cuda;
 
-			vector<Vector<double>::Host > vresults(4);
-			vector<double*> results(4);
+			int nstates = 16;
+
+			vector<Vector<double>::Host > vresults(nstates);
+			vector<double*> results(nstates);
 
 			Device* device = cuda::tryAcquireDevice();
 			EXPECT_TRUE(device != NULL);
 			if (!device) return;
-			{
-				Data data(4);
-				data.load("surplus_1.plt", 0);
-				data.load("surplus_2.plt", 1);
-				data.load("surplus_3.plt", 2);
-				data.load("surplus_4.plt", 3);
+			{			
+				Data data(nstates);
+				for (int i = 0; i < nstates; i += 4)
+				{
+					data.load("surplus_1.plt", i);
+					data.load("surplus_2.plt", i + 1);
+					data.load("surplus_3.plt", i + 2);
+					data.load("surplus_4.plt", i + 3);
+				}
 
-				vector<Vector<double>::Host > vx(4);
-				vector<double*> x(4);
-				for (int i = 0; i < 4; i++)
+				vector<Vector<double>::Host > vx(nstates);
+				vector<double*> x(nstates);
+				for (int i = 0; i < nstates; i++)
 				{
 					vx[i].resize(data.dim);
 					x[i] = vx[i].getData();
 					init(x[i], data.dim);
 				}
 
-				for (int i = 0; i < 4; i++)
+				for (int i = 0; i < nstates; i++)
 				{
 					vresults[i].resize(data.TotalDof);
 					results[i] = vresults[i].getData();
@@ -1000,14 +1045,14 @@ namespace cuda
 
 				// Run once without timing to do all CUDA-specific internal initializations.
 				LinearBasis_cuda_Generic_InterpolateArrayManyMultistate(device, data.dim,
-					&nnos[0], data.TotalDof, 4, &x[0],
+					&nnos[0], data.TotalDof, nstates, &x[0],
 					data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
 					data.device.getChains(0), data.device.getSurplus(0), &results[0]);
 
 				double start, finish;
 				get_time(&start);
 				LinearBasis_cuda_Generic_InterpolateArrayManyMultistate(device, data.dim,
-					&nnos[0], data.TotalDof, 4, &x[0],
+					&nnos[0], data.TotalDof, nstates, &x[0],
 					data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
 					data.device.getChains(0), data.device.getSurplus(0), &results[0]);
 				get_time(&finish);
@@ -1016,10 +1061,13 @@ namespace cuda
 			}
 			releaseDevice(device);
 
-			check_0(results[0], vresults[0].length());
-			check_1(results[1], vresults[1].length());
-			check_2(results[2], vresults[2].length());
-			check_3(results[3], vresults[3].length());
+			for (int i = 0; i < nstates; i += 4)
+			{
+				check_0(results[i], vresults[i].length());
+				check_1(results[i + 1], vresults[i + 1].length());
+				check_2(results[i + 2], vresults[i + 2].length());
+				check_3(results[i + 3], vresults[i + 3].length());
+			}
 		}
 	};
 }
