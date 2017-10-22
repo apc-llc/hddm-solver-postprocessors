@@ -63,7 +63,7 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 	{
 #ifdef X_IN_CONSTANT_MEMORY
 		double* x;
-		asm("mov.b64 %0, " STRPARAM(FUNCNAME, 5) ";" : "=l"(x));
+		asm("mov.b64 %0, " STRPARAM(FUNCNAME, 4) ";" : "=l"(x));
 		x += many * DIM;
 #else
 		const double* x = x_ + many * DIM;

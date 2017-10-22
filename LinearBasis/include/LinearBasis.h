@@ -30,7 +30,7 @@ inline __attribute__((always_inline)) double LinearBasis(const double* x_, const
 		"mov.b16 idx16, {idx_hi, idx_lo};"
 		"cvt.u32.u16 idx32, idx16;"
 		"mad.wide.u32 addr, idx32, 0x8, %2;"
-#if defined(DEFERRED)
+#if defined(X_IN_CONSTANT_MEMORY)
 		"ld.param.f64 x64, [addr];"
 #else
 		"ld.global.f64 x64, [addr];"
