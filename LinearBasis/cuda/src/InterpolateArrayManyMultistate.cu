@@ -53,7 +53,7 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 	// Set the next values array to zero.
 	if (blockIdx.x == 0)
 	{
-		for (int i = threadIdx.x, e = DIM * COUNT; i < e; i += blockDim.x)
+		for (int i = threadIdx.x, e = DOF_PER_NODE * COUNT; i < e; i += blockDim.x)
 			value_next_[i] = 0.0;
 	}
 
@@ -102,16 +102,19 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 				temp *= xp;
 
 				if (!idx.y) break;
+				if (ifreq + 1 >= nfreqs) break;
 				xp = xpv[idx.y];
 				if (xp <= 0.0) goto next;
 				temp *= xp;
 
 				if (!idx.z) break;
+				if (ifreq + 2 >= nfreqs) break;
 				xp = xpv[idx.z];
 				if (xp <= 0.0) goto next;
 				temp *= xp;
 
 				if (!idx.w) break;
+				if (ifreq + 3 >= nfreqs) break;
 				xp = xpv[idx.w];
 				if (xp <= 0.0) goto next;
 				temp *= xp;
@@ -137,6 +140,8 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 		// Loop to calculate scaled surplus product.
 		for (int i = blockIdx.x * nnoPerBlock, e = min(i + nnoPerBlock, nno), ii = 0; i < e; i++, ii++)
 		{
+			if (!temps[ii]) continue;
+
 			for (int Dof_choice = threadIdx.x, icache = 0; Dof_choice < DOF_PER_NODE; Dof_choice += blockDim.x, icache++)
 				cache += temps[ii] * surplus(i, Dof_choice);
 		}
