@@ -94,7 +94,7 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 
 			for (int ifreq = 0; ifreq < nfreqs; ifreq += 4)
 			{
-				int4 idx = *(int4*)&chains(i * nfreqs + ifreq);
+				ushort4 idx = *(ushort4*)&chains(i * nfreqs + ifreq);
 
 				if (!idx.x) break;
 				double xp = xpv[idx.x];
@@ -102,19 +102,16 @@ extern "C" __global__ void KERNEL(FUNCNAME)(
 				temp *= xp;
 
 				if (!idx.y) break;
-				if (ifreq + 1 >= nfreqs) break;
 				xp = xpv[idx.y];
 				if (xp <= 0.0) goto next;
 				temp *= xp;
 
 				if (!idx.z) break;
-				if (ifreq + 2 >= nfreqs) break;
 				xp = xpv[idx.z];
 				if (xp <= 0.0) goto next;
 				temp *= xp;
 
 				if (!idx.w) break;
-				if (ifreq + 3 >= nfreqs) break;
 				xp = xpv[idx.w];
 				if (xp <= 0.0) goto next;
 				temp *= xp;

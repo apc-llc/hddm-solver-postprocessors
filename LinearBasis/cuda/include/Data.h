@@ -473,8 +473,8 @@ struct XPS
 
 struct Chains
 {
-	typedef std::vector<uint32_t> Host;
-	typedef Vector<uint32_t>::Device Device;
+	typedef std::vector<uint16_t> Host;
+	typedef Vector<uint16_t>::Device Device;
 };
 
 class Interpolator;

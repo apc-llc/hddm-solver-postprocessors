@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <mpi.h>
 
@@ -891,8 +892,20 @@ void Data::load(int dim, int vdim, int nno, int TotalDof, int Level, const Matri
 	state.chains.resize(nno * nfreqsAligned);
 	for (int i = 0, e = vv.size(); i < e; i++)
 	{
+		auto chain = state.chains[0];
 		for (int ifreq = 0; ifreq < state.nfreqs; ifreq++)
-			state.chains[i * nfreqsAligned + ifreq] = vv[i][ifreq];
+		{
+			uint32_t idx = vv[i][ifreq];
+			if (idx > numeric_limits<decltype(chain)>::max())
+			{
+				MPI_Process* process;
+			        MPI_ERR_CHECK(MPI_Process_get(&process));
+				process->cerr("Chain index %u is out range predefined by type capacity\n", idx);
+				process->abort();
+			}
+			state.chains[i * nfreqsAligned + ifreq] = idx;
+		}
+
 	}	
 
 	// Reorder surpluses.
@@ -1151,7 +1164,7 @@ void Data::Device::setChains(int istate, Chains::Host* chains)
 	
 	if (chainsHost.size())
 		CUDA_ERR_CHECK(cudaMemcpy(chainsDevice.getData(), &chainsHost[0],
-			chainsHost.size() * sizeof(uint32_t), cudaMemcpyHostToDevice));
+			chainsHost.size() * sizeof(chainsHost[0]), cudaMemcpyHostToDevice));
 	
 	// Set that vector does not own its underlying data buffer.
 	chainsDevice.disownData();

@@ -4,7 +4,7 @@ LOCATION = ../../../..
 
 include $(LOCATION)/Makefile.inc
 
-GTEST_DIR = ../../googletest/googletest
+GTEST_DIR = ../googletest/googletest
 
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that
@@ -37,7 +37,7 @@ $(GTEST_DIR)/$(BUILD)/libgtest.a:
 
 $(BUILD)/test: test.cpp $(GTEST_HEADERS) \
 	$(GTEST_DIR)/$(BUILD)/libgtest.a
-	$(CDIR) && $(MPILD) $(CINC) $(COPT) $(FUSE_LINKER_PLUGIN) $< $(GTEST_DIR)/$(BUILD)/libgtest.a -Wl,--whole-archive $(INSTALL)/lib/libfrontend.a -Wl,--no-whole-archive -o $@ -L$(INSTALL)/lib -Wl,-rpath=$(INSTALL)/lib -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-Bstatic $(addprefix -Wl$(COMMA),$(LINK)) $(LINK_ACCELERATOR) -Wl,-Bdynamic -Ltbb/build/release -ltbb -ltbbmalloc -ldl $(MPILDFLAGS) -lrt -lgfortran -lstdc++ -lpostprocess -Wl,-rpath=$(ROOT)/$(BUILD) -lpthread -Wl,--wrap=main
+	$(CDIR) && $(MPICXX) $(CINC) $(COPT) $(FUSE_LINKER_PLUGIN) $< $(GTEST_DIR)/$(BUILD)/libgtest.a -Wl,--whole-archive $(INSTALL)/lib/libfrontend.a -Wl,--no-whole-archive -o $@ -L$(INSTALL)/lib -Wl,-rpath=$(INSTALL)/lib -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-Bstatic $(addprefix -Wl$(COMMA),$(LINK)) $(LINK_ACCELERATOR) -Wl,-Bdynamic -Ltbb/build/release -ltbb -ltbbmalloc -ldl $(MPILDFLAGS) -lrt -lgfortran -lstdc++ -lpostprocess -Wl,-rpath=$(ROOT)/$(BUILD) -lpthread -Wl,--wrap=main
 
 run: $(BUILD)/test
 	$(ROOT)/$(BUILD)/test

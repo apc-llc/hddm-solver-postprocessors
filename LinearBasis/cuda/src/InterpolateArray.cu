@@ -65,7 +65,7 @@ __global__ void KERNEL(FUNCNAME)(
 		for (int ifreq = 0; ifreq < nfreqs; ifreq++)
 		{
 			// Early exit for shorter chains.
-			int32_t idx = chains(i * nfreqs + ifreq);
+			const auto& idx = chains(i * nfreqs + ifreq);
 			if (!idx) break;
 
 			double xp = xpv[idx];

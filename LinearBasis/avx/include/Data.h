@@ -275,7 +275,7 @@ struct AVXIndex
 // XPS must be properly aligned for vectorized processing.
 typedef std::vector<AVXIndex<uint16_t>, AlignedAllocator<AVXIndex<uint16_t> > > XPS;
 
-typedef std::vector<uint32_t> Chains;
+typedef std::vector<uint16_t> Chains;
 
 class GoogleTest;
 

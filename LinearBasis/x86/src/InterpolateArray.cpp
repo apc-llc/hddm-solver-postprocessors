@@ -37,7 +37,7 @@ extern "C" void FUNCNAME(
 		for (int ifreq = 0; ifreq < nfreqs; ifreq++)
 		{
 			// Early exit for shorter chains.
-			int32_t idx = chains[ichain + ifreq];
+			const auto& idx = chains[ichain + ifreq];
 			if (!idx) break;
 
 			temp *= xpv[idx];

@@ -3,6 +3,7 @@
 #include "Data.h"
 
 #include <cstdlib>
+#include <limits>
 #include <map>
 #include <mpi.h>
 #include <utility> // pair
@@ -889,8 +890,19 @@ void DataSparse::load(const char* filename, int istate)
 	}
 	for (int i = 0, e = vv.size(); i < e; i++)
 	{
+		auto chain = state.chains[0];
 		for (int ifreq = 0; ifreq < state.nfreqs; ifreq++)
-			state.chains[i * state.nfreqs + ifreq] = vv[i][ifreq];
+		{
+			uint32_t idx = vv[i][ifreq];
+			if (idx > numeric_limits<decltype(chain)>::max())
+			{
+				MPI_Process* process;
+			        MPI_ERR_CHECK(MPI_Process_get(&process));
+				process->cerr("Chain index %u is out range predefined by type capacity\n", idx);
+				process->abort();
+			}
+			state.chains[i * state.nfreqs + ifreq] = idx;
+		}
 	}	
 
 	// Reorder surpluses.

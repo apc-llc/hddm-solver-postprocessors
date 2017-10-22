@@ -251,7 +251,7 @@ struct Index
 };
 
 typedef std::vector<Index<uint16_t> > XPS;
-typedef std::vector<uint32_t> Chains;
+typedef std::vector<uint16_t> Chains;
 
 class GoogleTest;
 
