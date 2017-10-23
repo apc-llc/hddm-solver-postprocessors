@@ -13,6 +13,10 @@ extern "C" void FUNCNAME(
 	const int dim, const int DofPerNode, const int count, const double* const* x_,
 	const int* nfreqs_, const XPS* xps_, const Chains* chains_, const Matrix<double>* surplus_, double** value_)
 {
+	const __m512d zero = _mm512_setzero_pd();
+	const __m512d one = _mm512_set1_pd(1.0);
+	const __m512d sign_mask = _mm512_set1_pd(-0.);
+
 	for (int many = 0; many < COUNT; many++)
 	{
 		const double* x = x_[many];
@@ -25,10 +29,7 @@ extern "C" void FUNCNAME(
 		int nno = surplus.dimy();
 
 		// Loop to calculate all unique xp values.
-		__m512d zero = _mm512_set1_pd(0.0);
-		__m512d one = _mm512_set1_pd(1.0);
-		__m512d sign_mask = _mm512_set1_pd(-0.);
-		vector<__m512d, AlignedAllocator<__m512d> > xpv64(xps.size());
+		vector<__m512d, AlignedAllocator<__m512d> > xpv64(xps.size() / DOUBLE_VECTOR_SIZE);
 		for (int i = 0, e = xpv64.size(); i < e; i++)
 		{
 			// Load Index.index
