@@ -1,3 +1,4 @@
+#include <omp.h>
 #include <x86intrin.h>
 
 #include "LinearBasis.h"
@@ -22,8 +23,8 @@ extern "C" void FUNCNAME(
 	// Loop to calculate all unique xp values.
 	__m512d zero = _mm512_set1_pd(0.0);
 	__m512d one = _mm512_set1_pd(1.0);
-	__m512d sign_mask = _mm512_set1_pd(-0.);
-	vector<__m512d, AlignedAllocator<__m512d> > xpv64(xps.size());
+	vector<__m512d, AlignedAllocator<__m512d> > xpv64(xps.size() / DOUBLE_VECTOR_SIZE);
+	#pragma omp parallel for
 	for (int i = 0, e = xpv64.size(); i < e; i++)
 	{
 		// Load Index.index
@@ -41,43 +42,76 @@ extern "C" void FUNCNAME(
 
 		// Compute xpv[i]
 		_mm512_store_pd((double*)&xpv64[i], _mm512_max_pd(zero,
-			_mm512_sub_pd(one, _mm512_andnot_pd(sign_mask, _mm512_fmadd_pd(x64, i32, j32)))));
+			_mm512_sub_pd(one, (__m512d)_mm512_abs_epi64((__m512i)_mm512_fmadd_pd(x64, i32, j32)))));
 	}
 
-	// Zero the values array.
-	memset(value, 0, sizeof(double) * DOF_PER_NODE);
+	size_t szscratch = DOF_PER_NODE;
+	if (DOF_PER_NODE % DOUBLE_VECTOR_SIZE)
+		szscratch = (DOF_PER_NODE / DOUBLE_VECTOR_SIZE + 1) * DOUBLE_VECTOR_SIZE;
+
+	int nthreads = 0;
+
+	#pragma omp parallel
+	{
+		#pragma omp master
+		nthreads = omp_get_num_threads();
+	}
+	Vector<double> vscratch(szscratch * (nthreads - 1));
+	double* scratch = vscratch.getData();
 
 	// Loop to calculate scaled surplus product.
 	double* xpv = (double*)&xpv64[0];
-	for (int i = 0, ichain = 0; i < nno; i++, ichain += nfreqs)
+	#pragma omp parallel
 	{
-		double temp = 1.0;
-		for (int ifreq = 0; ifreq < nfreqs; ifreq++)
+		int tid = omp_get_thread_num();
+
+		double* value_private = (tid == 0) ? value : scratch + szscratch * (tid - 1);
+
+		#pragma omp for
+		for (int i = 0; i < nno; i++)
 		{
-			// Early exit for shorter chains.
-			const auto& idx = chains[ichain + ifreq];
-			if (!idx) break;
-
-			temp *= xpv[idx];
-			if (!temp) goto next;
-		}
-
-		{
-			const __m512d temp64 = _mm512_set1_pd(temp);
-
-			for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE;
-				Dof_choice += sizeof(temp64) / sizeof(double))
+			double temp = 1.0;
+			for (int ichain = i * nfreqs, ifreq = 0; ifreq < nfreqs; ifreq++)
 			{
-				const __m512d surplus64 = _mm512_load_pd(&surplus(i, Dof_choice));
-				__m512d value64 = _mm512_load_pd(&value[Dof_choice]);
-				value64 = _mm512_fmadd_pd(temp64, surplus64, value64);
-				_mm512_store_pd(&value[Dof_choice], value64);
-			}
-		}
-		
-	next :
+				// Early exit for shorter chains.
+				const auto& idx = chains[ichain + ifreq];
+				if (!idx) break;
 
-		continue;
+				temp *= xpv[idx];
+				if (!temp) goto next;
+			}
+
+			{
+				const __m512d temp64 = _mm512_set1_pd(temp);
+
+				for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE; Dof_choice += DOUBLE_VECTOR_SIZE)
+				{
+					const __m512d surplus64 = _mm512_load_pd(&surplus(i, Dof_choice));
+					__m512d value64 = _mm512_load_pd(&value_private[Dof_choice]);
+					value64 = _mm512_fmadd_pd(temp64, surplus64, value64);
+					_mm512_store_pd(&value_private[Dof_choice], value64);
+				}
+			}
+		
+		next :
+
+			continue;
+		}
+
+		for (int shift = 1; shift < nthreads; shift <<= 1)
+		{
+			if (tid % (shift << 1) == 0)
+			{
+				double* value_private2 = scratch + szscratch * (tid - 1 + shift);
+				for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE; Dof_choice += DOUBLE_VECTOR_SIZE)
+				{
+					__m512d v = _mm512_load_pd(&value_private[Dof_choice]);
+					__m512d v2 = _mm512_load_pd(&value_private2[Dof_choice]);
+					_mm512_store_pd((__m512d*)&value_private[Dof_choice], _mm512_add_pd(v, v2));
+				}
+			}
+			#pragma omp barrier
+		}
 	}
 }
 
