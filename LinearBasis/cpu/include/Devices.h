@@ -22,6 +22,10 @@ public :
 	void release(Device* device);
 };
 
+NAMESPACE::Device* tryAcquireDevice();
+
+void releaseDevice(NAMESPACE::Device* device);
+
 } // namespace NAMESPACE
 
 #endif // DEVICES_H

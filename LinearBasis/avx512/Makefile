@@ -5,7 +5,7 @@ LOCATION = ../../..
 include $(LOCATION)/Makefile.inc
 
 CINC += -I. -I.. -I../include -I../../include
-COPT += -DAVX_VECTOR_SIZE=16 -DDOUBLE_VECTOR_SIZE=8 -DNAMESPACE=$(NAME) -axMIC-AVX512 -g
+COPT += -DAVX_VECTOR_SIZE=16 -DDOUBLE_VECTOR_SIZE=8 -DNAMESPACE=$(NAME) -axMIC-AVX512 -g -fopenmp
 ifeq (,$(DEBUG))
 COPT += -fast
 endif
@@ -24,7 +24,7 @@ $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
 	$(BUILD)/parameters.o $(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o \
 	$(BUILD)/priority.o $(BUILD)/instrset.o $(BUILD)/supported.o $(BUILD)/reset.o \
 	$(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o $(BUILD)/getData.o
-	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(MPILD) $(CINC) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ $(MPILDFLAGS)
+	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(MPILD) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ $(MPILDFLAGS)
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.cpp
 	$(CDIR) && $(CXX) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArray -DDIM=dim -DDOF_PER_NODE=DofPerNode $(CINC) $(COPT) -c $< -o $@

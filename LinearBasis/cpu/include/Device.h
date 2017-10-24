@@ -11,12 +11,15 @@ class Postprocessor;
 class Device
 {
 	int available;
+	int nthreads;
 	
 	Postprocessor* post;
 
 public :
 
 	Device();
+
+	int getThreadsCount() const;
 	
 	friend class Devices;
 };
