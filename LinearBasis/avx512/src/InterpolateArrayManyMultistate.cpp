@@ -26,8 +26,6 @@ extern "C" void FUNCNAME(
 
 	const __m512d zero = _mm512_setzero_pd();
         const __m512d one = _mm512_set1_pd(1.0);
-	const __m256d sign_mask = _mm256_set1_pd(-0.);
-
 	for (int many = 0; many < COUNT; many++)
 	{
 		const double* x = x_[many];

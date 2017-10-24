@@ -21,8 +21,8 @@ extern "C" void FUNCNAME(
 	int nno = surplus.dimy();
 
 	// Loop to calculate all unique xp values.
-	__m512d zero = _mm512_set1_pd(0.0);
-	__m512d one = _mm512_set1_pd(1.0);
+	const __m512d zero = _mm512_set1_pd(0.0);
+	const __m512d one = _mm512_set1_pd(1.0);
 	vector<__m512d, AlignedAllocator<__m512d> > xpv64(xps.size() / DOUBLE_VECTOR_SIZE);
 	#pragma omp parallel for
 	for (int i = 0, e = xpv64.size(); i < e; i++)
