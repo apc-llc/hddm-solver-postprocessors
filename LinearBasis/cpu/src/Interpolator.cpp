@@ -27,7 +27,7 @@ extern "C" void INTERPOLATE_ARRAY(
 void Interpolator::interpolate(Device* device, Data* data_,
 	const int istate, const real* x, int DofPerNode, real* value)
 {
-	Data::Sparse* data = dynamic_cast<Data::Sparse*>(data_);
+	Data::Sparse* data = (Data::Sparse*)data_;
 
 	if (DofPerNode != data->TotalDof)
 	{
@@ -62,7 +62,7 @@ extern "C" void INTERPOLATE_ARRAY_MANY_MULTISTATE(
 void Interpolator::interpolate(Device* device, Data* data_,
 	const real** x, int DofPerNode, real** value)
 {
-	Data::Sparse* data = dynamic_cast<Data::Sparse*>(data_);
+	Data::Sparse* data = (Data::Sparse*)data_;
 
 	if (DofPerNode != data->TotalDof)
 	{
