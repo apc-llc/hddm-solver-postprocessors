@@ -129,7 +129,7 @@ static void read_index(FILE* infile, int nno, int dim, int vdim, Matrix<int>::Ho
 	{
 		if (JA[i] >= dim)
 		{
-			process->cerr("JA[i] must be within column index range - not true for JA[%d] = %f\n",
+			process->cerr("JA[i] must be within column index range - not true for JA[%d] = %d\n",
 				i, JA[i]);
 			process->abort();
 		}

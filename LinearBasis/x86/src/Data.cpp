@@ -165,7 +165,7 @@ static void read_surplus(FILE* infile, int nno, int TotalDof, Matrix<double>& su
 	for (int i = 1, e = IA.size(); i != e; i++)
 		if (IA[i] < IA[i - 1])
 		{
-			process->cerr("IA[i] must be not less than IA[i - 1] - not true for IA[%d] >= IA[%d] : %f < %f\n",
+			process->cerr("IA[i] must be not less than IA[i - 1] - not true for IA[%d] >= IA[%d] : %d < %d\n",
 				i, i - 1, IA[i], IA[i - 1]);
 			process->abort();
 		}
@@ -178,7 +178,7 @@ static void read_surplus(FILE* infile, int nno, int TotalDof, Matrix<double>& su
 	{
 		if (JA[i] >= TotalDof)
 		{
-			process->cerr("JA[i] must be within column index range - not true for JA[%d] = %f\n", i, JA[i]);
+			process->cerr("JA[i] must be within column index range - not true for JA[%d] = %d\n", i, JA[i]);
 			process->abort();
 		}
 	}
