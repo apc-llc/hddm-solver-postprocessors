@@ -420,13 +420,13 @@ void DataDense::load(const char* filename, int istate)
 		if (dim != this->dim)
 		{
 			process->cerr("File \"%s\" # of dimensions (%d) mismatches another state (%d)\n",
-				dim, this->dim);
+				filename, dim, this->dim);
 			process->abort();
 		}
 		if (TotalDof != this->TotalDof)
 		{
 			process->cerr("File \"%s\" TotalDof (%d) mismatches another state (%d)\n",
-				TotalDof, this->TotalDof);
+				filename, TotalDof, this->TotalDof);
 			process->abort();
 		}
 	}
@@ -825,7 +825,7 @@ void DataSparse::load(const char* filename, int istate)
 		// The size of XPS index denotes how many meaninful linear basis
 		// calculations to perform.
 		if (process->isMaster())
-			process->cout("%d unique xp(s) to compute\n", map.xps.size());
+			process->cout("%zu unique xp(s) to compute\n", (size_t)map.xps.size());
 	}
 
 	// Create all possible chains between frequencies.
@@ -843,8 +843,8 @@ void DataSparse::load(const char* filename, int istate)
 	if (showDataAnalysis)
 	{
 		if (process->isMaster())
-			process->cout("%d chains of %d xp(s) to build\n",
-				state.chains.size() / state.nfreqs, state.nfreqs);
+			process->cout("%zu chains of %d xp(s) to build\n",
+				(size_t)(state.chains.size() / state.nfreqs), state.nfreqs);
 	}
 	
 	struct Freq

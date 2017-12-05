@@ -444,13 +444,13 @@ void Data::load(const char* filename, int istate)
 		if (dim != this->dim)
 		{
 			process->cerr("File \"%s\" # of dimensions (%d) mismatches another state (%d)\n",
-				dim, this->dim);
+				filename, dim, this->dim);
 			process->abort();
 		}
 		if (TotalDof != this->TotalDof)
 		{
 			process->cerr("File \"%s\" TotalDof (%d) mismatches another state (%d)\n",
-				TotalDof, this->TotalDof);
+				filename, TotalDof, this->TotalDof);
 			process->abort();
 		}
 	}
@@ -819,7 +819,7 @@ void Data::load(int dim, int vdim, int nno, int TotalDof, int Level, const Matri
 	if (showDataAnalysis)
 	{
 		if (process->isMaster())
-			process->cout("%d unique xp(s) to compute\n", map.xps.size());
+			process->cout("%zu unique xp(s) to compute\n", (size_t)map.xps.size());
 	}
 
 	// Create all possible chains between frequencies.
@@ -837,8 +837,8 @@ void Data::load(int dim, int vdim, int nno, int TotalDof, int Level, const Matri
 	if (showDataAnalysis)
 	{
 		if (process->isMaster())
-			process->cout("%d chains of %d xp(s) to build\n",
-				state.chains.size() / state.nfreqs, state.nfreqs);
+			process->cout("%zu chains of %d xp(s) to build\n",
+				(size_t)(state.chains.size() / state.nfreqs), state.nfreqs);
 	}
 	
 	// Convert xps from map to vector.
