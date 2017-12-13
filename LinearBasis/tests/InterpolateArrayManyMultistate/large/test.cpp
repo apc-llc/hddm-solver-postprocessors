@@ -2948,26 +2948,30 @@ public :
 
 		Postprocessors* posts = Postprocessors::getInstance(1, "LinearBasis");
 
-		string filters = "*.x86:*.gold";
-		if (isSupported(InstrSetAVX512F))
-			filters += ":*.avx512";
-		if (isSupported(InstrSetAVX2))
-			filters += ":*.avx2";
-		if (isSupported(InstrSetAVX))
-			filters += ":*.avx";
-#if defined(NVCC)
-		cuda::Device* device = cuda::tryAcquireDevice();
-		if (device)
+		string& filters = testing::GTEST_FLAG(filter);
+		if (filters == "*")
 		{
-			filters += ":*.cuda";
-			cuda::releaseDevice(device);
-		}
+			filters += "*.x86:*.gold";
+			if (isSupported(InstrSetAVX512F))
+				filters += ":*.avx512";
+			if (isSupported(InstrSetAVX2))
+				filters += ":*.avx2";
+			if (isSupported(InstrSetAVX))
+				filters += ":*.avx";
+#if defined(NVCC)
+			cuda::Device* device = cuda::tryAcquireDevice();
+			if (device)
+			{
+				filters += ":*.cuda";
+				cuda::releaseDevice(device);
+			}
 #endif
-
-		testing::GTEST_FLAG(filter) = filters;
+		}
 	}
 };
 
+// Benchmark specific target with e.g.:
+// $ build/linux/gnu/release/test --gtest_filter=*.cuda
 extern "C" int __wrap_main(int argc, char* argv[])
 {
 	const char* crunopt = getenv("RUNTIME_OPTIMIZATION");
