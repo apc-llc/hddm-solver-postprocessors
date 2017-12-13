@@ -12,9 +12,9 @@
 
 #define LOAD_DATA(filename, state) \
 	do { \
-		printf("Loading data from %s ... ", filename); \
+		printf("Loading data from %s ... ", filename); fflush(stdout); \
 		data.load(filename, state); \
-		printf("done\n"); \
+		printf("done\n"); fflush(stdout); \
 	} while (0)
 
 using namespace std;
