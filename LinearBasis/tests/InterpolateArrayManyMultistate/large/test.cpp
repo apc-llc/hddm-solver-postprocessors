@@ -10,6 +10,13 @@
 #define str(x) #x
 #define stringize(x) str(x)
 
+#define LOAD_DATA(filename, state) \
+	do { \
+		printf("Loading data from %s ... ", filename); \
+		data.load(filename, state); \
+		printf("done\n"); \
+	} while (0)
+
 using namespace std;
 
 static bool runopt = true;
@@ -2163,22 +2170,22 @@ namespace gold
 			int nstates = 16;
 			
 			Data::Dense data(nstates);
-			data.load("surplus_1.plt", 0);
-			data.load("surplus_2.plt", 1);
-			data.load("surplus_3.plt", 2);
-			data.load("surplus_4.plt", 3);
-			data.load("surplus_5.plt", 4);
-			data.load("surplus_6.plt", 5);
-			data.load("surplus_7.plt", 6);
-			data.load("surplus_8.plt", 7);
-			data.load("surplus_9.plt", 8);
-			data.load("surplus_10.plt", 9);
-			data.load("surplus_11.plt", 10);
-			data.load("surplus_12.plt", 11);
-			data.load("surplus_13.plt", 12);
-			data.load("surplus_14.plt", 13);
-			data.load("surplus_15.plt", 14);
-			data.load("surplus_16.plt", 15);
+			LOAD_DATA("surplus_1.plt", 0);
+			LOAD_DATA("surplus_2.plt", 1);
+			LOAD_DATA("surplus_3.plt", 2);
+			LOAD_DATA("surplus_4.plt", 3);
+			LOAD_DATA("surplus_5.plt", 4);
+			LOAD_DATA("surplus_6.plt", 5);
+			LOAD_DATA("surplus_7.plt", 6);
+			LOAD_DATA("surplus_8.plt", 7);
+			LOAD_DATA("surplus_9.plt", 8);
+			LOAD_DATA("surplus_10.plt", 9);
+			LOAD_DATA("surplus_11.plt", 10);
+			LOAD_DATA("surplus_12.plt", 11);
+			LOAD_DATA("surplus_13.plt", 12);
+			LOAD_DATA("surplus_14.plt", 13);
+			LOAD_DATA("surplus_15.plt", 14);
+			LOAD_DATA("surplus_16.plt", 15);
 
 			vector<Vector<double> > vx(nstates);
 			vector<double*> x(nstates);
@@ -2268,22 +2275,22 @@ namespace x86
 			int nstates = 16;
 			
 			Data::Sparse data(nstates);
-			data.load("surplus_1.plt", 0);
-			data.load("surplus_2.plt", 1);
-			data.load("surplus_3.plt", 2);
-			data.load("surplus_4.plt", 3);
-			data.load("surplus_5.plt", 4);
-			data.load("surplus_6.plt", 5);
-			data.load("surplus_7.plt", 6);
-			data.load("surplus_8.plt", 7);
-			data.load("surplus_9.plt", 8);
-			data.load("surplus_10.plt", 9);
-			data.load("surplus_11.plt", 10);
-			data.load("surplus_12.plt", 11);
-			data.load("surplus_13.plt", 12);
-			data.load("surplus_14.plt", 13);
-			data.load("surplus_15.plt", 14);
-			data.load("surplus_16.plt", 15);
+			LOAD_DATA("surplus_1.plt", 0);
+			LOAD_DATA("surplus_2.plt", 1);
+			LOAD_DATA("surplus_3.plt", 2);
+			LOAD_DATA("surplus_4.plt", 3);
+			LOAD_DATA("surplus_5.plt", 4);
+			LOAD_DATA("surplus_6.plt", 5);
+			LOAD_DATA("surplus_7.plt", 6);
+			LOAD_DATA("surplus_8.plt", 7);
+			LOAD_DATA("surplus_9.plt", 8);
+			LOAD_DATA("surplus_10.plt", 9);
+			LOAD_DATA("surplus_11.plt", 10);
+			LOAD_DATA("surplus_12.plt", 11);
+			LOAD_DATA("surplus_13.plt", 12);
+			LOAD_DATA("surplus_14.plt", 13);
+			LOAD_DATA("surplus_15.plt", 14);
+			LOAD_DATA("surplus_16.plt", 15);
 
 			vector<Vector<double> > vx(nstates);
 			vector<double*> x(nstates);
@@ -2402,22 +2409,22 @@ namespace avx
 			int nstates = 16;
 			
 			Data::Sparse data(nstates);
-			data.load("surplus_1.plt", 0);
-			data.load("surplus_2.plt", 1);
-			data.load("surplus_3.plt", 2);
-			data.load("surplus_4.plt", 3);
-			data.load("surplus_5.plt", 4);
-			data.load("surplus_6.plt", 5);
-			data.load("surplus_7.plt", 6);
-			data.load("surplus_8.plt", 7);
-			data.load("surplus_9.plt", 8);
-			data.load("surplus_10.plt", 9);
-			data.load("surplus_11.plt", 10);
-			data.load("surplus_12.plt", 11);
-			data.load("surplus_13.plt", 12);
-			data.load("surplus_14.plt", 13);
-			data.load("surplus_15.plt", 14);
-			data.load("surplus_16.plt", 15);
+			LOAD_DATA("surplus_1.plt", 0);
+			LOAD_DATA("surplus_2.plt", 1);
+			LOAD_DATA("surplus_3.plt", 2);
+			LOAD_DATA("surplus_4.plt", 3);
+			LOAD_DATA("surplus_5.plt", 4);
+			LOAD_DATA("surplus_6.plt", 5);
+			LOAD_DATA("surplus_7.plt", 6);
+			LOAD_DATA("surplus_8.plt", 7);
+			LOAD_DATA("surplus_9.plt", 8);
+			LOAD_DATA("surplus_10.plt", 9);
+			LOAD_DATA("surplus_11.plt", 10);
+			LOAD_DATA("surplus_12.plt", 11);
+			LOAD_DATA("surplus_13.plt", 12);
+			LOAD_DATA("surplus_14.plt", 13);
+			LOAD_DATA("surplus_15.plt", 14);
+			LOAD_DATA("surplus_16.plt", 15);
 
 			vector<Vector<double> > vx(nstates);
 			vector<double*> x(nstates);
@@ -2536,22 +2543,22 @@ namespace avx2
 			int nstates = 16;
 			
 			Data::Sparse data(nstates);
-			data.load("surplus_1.plt", 0);
-			data.load("surplus_2.plt", 1);
-			data.load("surplus_3.plt", 2);
-			data.load("surplus_4.plt", 3);
-			data.load("surplus_5.plt", 4);
-			data.load("surplus_6.plt", 5);
-			data.load("surplus_7.plt", 6);
-			data.load("surplus_8.plt", 7);
-			data.load("surplus_9.plt", 8);
-			data.load("surplus_10.plt", 9);
-			data.load("surplus_11.plt", 10);
-			data.load("surplus_12.plt", 11);
-			data.load("surplus_13.plt", 12);
-			data.load("surplus_14.plt", 13);
-			data.load("surplus_15.plt", 14);
-			data.load("surplus_16.plt", 15);
+			LOAD_DATA("surplus_1.plt", 0);
+			LOAD_DATA("surplus_2.plt", 1);
+			LOAD_DATA("surplus_3.plt", 2);
+			LOAD_DATA("surplus_4.plt", 3);
+			LOAD_DATA("surplus_5.plt", 4);
+			LOAD_DATA("surplus_6.plt", 5);
+			LOAD_DATA("surplus_7.plt", 6);
+			LOAD_DATA("surplus_8.plt", 7);
+			LOAD_DATA("surplus_9.plt", 8);
+			LOAD_DATA("surplus_10.plt", 9);
+			LOAD_DATA("surplus_11.plt", 10);
+			LOAD_DATA("surplus_12.plt", 11);
+			LOAD_DATA("surplus_13.plt", 12);
+			LOAD_DATA("surplus_14.plt", 13);
+			LOAD_DATA("surplus_15.plt", 14);
+			LOAD_DATA("surplus_16.plt", 15);
 
 			vector<Vector<double> > vx(nstates);
 			vector<double*> x(nstates);
@@ -2670,22 +2677,22 @@ namespace avx512
 			int nstates = 16;
 			
 			Data::Sparse data(nstates);
-			data.load("surplus_1.plt", 0);
-			data.load("surplus_2.plt", 1);
-			data.load("surplus_3.plt", 2);
-			data.load("surplus_4.plt", 3);
-			data.load("surplus_5.plt", 4);
-			data.load("surplus_6.plt", 5);
-			data.load("surplus_7.plt", 6);
-			data.load("surplus_8.plt", 7);
-			data.load("surplus_9.plt", 8);
-			data.load("surplus_10.plt", 9);
-			data.load("surplus_11.plt", 10);
-			data.load("surplus_12.plt", 11);
-			data.load("surplus_13.plt", 12);
-			data.load("surplus_14.plt", 13);
-			data.load("surplus_15.plt", 14);
-			data.load("surplus_16.plt", 15);
+			LOAD_DATA("surplus_1.plt", 0);
+			LOAD_DATA("surplus_2.plt", 1);
+			LOAD_DATA("surplus_3.plt", 2);
+			LOAD_DATA("surplus_4.plt", 3);
+			LOAD_DATA("surplus_5.plt", 4);
+			LOAD_DATA("surplus_6.plt", 5);
+			LOAD_DATA("surplus_7.plt", 6);
+			LOAD_DATA("surplus_8.plt", 7);
+			LOAD_DATA("surplus_9.plt", 8);
+			LOAD_DATA("surplus_10.plt", 9);
+			LOAD_DATA("surplus_11.plt", 10);
+			LOAD_DATA("surplus_12.plt", 11);
+			LOAD_DATA("surplus_13.plt", 12);
+			LOAD_DATA("surplus_14.plt", 13);
+			LOAD_DATA("surplus_15.plt", 14);
+			LOAD_DATA("surplus_16.plt", 15);
 
 			vector<Vector<double> > vx(nstates);
 			vector<double*> x(nstates);
@@ -2810,22 +2817,22 @@ namespace cuda
 			if (!device) return;
 			{			
 				Data data(nstates);
-				data.load("surplus_1.plt", 0);
-				data.load("surplus_2.plt", 1);
-				data.load("surplus_3.plt", 2);
-				data.load("surplus_4.plt", 3);
-				data.load("surplus_5.plt", 4);
-				data.load("surplus_6.plt", 5);
-				data.load("surplus_7.plt", 6);
-				data.load("surplus_8.plt", 7);
-				data.load("surplus_9.plt", 8);
-				data.load("surplus_10.plt", 9);
-				data.load("surplus_11.plt", 10);
-				data.load("surplus_12.plt", 11);
-				data.load("surplus_13.plt", 12);
-				data.load("surplus_14.plt", 13);
-				data.load("surplus_15.plt", 14);
-				data.load("surplus_16.plt", 15);
+				LOAD_DATA("surplus_1.plt", 0);
+				LOAD_DATA("surplus_2.plt", 1);
+				LOAD_DATA("surplus_3.plt", 2);
+				LOAD_DATA("surplus_4.plt", 3);
+				LOAD_DATA("surplus_5.plt", 4);
+				LOAD_DATA("surplus_6.plt", 5);
+				LOAD_DATA("surplus_7.plt", 6);
+				LOAD_DATA("surplus_8.plt", 7);
+				LOAD_DATA("surplus_9.plt", 8);
+				LOAD_DATA("surplus_10.plt", 9);
+				LOAD_DATA("surplus_11.plt", 10);
+				LOAD_DATA("surplus_12.plt", 11);
+				LOAD_DATA("surplus_13.plt", 12);
+				LOAD_DATA("surplus_14.plt", 13);
+				LOAD_DATA("surplus_15.plt", 14);
+				LOAD_DATA("surplus_16.plt", 15);
 
 				vector<Vector<double>::Host > vx(nstates);
 				vector<double*> x(nstates);
