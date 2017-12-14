@@ -13,7 +13,7 @@ CINC += -isystem $(GTEST_DIR)/include
 
 CINC += -I../../.. -I../../../../include -I$(LOCATION)/postprocess/include
 
-COPT += -DAVX_VECTOR_SIZE=8
+COPT += -DAVX_VECTOR_SIZE=8 -fopenmp
 
 NVCC := $(shell which nvcc 2>/dev/null)
 
