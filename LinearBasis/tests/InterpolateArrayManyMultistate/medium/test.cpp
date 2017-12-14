@@ -7,14 +7,13 @@
 
 #define EPSILON 0.001
 
-#define str(x) #x
-#define stringize(x) str(x)
+#define STR(x) #x
+#define stringize(x) STR(x)
 
 #define LOAD_DATA(filename, state) \
 	do { \
-		printf("Loading data from %s ... ", filename); fflush(stdout); \
+		printf("Loading data from %s \n", filename); fflush(stdout); \
 		data.load(filename, state); \
-		printf("done\n"); fflush(stdout); \
 	} while (0)
 
 using namespace std;
@@ -2656,6 +2655,7 @@ TEST(InterpolateArrayManyMultistate, avx2)
 #define INTERPOLATE_ARRAY_MANY_MULTISTATE LinearBasis_avx512_Generic_InterpolateArrayManyMultistate
 #undef INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT
 #define INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT LinearBasis_avx512_RuntimeOpt_InterpolateArrayManyMultistate
+#include "avx512/include/Devices.h"
 
 namespace avx512
 {
@@ -2677,22 +2677,16 @@ namespace avx512
 			int nstates = 16;
 
 			Data::Sparse data(nstates);
-			LOAD_DATA("surplus_1.plt", 0);
-			LOAD_DATA("surplus_2.plt", 1);
-			LOAD_DATA("surplus_3.plt", 2);
-			LOAD_DATA("surplus_4.plt", 3);
-			LOAD_DATA("surplus_5.plt", 4);
-			LOAD_DATA("surplus_6.plt", 5);
-			LOAD_DATA("surplus_7.plt", 6);
-			LOAD_DATA("surplus_8.plt", 7);
-			LOAD_DATA("surplus_9.plt", 8);
-			LOAD_DATA("surplus_10.plt", 9);
-			LOAD_DATA("surplus_11.plt", 10);
-			LOAD_DATA("surplus_12.plt", 11);
-			LOAD_DATA("surplus_13.plt", 12);
-			LOAD_DATA("surplus_14.plt", 13);
-			LOAD_DATA("surplus_15.plt", 14);
-			LOAD_DATA("surplus_16.plt", 15);
+			#pragma omp parallel for
+			for (int i = 0; i < nstates; i++)
+			{
+				stringstream sfilename;
+				sfilename << "surplus_";
+				sfilename << (i + 1);
+				sfilename << ".plt";
+				const string filename = sfilename.str();
+				LOAD_DATA(filename.c_str(), i);
+			}
 
 			vector<Vector<double> > vx(nstates);
 			vector<double*> x(nstates);
@@ -2711,47 +2705,51 @@ namespace avx512
 				results[i] = vresults[i].getData();
 			}
 
-			Device* device = NULL;
+			Device* device = avx512::tryAcquireDevice();
+			EXPECT_TRUE(device != NULL);
 
-			if (runopt)
 			{
-				typedef void (*Func)(
-					Device* device, const int dim, int DofPerNode, const int count, const double* const* x_,
-					const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
-
-				Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
-					JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
-						stringize(LinearBasis_avx512_RuntimeOpt_InterpolateArrayManyMultistate) "_",
-						(Func)NULL).getFunc();
-
-				volatile double start, finish;
-				get_time(&start);
-				for (int i = 0; i < ntests; i++)
+				if (runopt)
 				{
-					INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
-						device, data.dim, data.TotalDof, nstates, &x[0],
-						&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+					typedef void (*Func)(
+						Device* device, const int dim, int DofPerNode, const int count, const double* const* x_,
+						const int* nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double** value);
+
+					Func INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT =
+						JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
+							stringize(LinearBasis_avx512_RuntimeOpt_InterpolateArrayManyMultistate) "_",
+							(Func)NULL).getFunc();
+
+					volatile double start, finish;
+					get_time(&start);
+					for (int i = 0; i < ntests; i++)
+					{
+						INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
+							device, data.dim, data.TotalDof, nstates, &x[0],
+							&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+						get_time(&finish);
+					}
+
+					cout << "time = " << (finish - start) / (nstates * ntests) <<
+						" sec per state (averaged from " << ntests << " tests)" << endl;
+				}
+				else
+				{
+					volatile double start, finish;
+					get_time(&start);
+					for (int i = 0; i < ntests; i++)
+					{
+						INTERPOLATE_ARRAY_MANY_MULTISTATE(
+							device, data.dim, data.TotalDof, nstates, &x[0],
+							&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+					}
 					get_time(&finish);
-				}
 
-				cout << "time = " << (finish - start) / (nstates * ntests) <<
-					" sec per state (averaged from " << ntests << " tests)" << endl;
-			}
-			else
-			{
-				volatile double start, finish;
-				get_time(&start);
-				for (int i = 0; i < ntests; i++)
-				{
-					INTERPOLATE_ARRAY_MANY_MULTISTATE(
-						device, data.dim, data.TotalDof, nstates, &x[0],
-						&data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &results[0]);
+					cout << "time = " << (finish - start) / (nstates * ntests) <<
+						" sec per state (averaged from " << ntests << " tests)" << endl;
 				}
-				get_time(&finish);
-
-				cout << "time = " << (finish - start) / (nstates * ntests) <<
-					" sec per state (averaged from " << ntests << " tests)" << endl;
 			}
+			releaseDevice(device);
 			
 			check_0(results[0], data.TotalDof);
 			check_1(results[1], data.TotalDof);
@@ -2814,7 +2812,7 @@ namespace cuda
 
 			Device* device = cuda::tryAcquireDevice();
 			EXPECT_TRUE(device != NULL);
-			if (!device) return;
+
 			{
 				Data data(nstates);
 				LOAD_DATA("surplus_1.plt", 0);
