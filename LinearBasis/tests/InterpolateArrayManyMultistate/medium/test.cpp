@@ -2169,22 +2169,16 @@ namespace gold
 			int nstates = 16;
 
 			Data::Dense data(nstates);
-			LOAD_DATA("surplus_1.plt", 0);
-			LOAD_DATA("surplus_2.plt", 1);
-			LOAD_DATA("surplus_3.plt", 2);
-			LOAD_DATA("surplus_4.plt", 3);
-			LOAD_DATA("surplus_5.plt", 4);
-			LOAD_DATA("surplus_6.plt", 5);
-			LOAD_DATA("surplus_7.plt", 6);
-			LOAD_DATA("surplus_8.plt", 7);
-			LOAD_DATA("surplus_9.plt", 8);
-			LOAD_DATA("surplus_10.plt", 9);
-			LOAD_DATA("surplus_11.plt", 10);
-			LOAD_DATA("surplus_12.plt", 11);
-			LOAD_DATA("surplus_13.plt", 12);
-			LOAD_DATA("surplus_14.plt", 13);
-			LOAD_DATA("surplus_15.plt", 14);
-			LOAD_DATA("surplus_16.plt", 15);
+			#pragma omp parallel for
+			for (int i = 0; i < nstates; i++)
+			{
+				stringstream sfilename;
+				sfilename << "surplus_";
+				sfilename << (i + 1);
+				sfilename << ".plt";
+				const string filename = sfilename.str();
+				LOAD_DATA(filename.c_str(), i);
+			}
 
 			vector<Vector<double> > vx(nstates);
 			vector<double*> x(nstates);
@@ -2274,22 +2268,16 @@ namespace x86
 			int nstates = 16;
 
 			Data::Sparse data(nstates);
-			LOAD_DATA("surplus_1.plt", 0);
-			LOAD_DATA("surplus_2.plt", 1);
-			LOAD_DATA("surplus_3.plt", 2);
-			LOAD_DATA("surplus_4.plt", 3);
-			LOAD_DATA("surplus_5.plt", 4);
-			LOAD_DATA("surplus_6.plt", 5);
-			LOAD_DATA("surplus_7.plt", 6);
-			LOAD_DATA("surplus_8.plt", 7);
-			LOAD_DATA("surplus_9.plt", 8);
-			LOAD_DATA("surplus_10.plt", 9);
-			LOAD_DATA("surplus_11.plt", 10);
-			LOAD_DATA("surplus_12.plt", 11);
-			LOAD_DATA("surplus_13.plt", 12);
-			LOAD_DATA("surplus_14.plt", 13);
-			LOAD_DATA("surplus_15.plt", 14);
-			LOAD_DATA("surplus_16.plt", 15);
+			#pragma omp parallel for
+			for (int i = 0; i < nstates; i++)
+			{
+				stringstream sfilename;
+				sfilename << "surplus_";
+				sfilename << (i + 1);
+				sfilename << ".plt";
+				const string filename = sfilename.str();
+				LOAD_DATA(filename.c_str(), i);
+			}
 
 			vector<Vector<double> > vx(nstates);
 			vector<double*> x(nstates);
@@ -2408,22 +2396,16 @@ namespace avx
 			int nstates = 16;
 
 			Data::Sparse data(nstates);
-			LOAD_DATA("surplus_1.plt", 0);
-			LOAD_DATA("surplus_2.plt", 1);
-			LOAD_DATA("surplus_3.plt", 2);
-			LOAD_DATA("surplus_4.plt", 3);
-			LOAD_DATA("surplus_5.plt", 4);
-			LOAD_DATA("surplus_6.plt", 5);
-			LOAD_DATA("surplus_7.plt", 6);
-			LOAD_DATA("surplus_8.plt", 7);
-			LOAD_DATA("surplus_9.plt", 8);
-			LOAD_DATA("surplus_10.plt", 9);
-			LOAD_DATA("surplus_11.plt", 10);
-			LOAD_DATA("surplus_12.plt", 11);
-			LOAD_DATA("surplus_13.plt", 12);
-			LOAD_DATA("surplus_14.plt", 13);
-			LOAD_DATA("surplus_15.plt", 14);
-			LOAD_DATA("surplus_16.plt", 15);
+			#pragma omp parallel for
+			for (int i = 0; i < nstates; i++)
+			{
+				stringstream sfilename;
+				sfilename << "surplus_";
+				sfilename << (i + 1);
+				sfilename << ".plt";
+				const string filename = sfilename.str();
+				LOAD_DATA(filename.c_str(), i);
+			}
 
 			vector<Vector<double> > vx(nstates);
 			vector<double*> x(nstates);
@@ -2542,22 +2524,16 @@ namespace avx2
 			int nstates = 16;
 
 			Data::Sparse data(nstates);
-			LOAD_DATA("surplus_1.plt", 0);
-			LOAD_DATA("surplus_2.plt", 1);
-			LOAD_DATA("surplus_3.plt", 2);
-			LOAD_DATA("surplus_4.plt", 3);
-			LOAD_DATA("surplus_5.plt", 4);
-			LOAD_DATA("surplus_6.plt", 5);
-			LOAD_DATA("surplus_7.plt", 6);
-			LOAD_DATA("surplus_8.plt", 7);
-			LOAD_DATA("surplus_9.plt", 8);
-			LOAD_DATA("surplus_10.plt", 9);
-			LOAD_DATA("surplus_11.plt", 10);
-			LOAD_DATA("surplus_12.plt", 11);
-			LOAD_DATA("surplus_13.plt", 12);
-			LOAD_DATA("surplus_14.plt", 13);
-			LOAD_DATA("surplus_15.plt", 14);
-			LOAD_DATA("surplus_16.plt", 15);
+			#pragma omp parallel for
+			for (int i = 0; i < nstates; i++)
+			{
+				stringstream sfilename;
+				sfilename << "surplus_";
+				sfilename << (i + 1);
+				sfilename << ".plt";
+				const string filename = sfilename.str();
+				LOAD_DATA(filename.c_str(), i);
+			}
 
 			vector<Vector<double> > vx(nstates);
 			vector<double*> x(nstates);
@@ -2655,6 +2631,7 @@ TEST(InterpolateArrayManyMultistate, avx2)
 #define INTERPOLATE_ARRAY_MANY_MULTISTATE LinearBasis_avx512_Generic_InterpolateArrayManyMultistate
 #undef INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT
 #define INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT LinearBasis_avx512_RuntimeOpt_InterpolateArrayManyMultistate
+#undef DEVICES_H
 #include "avx512/include/Devices.h"
 
 namespace avx512
@@ -2787,6 +2764,7 @@ TEST(InterpolateArrayManyMultistate, avx512)
 #define INTERPOLATE_ARRAY_MANY_MULTISTATE LinearBasis_cuda_Generic_InterpolateArrayManyMultistate
 #undef INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT
 #define INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT LinearBasis_cuda_RuntimeOpt_InterpolateArrayManyMultistate
+#undef DEVICES_H
 #include "cuda/include/Devices.h"
 
 namespace cuda
@@ -2815,22 +2793,16 @@ namespace cuda
 
 			{
 				Data data(nstates);
-				LOAD_DATA("surplus_1.plt", 0);
-				LOAD_DATA("surplus_2.plt", 1);
-				LOAD_DATA("surplus_3.plt", 2);
-				LOAD_DATA("surplus_4.plt", 3);
-				LOAD_DATA("surplus_5.plt", 4);
-				LOAD_DATA("surplus_6.plt", 5);
-				LOAD_DATA("surplus_7.plt", 6);
-				LOAD_DATA("surplus_8.plt", 7);
-				LOAD_DATA("surplus_9.plt", 8);
-				LOAD_DATA("surplus_10.plt", 9);
-				LOAD_DATA("surplus_11.plt", 10);
-				LOAD_DATA("surplus_12.plt", 11);
-				LOAD_DATA("surplus_13.plt", 12);
-				LOAD_DATA("surplus_14.plt", 13);
-				LOAD_DATA("surplus_15.plt", 14);
-				LOAD_DATA("surplus_16.plt", 15);
+				#pragma omp parallel for
+				for (int i = 0; i < nstates; i++)
+				{
+					stringstream sfilename;
+					sfilename << "surplus_";
+					sfilename << (i + 1);
+					sfilename << ".plt";
+					const string filename = sfilename.str();
+					LOAD_DATA(filename.c_str(), i);
+				}
 
 				vector<Vector<double>::Host > vx(nstates);
 				vector<double*> x(nstates);

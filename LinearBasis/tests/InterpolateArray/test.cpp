@@ -9,6 +9,10 @@ using namespace std;
 
 #define EPSILON 0.001
 
+// The number of repeations to be averaged when
+// calculating time/performance.
+static int ntests = 1;
+
 // Get the timer value.
 static void get_time(volatile double* ret)
 {
@@ -212,12 +216,13 @@ static void check(double* result, int TotalDof)
 
 #define NAMESPACE gold
 #include "gold/include/Data.h"
+#define INTERPOLATE_ARRAY LinearBasis_gold_Generic_InterpolateArray
 
 namespace gold
 {
 	class Device;
 
-	extern "C" void LinearBasis_gold_Generic_InterpolateArray(
+	extern "C" void INTERPOLATE_ARRAY(
 		Device* device,
 		const int dim, const int DofPerNode, const double* x,
 		const Matrix<int>* index, const Matrix<double>* surplus, double* value);
@@ -242,11 +247,15 @@ namespace gold
 
 			volatile double start, finish;
 			get_time(&start);
-			LinearBasis_gold_Generic_InterpolateArray(device, data.dim, data.TotalDof, &x(0),
-				&data.index[0], &data.surplus[0], &result(0));
+			for (int i = 0; i < ntests; i++)
+			{
+				INTERPOLATE_ARRAY(device, data.dim, data.TotalDof, &x(0),
+					&data.index[0], &data.surplus[0], &result(0));
+			}
 			get_time(&finish);
 			
-			cout << "time = " << (finish - start) << " sec" << endl;
+			cout << "time = " << (finish - start) / ntests <<
+				" sec (averaged from " << ntests << " tests)" << endl;
 
 			check(&result(0), data.TotalDof);
 		}
@@ -262,12 +271,18 @@ TEST(InterpolateArray, gold)
 #define NAMESPACE x86
 #undef DATA_H
 #include "x86/include/Data.h"
+#undef JIT_H
+#include "x86/include/JIT.h"
+#undef INTERPOLATE_ARRAY
+#define INTERPOLATE_ARRAY LinearBasis_x86_Generic_InterpolateArray
+#undef INTERPOLATE_ARRAY_RUNTIME_OPT
+#define INTERPOLATE_ARRAY_RUNTIME_OPT LinearBasis_x86_RuntimeOpt_InterpolateArray
 
 namespace x86
 {
 	class Device;
 
-	extern "C" void LinearBasis_x86_Generic_InterpolateArray(
+	extern "C" void INTERPOLATE_ARRAY(
 		Device* device,
 		const int dim, const int DofPerNode, const double* x,
 		const int nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double* value);
@@ -292,11 +307,15 @@ namespace x86
 
 			volatile double start, finish;
 			get_time(&start);
-			LinearBasis_x86_Generic_InterpolateArray(device, data.dim, data.TotalDof, &x(0),
-				data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &result(0));
+			for (int i = 0; i < ntests; i++)
+			{
+				INTERPOLATE_ARRAY(device, data.dim, data.TotalDof, &x(0),
+					data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &result(0));
+			}
 			get_time(&finish);
-			
-			cout << "time = " << (finish - start) << " sec" << endl;
+		
+			cout << "time = " << (finish - start) / ntests <<
+				" sec (averaged from " << ntests << " tests)" << endl;
 
 			check(&result(0), data.TotalDof);
 		}
@@ -314,12 +333,18 @@ TEST(InterpolateArray, x86)
 #define DOUBLE_VECTOR_SIZE 4
 #undef DATA_H
 #include "avx/include/Data.h"
+#undef JIT_H
+#include "avx/include/JIT.h"
+#undef INTERPOLATE_ARRAY
+#define INTERPOLATE_ARRAY LinearBasis_avx_Generic_InterpolateArray
+#undef INTERPOLATE_ARRAY_RUNTIME_OPT
+#define INTERPOLATE_ARRAY_RUNTIME_OPT LinearBasis_avx_RuntimeOpt_InterpolateArray
 
 namespace avx
 {
 	class Device;
 
-	extern "C" void LinearBasis_avx_Generic_InterpolateArray(
+	extern "C" void INTERPOLATE_ARRAY(
 		Device* device,
 		const int dim, const int DofPerNode, const double* x,
 		const int nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double* value);
@@ -344,11 +369,15 @@ namespace avx
 
 			volatile double start, finish;
 			get_time(&start);
-			LinearBasis_avx_Generic_InterpolateArray(device, data.dim, data.TotalDof, &x(0),
-				data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &result(0));
+			for (int i = 0; i < ntests; i++)
+			{
+				INTERPOLATE_ARRAY(device, data.dim, data.TotalDof, &x(0),
+					data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &result(0));
+			}
 			get_time(&finish);
-			
-			cout << "time = " << (finish - start) << " sec" << endl;
+
+			cout << "time = " << (finish - start) / ntests <<
+				" sec (averaged from " << ntests << " tests)" << endl;
 
 			check(&result(0), data.TotalDof);
 		}
@@ -366,12 +395,18 @@ TEST(InterpolateArray, avx)
 #define DOUBLE_VECTOR_SIZE 4
 #undef DATA_H
 #include "avx2/include/Data.h"
+#undef JIT_H
+#include "avx2/include/JIT.h"
+#undef INTERPOLATE_ARRAY
+#define INTERPOLATE_ARRAY LinearBasis_avx2_Generic_InterpolateArray
+#undef INTERPOLATE_ARRAY_RUNTIME_OPT
+#define INTERPOLATE_ARRAY_RUNTIME_OPT LinearBasis_avx2_RuntimeOpt_InterpolateArray
 
 namespace avx2
 {
 	class Device;
 
-	extern "C" void LinearBasis_avx2_Generic_InterpolateArray(
+	extern "C" void INTERPOLATE_ARRAY(
 		Device* device,
 		const int dim, const int DofPerNode, const double* x,
 		const int nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double* value);
@@ -396,11 +431,15 @@ namespace avx2
 
 			volatile double start, finish;
 			get_time(&start);
-			LinearBasis_avx2_Generic_InterpolateArray(device, data.dim, data.TotalDof, &x(0),
-				data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &result(0));
+			for (int i = 0; i < ntests; i++)
+			{
+				INTERPOLATE_ARRAY(device, data.dim, data.TotalDof, &x(0),
+					data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &result(0));
+			}
 			get_time(&finish);
-			
-			cout << "time = " << (finish - start) << " sec" << endl;
+
+			cout << "time = " << (finish - start) / ntests <<
+				" sec (averaged from " << ntests << " tests)" << endl;
 
 			check(&result(0), data.TotalDof);
 		}
@@ -418,12 +457,20 @@ TEST(InterpolateArray, avx2)
 #define DOUBLE_VECTOR_SIZE 8
 #undef DATA_H
 #include "avx512/include/Data.h"
+#undef JIT_H
+#include "avx512/include/JIT.h"
+#undef INTERPOLATE_ARRAY
+#define INTERPOLATE_ARRAY LinearBasis_avx512_Generic_InterpolateArray
+#undef INTERPOLATE_ARRAY_RUNTIME_OPT
+#define INTERPOLATE_ARRAY_RUNTIME_OPT LinearBasis_avx512_RuntimeOpt_InterpolateArray
+#undef DEVICES_H
+#include "avx512/include/Devices.h"
 
 namespace avx512
 {
 	class Device;
 
-	extern "C" void LinearBasis_avx512_Generic_InterpolateArray(
+	extern "C" void INTERPOLATE_ARRAY(
 		Device* device,
 		const int dim, const int DofPerNode, const double* x,
 		const int nfreqs, const XPS* xps, const Chains* chains, const Matrix<double>* surplus, double* value);
@@ -444,15 +491,20 @@ namespace avx512
 
 			Vector<double> result(data.TotalDof);
 
-			Device* device = NULL;
+			Device* device = avx512::tryAcquireDevice();
+			EXPECT_TRUE(device != NULL);
 
 			volatile double start, finish;
 			get_time(&start);
-			LinearBasis_avx512_Generic_InterpolateArray(device, data.dim, data.TotalDof, &x(0),
-				data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &result(0));
+			for (int i = 0; i < ntests; i++)
+			{
+				INTERPOLATE_ARRAY(device, data.dim, data.TotalDof, &x(0),
+					data.nfreqs[0], &data.xps[0], &data.chains[0], &data.surplus[0], &result(0));
+			}
 			get_time(&finish);
-			
-			cout << "time = " << (finish - start) << " sec" << endl;
+
+			cout << "time = " << (finish - start) / ntests <<
+				" sec (averaged from " << ntests << " tests)" << endl;
 
 			check(&result(0), data.TotalDof);
 		}
@@ -469,11 +521,18 @@ TEST(InterpolateArray, avx512)
 #define NAMESPACE cuda
 #undef DATA_H
 #include "cuda/include/Data.h"
+#undef JIT_H
+#include "cuda/include/JIT.h"
+#undef INTERPOLATE_ARRAY
+#define INTERPOLATE_ARRAY LinearBasis_cuda_Generic_InterpolateArray
+#undef INTERPOLATE_ARRAY_RUNTIME_OPT
+#define INTERPOLATE_ARRAY_RUNTIME_OPT LinearBasis_cuda_RuntimeOpt_InterpolateArray
+#undef DEVICES_H
 #include "cuda/include/Devices.h"
 
 namespace cuda
 {
-	extern "C" void LinearBasis_cuda_Generic_InterpolateArray(
+	extern "C" void INTERPOLATE_ARRAY(
 		Device* device,
 		const int dim, const int nno, const int DofPerNode, const double* x,
 		const int nfreqs, const XPS::Device* xps_, const int szxps, const Chains::Device* chains_,
@@ -501,21 +560,24 @@ namespace cuda
 				init(&x(0), data.dim);
 
 				// Run once without timing to do all CUDA-specific internal initializations.
-				LinearBasis_cuda_Generic_InterpolateArray(device, data.dim,
+				INTERPOLATE_ARRAY(device, data.dim,
 					data.host.getSurplus(0)->dimy(), data.TotalDof, &x(0),
 					*data.host.getNfreqs(0), data.device.getXPS(0), *data.host.getSzXPS(0),
 					data.device.getChains(0), data.device.getSurplus(0), &result(0));
 
 				volatile double start, finish;
 				get_time(&start);
-				LinearBasis_cuda_Generic_InterpolateArray(device, data.dim,
-					data.host.getSurplus(0)->dimy(), data.TotalDof, &x(0),
-					*data.host.getNfreqs(0), data.device.getXPS(0), *data.host.getSzXPS(0),
-					data.device.getChains(0), data.device.getSurplus(0), &result(0));
+				for (int i = 0; i < ntests; i++)
+				{
+					INTERPOLATE_ARRAY(device, data.dim,
+						data.host.getSurplus(0)->dimy(), data.TotalDof, &x(0),
+						*data.host.getNfreqs(0), data.device.getXPS(0), *data.host.getSzXPS(0),
+						data.device.getChains(0), data.device.getSurplus(0), &result(0));
+				}
 				get_time(&finish);
-			
-				cout << "time = " << (finish - start) << " sec" << endl;
 
+				cout << "time = " << (finish - start) / ntests <<
+					" sec (averaged from " << ntests << " tests)" << endl;
 			}
 			releaseDevice(device);
 
@@ -542,28 +604,36 @@ public :
 
 		Postprocessors* posts = Postprocessors::getInstance(1, "LinearBasis");
 
-		string filters = "*.x86:*.gold";
-		if (isSupported(InstrSetAVX512F))
-			filters += ":*.avx512";
-		if (isSupported(InstrSetAVX2))
-			filters += ":*.avx2";
-		if (isSupported(InstrSetAVX))
-			filters += ":*.avx";
-#if defined(NVCC)
-		cuda::Device* device = cuda::tryAcquireDevice();
-		if (device)
+		string& filters = testing::GTEST_FLAG(filter);
+		if (filters == "*")
 		{
-			filters += ":*.cuda";
-			cuda::releaseDevice(device);
-		}
+			filters += "*.x86:*.gold";
+			if (isSupported(InstrSetAVX512F))
+				filters += ":*.avx512";
+			if (isSupported(InstrSetAVX2))
+				filters += ":*.avx2";
+			if (isSupported(InstrSetAVX))
+				filters += ":*.avx";
+#if defined(NVCC)
+			cuda::Device* device = cuda::tryAcquireDevice();
+			if (device)
+			{
+				filters += ":*.cuda";
+				cuda::releaseDevice(device);
+			}
 #endif
-
-		testing::GTEST_FLAG(filter) = filters;
+		}
 	}
 };
 
+// Benchmark specific target with e.g.:
+// $ build/linux/gnu/release/test --gtest_filter=*.cuda
 extern "C" int __wrap_main(int argc, char* argv[])
 {
+	const char* cntests = getenv("NTESTS");
+	if (cntests)
+		ntests = atoi(cntests);
+
 	GoogleTest(argc, argv);
 
 	::testing::InitGoogleTest(&argc, argv);
