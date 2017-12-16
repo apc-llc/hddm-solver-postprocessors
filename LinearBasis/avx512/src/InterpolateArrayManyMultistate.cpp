@@ -25,7 +25,7 @@ extern "C" void FUNCNAME(
 	double* scratch = vscratch.getData();
 
 	const __m512d zero = _mm512_setzero_pd();
-        const __m512d one = _mm512_set1_pd(1.0);
+	const __m512d one = _mm512_set1_pd(1.0);
 	for (int many = 0; many < COUNT; many++)
 	{
 		const double* x = x_[many];
@@ -37,8 +37,11 @@ extern "C" void FUNCNAME(
 
 		int nno = surplus.dimy();
 
+		size_t szxpv64 = xps.size() / DOUBLE_VECTOR_SIZE;
+		if (xps.size() % DOUBLE_VECTOR_SIZE) szxpv64++;
+		vector<__m512d, AlignedAllocator<__m512d> > xpv64(szxpv64);
+
 		// Loop to calculate all unique xp values.
-		vector<__m512d, AlignedAllocator<__m512d> > xpv64(xps.size() / DOUBLE_VECTOR_SIZE);
 		#pragma omp parallel for
 		for (int i = 0, e = xpv64.size(); i < e; i++)
 		{
@@ -56,16 +59,8 @@ extern "C" void FUNCNAME(
 			const __m512d j32 = _mm512_cvtepi32_pd(_mm256_cvtepi8_epi32(index));
 
 			// Compute xpv[i]
-#if 0
-			// Alas, there is no _mm512_andnot_pd on avx512f/pf/er/cd, so we abs in two 256-wide parts.
-			x64 = _mm512_fmadd_pd(x64, i32, j32);
-			x64 = _mm512_insertf64x4(_mm512_castpd256_pd512(_mm256_andnot_pd(sign_mask, _mm512_castpd512_pd256(x64))),
-				_mm256_andnot_pd(sign_mask, _mm512_extractf64x4_pd(x64, 1)), 1);
-			_mm512_store_pd((double*)&xpv64[i], _mm512_max_pd(zero, _mm512_sub_pd(one, x64)));
-#else
 			_mm512_store_pd((double*)&xpv64[i], _mm512_max_pd(zero, _mm512_sub_pd(one,
 				(__m512d)_mm512_abs_epi64((__m512i)_mm512_fmadd_pd(x64, i32, j32)))));
-#endif
 		}
 
 		// Loop to calculate scaled surplus product.
@@ -95,8 +90,7 @@ extern "C" void FUNCNAME(
 
 					for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE; Dof_choice += DOUBLE_VECTOR_SIZE)
 					{
-						__m512d surplus64 = _mm512_load_pd(&surplus(i, Dof_choice)/*,
-							_MM_UPCONV_PD_NONE, _MM_BROADCAST64_NONE, _MM_HINT_NT*/);
+						__m512d surplus64 = _mm512_load_pd(&surplus(i, Dof_choice));
 						__m512d value64 = _mm512_load_pd(&value_private[Dof_choice]);
 						value64 = _mm512_fmadd_pd(temp64, surplus64, value64);
 						_mm512_store_pd(&value_private[Dof_choice], value64);
@@ -116,11 +110,12 @@ extern "C" void FUNCNAME(
 					for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE; Dof_choice += DOUBLE_VECTOR_SIZE)
 					{
 						__m512d v = _mm512_load_pd(&value_private[Dof_choice]);
-						__m512d v2 = _mm512_load_pd(&value_private2[Dof_choice]/*,
-							_MM_UPCONV_PD_NONE, _MM_BROADCAST64_NONE, _MM_HINT_NT*/);
+						__m512d v2 = _mm512_load_pd(&value_private2[Dof_choice]);
 						_mm512_store_pd((__m512d*)&value_private[Dof_choice], _mm512_add_pd(v, v2));
 					}
 				}
+				
+				// TODO Sync only needed pair of threads. Rework into task-based tree traversal?
 				#pragma omp barrier
 			}
 		}
