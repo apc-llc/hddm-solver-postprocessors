@@ -5,8 +5,16 @@ LOCATION = ../../..
 include $(LOCATION)/Makefile.inc
 
 CINC += -I. -I.. -I../include -I../../include
-COPT += -DAVX_VECTOR_SIZE=8 -DDOUBLE_VECTOR_SIZE=4 -DNAMESPACE=$(NAME) -mavx
+COPT += -DAVX_VECTOR_SIZE=8 -DDOUBLE_VECTOR_SIZE=4 -DNAMESPACE=$(NAME)
 CDIR = mkdir -p $(shell dirname $@)
+
+ifeq (gnu,$(COMPILER))
+COPT += -mavx
+endif
+
+ifeq (intel,$(COMPILER))
+COPT += -march=core-avx
+endif
 
 all: $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so
 
