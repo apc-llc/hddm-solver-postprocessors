@@ -22,6 +22,10 @@ CINC += -I$(shell dirname $(NVCC) 2>/dev/null)/../include
 COPT += -DNVCC
 endif
 
+ifeq ($(COMPILER),gnu)
+GNU_LIBS := -lgfortran -lstdc++
+endif
+
 CDIR = mkdir -p $(shell dirname $@)
 FDIR = mkdir -p $(shell dirname $@)
 
@@ -37,7 +41,7 @@ $(GTEST_DIR)/$(BUILD)/libgtest.a:
 
 $(BUILD)/test: test.cpp $(GTEST_HEADERS) \
 	$(GTEST_DIR)/$(BUILD)/libgtest.a
-	$(CDIR) && $(MPILD) $(CINC) $(COPT) $(FUSE_LINKER_PLUGIN) $< $(GTEST_DIR)/$(BUILD)/libgtest.a -Wl,--whole-archive $(INSTALL)/lib/libfrontend.a -Wl,--no-whole-archive -o $@ -L$(INSTALL)/lib -Wl,-rpath=$(INSTALL)/lib -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-Bstatic $(addprefix -Wl$(COMMA),$(LINK)) $(LINK_ACCELERATOR) -Wl,-Bdynamic -Ltbb/build/release -ltbb -ltbbmalloc -ldl $(MPILDFLAGS) -lrt -lgfortran -lstdc++ -lpostprocess -Wl,-rpath=$(ROOT)/$(BUILD) -lpthread -Wl,--wrap=main
+	$(CDIR) && $(MPILD) $(CINC) $(COPT) $(FUSE_LINKER_PLUGIN) $< $(GTEST_DIR)/$(BUILD)/libgtest.a -Wl,--whole-archive $(INSTALL)/lib/libfrontend.a -Wl,--no-whole-archive -o $@ -L$(INSTALL)/lib -Wl,-rpath=$(INSTALL)/lib -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-Bstatic $(addprefix -Wl$(COMMA),$(LINK)) $(LINK_ACCELERATOR) -Wl,-Bdynamic -Ltbb/build/release -ltbb -ltbbmalloc -ldl $(MPILDFLAGS) -lrt $(GNU_LIBS) -lpostprocess -Wl,-rpath=$(ROOT)/$(BUILD) -lpthread -Wl,--wrap=main
 
 run: $(BUILD)/test
 	$(ROOT)/$(BUILD)/test
