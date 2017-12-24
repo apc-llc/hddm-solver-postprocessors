@@ -1,5 +1,6 @@
 #include <map>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include "interpolator.h"
@@ -78,9 +79,13 @@ namespace NAMESPACE
 
 Interpolator* Interpolator::getInstance()
 {
-	if (!interp.get())
-		interp.reset(new Interpolator(stringize(NAME)));
-	
+	static mutex mtx;
+	{
+		lock_guard<std::mutex> lck(mtx);
+		if (!interp.get())
+			interp.reset(new Interpolator(stringize(NAME)));
+	}
+
 	return interp.get();
 }
 
