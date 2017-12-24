@@ -13,7 +13,7 @@ COPT += -mavx
 endif
 
 ifeq (intel,$(COMPILER))
-COPT += -march=core-avx
+COPT += -xAVX
 endif
 
 all: $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so
