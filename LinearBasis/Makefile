@@ -18,10 +18,10 @@ TARGETS += avx2
 else
 $(info AVX2 target is not supported by host GCC compiler)
 endif
-ifneq (,$(shell which icpc))
+ifeq (intel,$(COMPILER))
 TARGETS += avx512
 else
-$(info AVX512 target is not built because Intel compiler is not found)
+$(info AVX512 target is not built because Intel compiler is not used for entire build)
 endif
 ifneq (,$(NVCC))
 TARGETS += cuda
