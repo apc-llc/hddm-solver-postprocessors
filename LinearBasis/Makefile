@@ -29,7 +29,7 @@ else
 $(info CUDA target is not built because NVIDIA CUDA compiler is not found)
 endif
 
-.PHONY: $(TARGETS)
+.PHONY: $(TARGETS) tests
 
 all: $(TARGETS) tests
 
