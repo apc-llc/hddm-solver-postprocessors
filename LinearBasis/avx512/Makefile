@@ -6,15 +6,7 @@ include $(LOCATION)/Makefile.inc
 
 CINC += -I. -I.. -I../include -I../../include
 COPT += -DAVX_VECTOR_SIZE=16 -DDOUBLE_VECTOR_SIZE=8 -DNAMESPACE=$(NAME) -axMIC-AVX512 -g -fopenmp
-ifeq (,$(DEBUG))
-COPT += -fast
-endif
-COPT_FILTERED := $(filter-out -g3, $(filter-out -ffast-math, $(COPT)))
-COPT := $(COPT_FILTERED)
 CDIR = mkdir -p $(shell dirname $@)
-CXX_INTEL := icpc
-MPILD := $(subst $(CXX),$(CXX_INTEL),$(MPILD))
-CXX := $(CXX_INTEL)
 
 all: $(INSTALL)/bin/postprocessors/LinearBasis/avx512/libpostprocessor.so
 
