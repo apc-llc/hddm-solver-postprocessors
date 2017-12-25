@@ -35,12 +35,16 @@ NVCCOPT += $(addsuffix \", $(addprefix -Xcompiler=\", $(subst $(COMMA),\$(COMMA)
 all: $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so
 
 $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
+	$(BUILD)/exec-stream.o \
 	$(BUILD)/InterpolateArray.o $(BUILD)/InterpolateArrayManyMultistate.o \
 	$(BUILD)/libInterpolateArray.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
 	$(BUILD)/parameters.o $(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o $(BUILD)/SIMDVector.o \
 	$(BUILD)/priority.o $(BUILD)/supported.o $(BUILD)/reset.o \
 	$(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o
 	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(CXX) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ -L$(CUDA_LIBRARY_PATH) -lcudart_static -Wl,-rpath=$(CUDA_LIBRARY_PATH)
+
+$(BUILD)/exec-stream.o: ../src/exec-stream.cpp ../src/posix/exec-stream-helpers.cpp ../src/posix/exec-stream-impl.cpp
+	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.cu ../include/LinearBasis.h
 	$(CDIR) && $(NVCC) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArray -DDIM=dim -DDOF_PER_NODE=DofPerNode $(CINC) $(NVCCOPT) -c $< -o $@

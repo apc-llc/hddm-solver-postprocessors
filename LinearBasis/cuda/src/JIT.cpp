@@ -3,7 +3,7 @@
 #include <functional>
 #include <map>
 #include <pthread.h>
-#include <pstreams/pstream.h>
+#include <exec-stream.h>
 #include <string>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -242,12 +242,12 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 
 			// Add option for including line-number information for device code in release mode only
 			// - debug more already implies it is enabled (compiler warning).
-			const char* format = "%s -arch=sm_%d %s -DFUNCNAME=%s -DDIM=%d "
+			const char* format = "-c \"%s -arch=sm_%d %s -DFUNCNAME=%s -DDIM=%d "
 				"-DCOUNT=%d -DDOF_PER_NODE=%d -o %s %s"
 #if defined(NDEBUG)
 				" -lineinfo"
 #endif
-				;
+				" 2>&1\"";
 
 			bool keepCache = false;
 			const char* keepCacheValue = getenv("KEEP_CACHE");
@@ -277,13 +277,27 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 		// Run compiler as a process and create a streambuf that
 		// reads its stdout and stderr.
 		{
-			redi::ipstream proc((string)&cmd[0], redi::pstreams::pstderr);
+			exec_stream_t es;
 
-			string line;
-			while (std::getline(proc.out(), line))
-				process->cout("%s\n", line.c_str());
-			while (std::getline(proc.err(), line))
-				process->cout("%s\n", line.c_str());
+			try
+			{
+				// Start command and wait for it infinitely.
+				es.set_wait_timeout(exec_stream_t::s_all, (unsigned long)-1);
+				es.start("sh", (string)&cmd[0]);
+
+				int length = 0;
+				vector<char> buffer(512 + 1);
+				while (length = es.out().rdbuf()->sgetn(&buffer[0], 512))
+				{
+					buffer[length + 1] = '\0';
+					process->cout("%s", &buffer[0]);
+				}
+			}
+			catch (exception const & e)
+			{
+				const string& out = e.what();
+				process->cerr("%s", out.c_str());
+			}
 		}
 
 		// If the output file does not exist, there must be some

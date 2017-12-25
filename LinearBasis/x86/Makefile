@@ -8,15 +8,23 @@ CINC += -I. -I.. -I../include -I../../include
 COPT += -DAVX_VECTOR_SIZE=8 -DNAMESPACE=$(NAME)
 CDIR = mkdir -p $(shell dirname $@)
 
+ifeq (intel,$(COMPILER))
+COPT += -xSSE2
+endif
+
 all: $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so
 
 $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
+	$(BUILD)/exec-stream.o \
 	$(BUILD)/InterpolateArray.o $(BUILD)/InterpolateArrayManyMultistate.o \
 	$(BUILD)/libInterpolateArray.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
 	$(BUILD)/parameters.o $(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o \
 	$(BUILD)/priority.o $(BUILD)/instrset.o $(BUILD)/supported.o $(BUILD)/reset.o \
 	$(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o $(BUILD)/getData.o
 	mkdir -p $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME) && $(MPILD) $(CINC) $(COPT) -Wl,--whole-archive $(filter %.o,$^) -Wl,--no-whole-archive -shared -o $@ -L$(INSTALL)/lib/ $(MPILDFLAGS)
+
+$(BUILD)/exec-stream.o: ../src/exec-stream.cpp ../src/posix/exec-stream-helpers.cpp ../src/posix/exec-stream-impl.cpp
+	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/InterpolateArray.o: src/InterpolateArray.cpp
 	$(CDIR) && $(CXX) -DFUNCNAME=LinearBasis_$(NAME)_Generic_InterpolateArray -DDIM=dim -DDOF_PER_NODE=DofPerNode $(CINC) $(COPT) -c $< -o $@

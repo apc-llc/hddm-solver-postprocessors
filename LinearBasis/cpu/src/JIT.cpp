@@ -3,7 +3,7 @@
 #include <functional>
 #include <map>
 #include <pthread.h>
-#include <pstreams/pstream.h>
+#include <exec-stream.h>
 #include <string>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -223,7 +223,7 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 			for (long i = 0; i < length; i++)
 				if (sh[i] == '\n') sh[i] = ' ';
 
-			const char* format = "%s -DFUNCNAME=%s -DDIM=%d -DCOUNT=%d -DDOF_PER_NODE=%d -o %s";
+			const char* format = "-c \"%s -DFUNCNAME=%s -DDIM=%d -DCOUNT=%d -DDOF_PER_NODE=%d -o %s 2>&1\"";
 			size_t szcmd = snprintf(NULL, 0, format,
 				&sh[0], funcname.c_str(), dim, count, DofPerNode, tmp.filename.c_str());
 
@@ -244,13 +244,27 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 		// Run compiler as a process and create a streambuf that
 		// reads its stdout and stderr.
 		{
-			redi::ipstream proc((string)&cmd[0], redi::pstreams::pstderr);
+			exec_stream_t es;
 
-			string line;
-			while (std::getline(proc.out(), line))
-				process->cout("%s\n", line.c_str());
-			while (std::getline(proc.err(), line))
-				process->cout("%s\n", line.c_str());
+			try
+			{
+				// Start command and wait for it infinitely.
+				es.set_wait_timeout(exec_stream_t::s_all, (unsigned long)-1);
+				es.start("sh", (string)&cmd[0]);
+
+				int length = 0;
+				vector<char> buffer(512 + 1);
+				while (length = es.out().rdbuf()->sgetn(&buffer[0], 512))
+				{
+					buffer[length + 1] = '\0';
+					process->cout("%s", &buffer[0]);
+				}
+			}
+			catch (exception const & e)
+			{
+				const string& out = e.what();
+				process->cerr("%s", out.c_str());
+			}
 		}
 
 		// If the output file does not exist, there must be some
