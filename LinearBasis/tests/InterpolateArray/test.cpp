@@ -23,7 +23,7 @@ static void get_time(volatile double* ret)
 
 static void init(double* input, int dim)
 {
-	EXPECT_EQ(dim, 59);
+	ASSERT_EQ(dim, 59);
 
 	input[0] = 0.0084745762711864406;
 	input[1] = 0.016949152542372881;
@@ -88,7 +88,7 @@ static void init(double* input, int dim)
 
 static void check(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.11149;
@@ -231,7 +231,7 @@ namespace gold
 	{
 	public :
 
-		GoogleTest()
+		static void run()
 		{
 			using namespace gold;
 
@@ -264,7 +264,7 @@ namespace gold
 
 TEST(InterpolateArray, gold)
 {
-	gold::GoogleTest();
+	gold::GoogleTest::run();
 }
 
 #undef NAMESPACE
@@ -291,7 +291,7 @@ namespace x86
 	{
 	public :
 
-		GoogleTest()
+		static void run()
 		{
 			using namespace x86;
 
@@ -324,7 +324,7 @@ namespace x86
 
 TEST(InterpolateArray, x86)
 {
-	x86::GoogleTest();
+	x86::GoogleTest::run();
 }
 
 #undef NAMESPACE
@@ -353,7 +353,7 @@ namespace avx
 	{
 	public :
 
-		GoogleTest()
+		static void run()
 		{
 			using namespace avx;
 
@@ -386,7 +386,7 @@ namespace avx
 
 TEST(InterpolateArray, avx)
 {
-	avx::GoogleTest();
+	avx::GoogleTest::run();
 }
 
 #undef NAMESPACE
@@ -415,7 +415,7 @@ namespace avx2
 	{
 	public :
 
-		GoogleTest()
+		static void run()
 		{
 			using namespace avx2;
 
@@ -448,7 +448,7 @@ namespace avx2
 
 TEST(InterpolateArray, avx2)
 {
-	avx2::GoogleTest();
+	avx2::GoogleTest::run();
 }
 
 #undef NAMESPACE
@@ -479,7 +479,7 @@ namespace avx512
 	{
 	public :
 
-		GoogleTest()
+		static void run()
 		{
 			using namespace avx512;
 
@@ -492,7 +492,7 @@ namespace avx512
 			Vector<double> result(data.TotalDof);
 
 			Device* device = avx512::tryAcquireDevice();
-			EXPECT_TRUE(device != NULL);
+			ASSERT_TRUE(device != NULL);
 
 			volatile double start, finish;
 			get_time(&start);
@@ -513,7 +513,7 @@ namespace avx512
 
 TEST(InterpolateArray, avx512)
 {
-	avx512::GoogleTest();
+	avx512::GoogleTest::run();
 }
 
 #if defined(NVCC)
@@ -542,15 +542,15 @@ namespace cuda
 	{
 	public :
 
-		GoogleTest()
+		static void run()
 		{
 			using namespace cuda;
 
 			Vector<double>::Host result;
 
 			Device* device = cuda::tryAcquireDevice();
-			EXPECT_TRUE(device != NULL);
-			if (!device) return;
+			ASSERT_TRUE(device != NULL);
+
 			{
 				Data data(1);
 				data.load("surplus.plt", 0);
@@ -588,7 +588,7 @@ namespace cuda
 
 TEST(InterpolateArray, cuda)
 {
-	cuda::GoogleTest();
+	cuda::GoogleTest::run();
 }
 #endif // NVCC
 

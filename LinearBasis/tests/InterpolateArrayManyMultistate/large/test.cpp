@@ -34,7 +34,7 @@ static void get_time(volatile double* ret)
 
 static void init(double* input, int dim)
 {
-	EXPECT_EQ(dim, 59);
+	ASSERT_EQ(dim, 59);
 
 	input[0] = 0.0084745762711864406;
 	input[1] = 0.016949152542372881;
@@ -99,7 +99,7 @@ static void init(double* input, int dim)
 
 static void check_0(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.024336;
@@ -227,7 +227,7 @@ static void check_0(double* result, int TotalDof)
 
 static void check_1(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.029201;
@@ -355,7 +355,7 @@ static void check_1(double* result, int TotalDof)
 
 static void check_2(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.021189;
@@ -483,7 +483,7 @@ static void check_2(double* result, int TotalDof)
 
 static void check_3(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.025772;
@@ -611,7 +611,7 @@ static void check_3(double* result, int TotalDof)
 
 static void check_4(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.029760;
@@ -739,7 +739,7 @@ static void check_4(double* result, int TotalDof)
 
 static void check_5(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.027398;
@@ -867,7 +867,7 @@ static void check_5(double* result, int TotalDof)
 
 static void check_6(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.024743;
@@ -995,7 +995,7 @@ static void check_6(double* result, int TotalDof)
 
 static void check_7(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.029435;
@@ -1123,7 +1123,7 @@ static void check_7(double* result, int TotalDof)
 
 static void check_8(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.024336;
@@ -1251,7 +1251,7 @@ static void check_8(double* result, int TotalDof)
 
 static void check_9(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.029201;
@@ -1379,7 +1379,7 @@ static void check_9(double* result, int TotalDof)
 
 static void check_10(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.018479;
@@ -1507,7 +1507,7 @@ static void check_10(double* result, int TotalDof)
 
 static void check_11(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.024644;
@@ -1635,7 +1635,7 @@ static void check_11(double* result, int TotalDof)
 
 static void check_12(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.029760;
@@ -1763,7 +1763,7 @@ static void check_12(double* result, int TotalDof)
 
 static void check_13(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.027398;
@@ -1891,7 +1891,7 @@ static void check_13(double* result, int TotalDof)
 
 static void check_14(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.027213;
@@ -2019,7 +2019,7 @@ static void check_14(double* result, int TotalDof)
 
 static void check_15(double* result, int TotalDof)
 {
-	EXPECT_EQ(TotalDof, 118);
+	ASSERT_EQ(TotalDof, 118);
 
 	vector<double> expected(118);
 	expected[0] = -0.043403;
@@ -2162,7 +2162,7 @@ namespace gold
 	{
 	public :
 
-		GoogleTest()
+		static void run()
 		{
 			using namespace gold;
 
@@ -2234,7 +2234,7 @@ namespace gold
 
 TEST(InterpolateArrayManyMultistate, gold)
 {
-	gold::GoogleTest();
+	gold::GoogleTest::run();
 }
 
 #undef NAMESPACE
@@ -2261,7 +2261,7 @@ namespace x86
 	{
 	public :
 
-		GoogleTest()
+		static void run()
 		{
 			using namespace x86;
 
@@ -2308,6 +2308,8 @@ namespace x86
 					JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
 						stringize(LinearBasis_x86_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 						(Func)NULL).getFunc();
+
+				ASSERT_TRUE(INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT != NULL);
 
 				volatile double start, finish;
 				get_time(&start);
@@ -2360,7 +2362,7 @@ namespace x86
 
 TEST(InterpolateArrayManyMultistate, x86)
 {
-	x86::GoogleTest();
+	x86::GoogleTest::run();
 }
 
 #undef NAMESPACE
@@ -2389,7 +2391,7 @@ namespace avx
 	{
 	public :
 
-		GoogleTest()
+		static void run()
 		{
 			using namespace avx;
 
@@ -2436,6 +2438,8 @@ namespace avx
 					JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
 						stringize(LinearBasis_avx_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 						(Func)NULL).getFunc();
+
+				ASSERT_TRUE(INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT != NULL);
 
 				volatile double start, finish;
 				get_time(&start);
@@ -2488,7 +2492,7 @@ namespace avx
 
 TEST(InterpolateArrayManyMultistate, avx)
 {
-	avx::GoogleTest();
+	avx::GoogleTest::run();
 }
 
 #undef NAMESPACE
@@ -2517,7 +2521,7 @@ namespace avx2
 	{
 	public :
 
-		GoogleTest()
+		static void run()
 		{
 			using namespace avx2;
 
@@ -2564,6 +2568,8 @@ namespace avx2
 					JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
 						stringize(LinearBasis_avx2_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 						(Func)NULL).getFunc();
+
+				ASSERT_TRUE(INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT != NULL);
 
 				volatile double start, finish;
 				get_time(&start);
@@ -2616,7 +2622,7 @@ namespace avx2
 
 TEST(InterpolateArrayManyMultistate, avx2)
 {
-	avx2::GoogleTest();
+	avx2::GoogleTest::run();
 }
 
 #undef NAMESPACE
@@ -2647,7 +2653,7 @@ namespace avx512
 	{
 	public :
 
-		GoogleTest()
+		static void run()
 		{
 			using namespace avx512;
 
@@ -2683,7 +2689,7 @@ namespace avx512
 			}
 
 			Device* device = avx512::tryAcquireDevice();
-			EXPECT_TRUE(device != NULL);
+			ASSERT_TRUE(device != NULL);
 
 			{
 				if (runopt)
@@ -2696,6 +2702,8 @@ namespace avx512
 						JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
 							stringize(LinearBasis_avx512_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 							(Func)NULL).getFunc();
+
+					ASSERT_TRUE(INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT != NULL);
 
 					volatile double start, finish;
 					get_time(&start);
@@ -2750,7 +2758,7 @@ namespace avx512
 
 TEST(InterpolateArrayManyMultistate, avx512)
 {
-	avx512::GoogleTest();
+	avx512::GoogleTest::run();
 }
 
 #if defined(NVCC)
@@ -2789,7 +2797,7 @@ namespace cuda
 			vector<double*> results(nstates);
 
 			Device* device = cuda::tryAcquireDevice();
-			EXPECT_TRUE(device != NULL);
+			ASSERT_TRUE(device != NULL);
 
 			{			
 				Data data(nstates);
@@ -2834,6 +2842,8 @@ namespace cuda
 						JIT::jitCompile(device, data.dim, nstates, data.TotalDof,
 							stringize(LinearBasis_cuda_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 							(Func)NULL).getFunc();
+
+					ASSERT_TRUE(INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT != NULL);
 
 					// Run once without timing to do all CUDA-specific internal initializations.
 					INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
