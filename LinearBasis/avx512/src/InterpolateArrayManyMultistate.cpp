@@ -20,13 +20,14 @@ extern "C" void FUNCNAME(
 
 	int nthreads = device->getThreadsCount();
 
-	Vector<double> vscratch(szscratch * (nthreads - 1));
-	double* scratch = vscratch.getData();
-
 	const __m512d zero = _mm512_setzero_pd();
 	const __m512d one = _mm512_set1_pd(1.0);
 	for (int many = 0; many < COUNT; many++)
 	{
+		// Must be inside the COUNT loop to have the scratch zeroed each time.
+		Vector<double> vscratch(szscratch * (nthreads - 1));
+		double* scratch = vscratch.getData();
+
 		const double* x = x_[many];
 		const int& nfreqs = nfreqs_[many];
 		const XPS& xps = xps_[many];
@@ -64,8 +65,6 @@ extern "C" void FUNCNAME(
 
 		// Loop to calculate scaled surplus product.
 		double* xpv = (double*)&xpv64[0];
-#if 0
-
 		#pragma omp parallel
 		{
 			int tid = omp_get_thread_num();
@@ -120,32 +119,6 @@ extern "C" void FUNCNAME(
 				#pragma omp barrier
 			}
 		}
-#else
-		// Zero the values array.
-		memset(value, 0, sizeof(double) * DOF_PER_NODE);
-
-		// Loop to calculate scaled surplus product.
-		for (int i = 0, ichain = 0; i < nno; i++, ichain += nfreqs)
-		{
-			double temp = 1.0;
-			for (int ifreq = 0; ifreq < nfreqs; ifreq++)
-			{
-				// Early exit for shorter chains.
-				const auto& idx = chains[ichain + ifreq];
-				if (!idx) break;
-
-				temp *= xpv[idx];
-				if (!temp) goto next;
-			}
-
-			for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE; Dof_choice++)
-				value[Dof_choice] += temp * surplus(i, Dof_choice);
-			
-		next :
-
-			continue;
-		}
-#endif
 	}
 }
 
