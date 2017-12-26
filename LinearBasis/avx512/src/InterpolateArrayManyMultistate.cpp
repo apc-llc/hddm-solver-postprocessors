@@ -1,7 +1,6 @@
 #include <omp.h>
 #include <x86intrin.h>
 
-#include "LinearBasis.h"
 #include "avx512/include/Data.h"
 #include "avx512/include/Device.h"
 
@@ -60,11 +59,13 @@ extern "C" void FUNCNAME(
 
 			// Compute xpv[i]
 			_mm512_store_pd((double*)&xpv64[i], _mm512_max_pd(zero, _mm512_sub_pd(one,
-				(__m512d)_mm512_abs_epi64((__m512i)_mm512_fmadd_pd(x64, i32, j32)))));
+				_mm512_abs_pd(_mm512_fmadd_pd(x64, i32, j32)))));
 		}
 
 		// Loop to calculate scaled surplus product.
 		double* xpv = (double*)&xpv64[0];
+#if 0
+
 		#pragma omp parallel
 		{
 			int tid = omp_get_thread_num();
@@ -119,6 +120,32 @@ extern "C" void FUNCNAME(
 				#pragma omp barrier
 			}
 		}
+#else
+		// Zero the values array.
+		memset(value, 0, sizeof(double) * DOF_PER_NODE);
+
+		// Loop to calculate scaled surplus product.
+		for (int i = 0, ichain = 0; i < nno; i++, ichain += nfreqs)
+		{
+			double temp = 1.0;
+			for (int ifreq = 0; ifreq < nfreqs; ifreq++)
+			{
+				// Early exit for shorter chains.
+				const auto& idx = chains[ichain + ifreq];
+				if (!idx) break;
+
+				temp *= xpv[idx];
+				if (!temp) goto next;
+			}
+
+			for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE; Dof_choice++)
+				value[Dof_choice] += temp * surplus(i, Dof_choice);
+			
+		next :
+
+			continue;
+		}
+#endif
 	}
 }
 
