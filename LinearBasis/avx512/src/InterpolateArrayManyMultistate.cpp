@@ -18,16 +18,10 @@ extern "C" void FUNCNAME(
 	if (DOF_PER_NODE % DOUBLE_VECTOR_SIZE)
 		szscratch = (DOF_PER_NODE / DOUBLE_VECTOR_SIZE + 1) * DOUBLE_VECTOR_SIZE;
 
-	int nthreads = device->getThreadsCount();
-
 	const __m512d zero = _mm512_setzero_pd();
 	const __m512d one = _mm512_set1_pd(1.0);
 	for (int many = 0; many < COUNT; many++)
 	{
-		// Must be inside the COUNT loop to have the scratch zeroed each time.
-		Vector<double> vscratch(szscratch * (nthreads - 1));
-		double* scratch = vscratch.getData();
-
 		const double* x = x_[many];
 		const int& nfreqs = nfreqs_[many];
 		const XPS& xps = xps_[many];
@@ -36,6 +30,12 @@ extern "C" void FUNCNAME(
 		double* value = value_[many];
 
 		int nno = surplus.dimy();
+
+		int nthreads = min(device->getThreadsCount(), nno);
+
+		// Must be inside the COUNT loop to have the scratch zeroed each time.
+		Vector<double> vscratch(szscratch * (nthreads - 1));
+		double* scratch = vscratch.getData();
 
 		size_t szxpv64 = xps.size() / DOUBLE_VECTOR_SIZE;
 		if (xps.size() % DOUBLE_VECTOR_SIZE) szxpv64++;
@@ -65,7 +65,7 @@ extern "C" void FUNCNAME(
 
 		// Loop to calculate scaled surplus product.
 		double* xpv = (double*)&xpv64[0];
-		#pragma omp parallel
+		#pragma omp parallel num_threads(nthreads)
 		{
 			int tid = omp_get_thread_num();
 
