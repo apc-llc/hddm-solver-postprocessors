@@ -1,0 +1,144 @@
+simonsch@tave101:/scratch/snx2000/simonsch/dmitry/hddm-solver/interpolators/LinearBasis/tests/InterpolateArrayManyMultistate/medium> NTESTS=1000 RUNTIME_OPTIMIZATION=0 srun build/cray/intel/release/test
+------------------------------------
+INITIALIZING MPI
+------------------------------------
+1 host(s) participating: 
+	nid00001
+
+rank 0 (pid = 20863) @ hostname "nid00001"
+------------------------------------
+LOADING "avx512" POSTPROCESSOR CONFIG (hddm-solver.cfg)
+------------------------------------
+nagents : 59
+priority : 3
+surplusCutoff : unused
+Maximum SIMD vector size across postprocessors: 16
+Note: Google Test filter = **.x86:*.gold:*.avx512:*.avx2:*.avx
+[==========] Running 5 tests from 1 test case.
+[----------] Global test environment set-up.
+[----------] 5 tests from InterpolateArrayManyMultistate
+[ RUN      ] InterpolateArrayManyMultistate.gold
+Loading data from surplus_10.plt 
+Loading data from surplus_15.plt 
+Loading data from surplus_13.plt 
+Loading data from surplus_9.plt 
+Loading data from surplus_3.plt 
+Loading data from surplus_2.plt 
+Loading data from surplus_4.plt 
+Loading data from surplus_1.plt 
+Loading data from surplus_16.plt 
+Loading data from surplus_7.plt 
+Loading data from surplus_8.plt 
+Loading data from surplus_14.plt 
+------------------------------------
+LOADING "gold" POSTPROCESSOR CONFIG (hddm-solver.cfg)
+------------------------------------
+Loading data from surplus_5.plt 
+Loading data from surplus_6.plt 
+Loading data from surplus_11.plt 
+Loading data from surplus_12.plt 
+nagents : 59
+priority : 3
+surplusCutoff : unused
+time = 0.00223023 sec per state (averaged from 1000 tests)
+[       OK ] InterpolateArrayManyMultistate.gold (36229 ms)
+[ RUN      ] InterpolateArrayManyMultistate.x86
+Loading data from surplus_3.plt 
+Loading data from surplus_13.plt 
+Loading data from surplus_14.plt 
+Loading data from surplus_10.plt 
+Loading data from surplus_15.plt 
+Loading data from surplus_12.plt 
+Loading data from surplus_8.plt 
+Loading data from surplus_1.plt 
+Loading data from surplus_4.plt 
+Loading data from surplus_9.plt 
+------------------------------------
+Loading data from surplus_11.plt 
+Loading data from surplus_7.plt 
+LOADING "x86" POSTPROCESSOR CONFIG (hddm-solver.cfg)
+------------------------------------
+Loading data from surplus_5.plt 
+Loading data from surplus_16.plt 
+Loading data from surplus_6.plt 
+nagents : 59
+priority : 3
+Loading data from surplus_2.plt 
+surplusCutoff : unused
+time = 0.000757741 sec per state (averaged from 1000 tests)
+[       OK ] InterpolateArrayManyMultistate.x86 (12410 ms)
+[ RUN      ] InterpolateArrayManyMultistate.avx
+Loading data from surplus_1.plt 
+Loading data from surplus_4.plt 
+Loading data from surplus_14.plt 
+Loading data from surplus_5.plt 
+Loading data from surplus_6.plt 
+Loading data from surplus_15.plt 
+------------------------------------
+Loading data from surplus_11.plt 
+Loading data from surplus_8.plt 
+Loading data from surplus_10.plt 
+LOADING "avx" POSTPROCESSOR CONFIG (hddm-solver.cfg)
+Loading data from surplus_12.plt 
+Loading data from surplus_7.plt 
+Loading data from surplus_3.plt 
+Loading data from surplus_16.plt 
+Loading data from surplus_13.plt 
+------------------------------------
+Loading data from surplus_9.plt 
+nagents : 59
+priority : 3
+Loading data from surplus_2.plt 
+surplusCutoff : unused
+time = 0.000773736 sec per state (averaged from 1000 tests)
+[       OK ] InterpolateArrayManyMultistate.avx (12646 ms)
+[ RUN      ] InterpolateArrayManyMultistate.avx2
+Loading data from surplus_1.plt 
+Loading data from surplus_3.plt 
+Loading data from surplus_14.plt 
+Loading data from surplus_10.plt 
+Loading data from surplus_5.plt 
+Loading data from surplus_16.plt 
+------------------------------------
+LOADING "avx2" POSTPROCESSOR CONFIG (hddm-solver.cfg)
+------------------------------------
+Loading data from surplus_11.plt 
+Loading data from surplus_8.plt 
+Loading data from surplus_4.plt 
+Loading data from surplus_15.plt 
+Loading data from surplus_13.plt 
+Loading data from surplus_9.plt 
+Loading data from surplus_6.plt 
+Loading data from surplus_7.plt 
+Loading data from surplus_12.plt 
+nagents : 59
+priority : 3
+surplusCutoff : unused
+Loading data from surplus_2.plt 
+time = 0.000759073 sec per state (averaged from 1000 tests)
+[       OK ] InterpolateArrayManyMultistate.avx2 (12415 ms)
+[ RUN      ] InterpolateArrayManyMultistate.avx512
+Loading data from surplus_4.plt 
+Loading data from surplus_14.plt 
+Loading data from surplus_9.plt 
+Loading data from surplus_6.plt 
+Loading data from surplus_16.plt 
+Loading data from surplus_8.plt 
+Loading data from surplus_12.plt 
+Loading data from surplus_1.plt 
+Loading data from surplus_3.plt 
+Loading data from surplus_5.plt 
+Loading data from surplus_11.plt 
+Loading data from surplus_10.plt 
+Loading data from surplus_13.plt 
+Loading data from surplus_15.plt 
+Loading data from surplus_7.plt 
+Loading data from surplus_2.plt 
+time = 0.000225382 sec per state (averaged from 1000 tests)
+[       OK ] InterpolateArrayManyMultistate.avx512 (3907 ms)
+[----------] 5 tests from InterpolateArrayManyMultistate (77610 ms total)
+
+[----------] Global test environment tear-down
+[==========] 5 tests from 1 test case ran. (77611 ms total)
+[  PASSED  ] 5 tests.
+

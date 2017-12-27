@@ -1,0 +1,44 @@
+simonsch@tave101:/scratch/snx2000/simonsch/dmitry/hddm-solver/interpolators/LinearBasis/tests/InterpolateArrayManyMultistate/large> NTESTS=1000 RUNTIME_OPTIMIZATION=0 srun build/cray/intel/release/test --gtest_filter=*.avx512
+------------------------------------
+INITIALIZING MPI
+------------------------------------
+1 host(s) participating: 
+	nid00001
+
+rank 0 (pid = 26237) @ hostname "nid00001"
+------------------------------------
+LOADING "avx512" POSTPROCESSOR CONFIG (hddm-solver.cfg)
+------------------------------------
+nagents : 59
+priority : 3
+surplusCutoff : unused
+Maximum SIMD vector size across postprocessors: 16
+Note: Google Test filter = *.avx512
+[==========] Running 1 test from 1 test case.
+[----------] Global test environment set-up.
+[----------] 1 test from InterpolateArrayManyMultistate
+[ RUN      ] InterpolateArrayManyMultistate.avx512
+Loading data from surplus_15.plt 
+Loading data from surplus_9.plt 
+Loading data from surplus_14.plt 
+Loading data from surplus_4.plt 
+Loading data from surplus_11.plt 
+Loading data from surplus_8.plt 
+Loading data from surplus_10.plt 
+Loading data from surplus_13.plt 
+Loading data from surplus_5.plt 
+Loading data from surplus_1.plt 
+Loading data from surplus_12.plt 
+Loading data from surplus_7.plt 
+Loading data from surplus_16.plt 
+Loading data from surplus_6.plt 
+Loading data from surplus_3.plt 
+Loading data from surplus_2.plt 
+time = 0.000907725 sec per state (averaged from 1000 tests)
+[       OK ] InterpolateArrayManyMultistate.avx512 (31732 ms)
+[----------] 1 test from InterpolateArrayManyMultistate (31732 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test case ran. (31733 ms total)
+[  PASSED  ] 1 test.
+
