@@ -1,0 +1,159 @@
+mikushin@daint104:/scratch/snx3000/mikushin/hddm-solver/interpolators/LinearBasis/tests/InterpolateArrayManyMultistate/large> NTESTS=1000 srun build/cray/gnu/release/test 
+------------------------------------
+INITIALIZING MPI
+------------------------------------
+1 host(s) participating: 
+	nid02112
+
+rank 0 (pid = 28776) @ hostname "nid02112"
+------------------------------------
+LOADING "avx2" POSTPROCESSOR CONFIG (hddm-solver.cfg)
+------------------------------------
+nagents : 59
+priority : 3
+surplusCutoff : unused
+------------------------------------
+LOADING "cuda" POSTPROCESSOR CONFIG (hddm-solver.cfg)
+------------------------------------
+nagents : 59
+priority : 2
+surplusCutoff : unused
+1 GPU(s) available
+Maximum SIMD vector size across postprocessors: 32
+Note: Google Test filter = *.x86:*.gold:*.avx2:*.avx:*.cuda
+[==========] Running 5 tests from 1 test case.
+[----------] Global test environment set-up.
+[----------] 5 tests from InterpolateArrayManyMultistate
+[ RUN      ] InterpolateArrayManyMultistate.gold
+Loading data from surplus_1.plt ... ------------------------------------
+LOADING "gold" POSTPROCESSOR CONFIG (hddm-solver.cfg)
+------------------------------------
+nagents : 59
+priority : 3
+surplusCutoff : unused
+done
+Loading data from surplus_2.plt ... done
+Loading data from surplus_3.plt ... done
+Loading data from surplus_4.plt ... done
+Loading data from surplus_5.plt ... done
+Loading data from surplus_6.plt ... done
+Loading data from surplus_7.plt ... done
+Loading data from surplus_8.plt ... done
+Loading data from surplus_9.plt ... done
+Loading data from surplus_10.plt ... done
+Loading data from surplus_11.plt ... done
+Loading data from surplus_12.plt ... done
+Loading data from surplus_13.plt ... done
+Loading data from surplus_14.plt ... done
+Loading data from surplus_15.plt ... done
+Loading data from surplus_16.plt ... done
+time = 0.0188846 sec per state (averaged from 1000 tests)
+[       OK ] InterpolateArrayManyMultistate.gold (332958 ms)
+[ RUN      ] InterpolateArrayManyMultistate.x86
+Loading data from surplus_1.plt ... ------------------------------------
+LOADING "x86" POSTPROCESSOR CONFIG (hddm-solver.cfg)
+------------------------------------
+nagents : 59
+priority : 3
+surplusCutoff : unused
+done
+Loading data from surplus_2.plt ... done
+Loading data from surplus_3.plt ... done
+Loading data from surplus_4.plt ... done
+Loading data from surplus_5.plt ... done
+Loading data from surplus_6.plt ... done
+Loading data from surplus_7.plt ... done
+Loading data from surplus_8.plt ... done
+Loading data from surplus_9.plt ... done
+Loading data from surplus_10.plt ... done
+Loading data from surplus_11.plt ... done
+Loading data from surplus_12.plt ... done
+Loading data from surplus_13.plt ... done
+Loading data from surplus_14.plt ... done
+Loading data from surplus_15.plt ... done
+Loading data from surplus_16.plt ... done
+Performing deferred CPU kernel compilation for dim = 59, count = 16, DofPerNode = 118 ...
+JIT-compiled CPU kernel for dim = 59, count = 16, DofPerNode = 118
+Rank #0 loaded CPU kernel for dim = 59, count = 16, DofPerNode = 118 : LinearBasis_x86_RuntimeOpt_InterpolateArrayManyMultistate_11093822111081 @ 0xbca57be0
+time = 0.00425174 sec per state (averaged from 1000 tests)
+[       OK ] InterpolateArrayManyMultistate.x86 (96482 ms)
+[ RUN      ] InterpolateArrayManyMultistate.avx
+Loading data from surplus_1.plt ... ------------------------------------
+LOADING "avx" POSTPROCESSOR CONFIG (hddm-solver.cfg)
+------------------------------------
+nagents : 59
+priority : 3
+surplusCutoff : unused
+done
+Loading data from surplus_2.plt ... done
+Loading data from surplus_3.plt ... done
+Loading data from surplus_4.plt ... done
+Loading data from surplus_5.plt ... done
+Loading data from surplus_6.plt ... done
+Loading data from surplus_7.plt ... done
+Loading data from surplus_8.plt ... done
+Loading data from surplus_9.plt ... done
+Loading data from surplus_10.plt ... done
+Loading data from surplus_11.plt ... done
+Loading data from surplus_12.plt ... done
+Loading data from surplus_13.plt ... done
+Loading data from surplus_14.plt ... done
+Loading data from surplus_15.plt ... done
+Loading data from surplus_16.plt ... done
+Performing deferred CPU kernel compilation for dim = 59, count = 16, DofPerNode = 118 ...
+JIT-compiled CPU kernel for dim = 59, count = 16, DofPerNode = 118
+Rank #0 loaded CPU kernel for dim = 59, count = 16, DofPerNode = 118 : LinearBasis_avx_RuntimeOpt_InterpolateArrayManyMultistate_11093822111081 @ 0xbcc5b680
+time = 0.00422118 sec per state (averaged from 1000 tests)
+[       OK ] InterpolateArrayManyMultistate.avx (94193 ms)
+[ RUN      ] InterpolateArrayManyMultistate.avx2
+Loading data from surplus_1.plt ... done
+Loading data from surplus_2.plt ... done
+Loading data from surplus_3.plt ... done
+Loading data from surplus_4.plt ... done
+Loading data from surplus_5.plt ... done
+Loading data from surplus_6.plt ... done
+Loading data from surplus_7.plt ... done
+Loading data from surplus_8.plt ... done
+Loading data from surplus_9.plt ... done
+Loading data from surplus_10.plt ... done
+Loading data from surplus_11.plt ... done
+Loading data from surplus_12.plt ... done
+Loading data from surplus_13.plt ... done
+Loading data from surplus_14.plt ... done
+Loading data from surplus_15.plt ... done
+Loading data from surplus_16.plt ... done
+Performing deferred CPU kernel compilation for dim = 59, count = 16, DofPerNode = 118 ...
+JIT-compiled CPU kernel for dim = 59, count = 16, DofPerNode = 118
+Rank #0 loaded CPU kernel for dim = 59, count = 16, DofPerNode = 118 : LinearBasis_avx2_RuntimeOpt_InterpolateArrayManyMultistate_11093822111081 @ 0xbce5f680
+time = 0.00423415 sec per state (averaged from 1000 tests)
+[       OK ] InterpolateArrayManyMultistate.avx2 (94535 ms)
+[ RUN      ] InterpolateArrayManyMultistate.cuda
+Loading data from surplus_1.plt ... done
+Loading data from surplus_2.plt ... done
+Loading data from surplus_3.plt ... done
+Loading data from surplus_4.plt ... done
+Loading data from surplus_5.plt ... done
+Loading data from surplus_6.plt ... done
+Loading data from surplus_7.plt ... done
+Loading data from surplus_8.plt ... done
+Loading data from surplus_9.plt ... done
+Loading data from surplus_10.plt ... done
+Loading data from surplus_11.plt ... done
+Loading data from surplus_12.plt ... done
+Loading data from surplus_13.plt ... done
+Loading data from surplus_14.plt ... done
+Loading data from surplus_15.plt ... done
+Loading data from surplus_16.plt ... done
+Performing deferred GPU kernel compilation for dim = 59, count = 16, DofPerNode = 118 ...
+cc1: warning: command line option '-std=c++11' is valid for C++/ObjC++ but not for C
+cc1: warning: command line option '-std=c++11' is valid for C++/ObjC++ but not for C
+JIT-compiled GPU kernel for dim = 59, count = 16, DofPerNode = 118
+Rank #0 loaded GPU kernel for dim = 59, count = 16, DofPerNode = 118: LinearBasis_cuda_RuntimeOpt_InterpolateArrayManyMultistate_11093822111081 @ 0xbd06b740
+time = 0.000275421 sec per state (averaged from 1000 tests)
+[       OK ] InterpolateArrayManyMultistate.cuda (38318 ms)
+[----------] 5 tests from InterpolateArrayManyMultistate (656486 ms total)
+
+[----------] Global test environment tear-down
+[==========] 5 tests from 1 test case ran. (656487 ms total)
+[  PASSED  ] 5 tests.
+
