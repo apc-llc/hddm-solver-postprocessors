@@ -223,6 +223,10 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 			for (long i = 0; i < length; i++)
 				if (sh[i] == '\n') sh[i] = ' ';
 
+			// Replace all double quotes with sigle quotes.
+			for (long i = 0; i < length; i++)
+				if (sh[i] == '"') sh[i] = '\'';			
+
 			const char* format = "-c \"%s -DFUNCNAME=%s -DDIM=%d -DCOUNT=%d -DDOF_PER_NODE=%d -o %s 2>&1\"";
 			size_t szcmd = snprintf(NULL, 0, format,
 				&sh[0], funcname.c_str(), dim, count, DofPerNode, tmp.filename.c_str());
@@ -256,7 +260,7 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 				vector<char> buffer(512 + 1);
 				while (length = es.out().rdbuf()->sgetn(&buffer[0], 512))
 				{
-					buffer[length + 1] = '\0';
+					buffer[length] = '\0';
 					process->cout("%s", &buffer[0]);
 				}
 			}

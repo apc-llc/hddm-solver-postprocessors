@@ -233,6 +233,10 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 			// Remove newlines.
 			for (long i = 0; i < length; i++)
 				if (sh[i] == '\n') sh[i] = ' ';
+			
+			// Replace all double quotes with sigle quotes.
+			for (long i = 0; i < length; i++)
+				if (sh[i] == '"') sh[i] = '\'';			
 
 			// Map X vector onto formal parameter constant memory space, if smaller than
 			// DEVICE_CONST_X_MAX_SIZE, and the size is runtime-constant.
@@ -289,7 +293,7 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 				vector<char> buffer(512 + 1);
 				while (length = es.out().rdbuf()->sgetn(&buffer[0], 512))
 				{
-					buffer[length + 1] = '\0';
+					buffer[length] = '\0';
 					process->cout("%s", &buffer[0]);
 				}
 			}
