@@ -2843,13 +2843,13 @@ namespace cuda
 							stringize(LinearBasis_cuda_RuntimeOpt_InterpolateArrayManyMultistate) "_",
 							(Func)NULL).getFunc();
 
+					ASSERT_TRUE(INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT != NULL);
+
 					// Run once without timing to do all CUDA-specific internal initializations.
 					INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT(
 						device, data.dim, &nnos[0], data.TotalDof, nstates, &x[0],
 						data.device.getNfreqs(0), data.device.getXPS(0), data.host.getSzXPS(0),
 						data.device.getChains(0), data.device.getSurplus(0), &results[0]);
-
-					ASSERT_TRUE(INTERPOLATE_ARRAY_MANY_MULTISTATE_RUNTIME_OPT != NULL);
 
 					volatile double start, finish;
 					get_time(&start);
