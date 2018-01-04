@@ -2787,7 +2787,7 @@ namespace cuda
 	{
 	public :
 
-		GoogleTest()
+		static void run()
 		{
 			using namespace cuda;
 
@@ -2912,7 +2912,7 @@ namespace cuda
 
 TEST(InterpolateArrayManyMultistate, cuda)
 {
-	cuda::GoogleTest();
+	cuda::GoogleTest::run();
 }
 #endif // NVCC
 
