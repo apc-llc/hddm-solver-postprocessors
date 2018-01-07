@@ -16,15 +16,18 @@ Device* Devices::tryAcquire()
 	// the only CPU device is always available to all threads.
 	Device* device = &devices[0];
 
-#if defined(_OPENMP)
-	#pragma omp parallel
+	if (device->nthreads == -1)
 	{
-		#pragma omp master
-		device->nthreads = omp_get_num_threads();
-	}
+#if defined(_OPENMP)
+		#pragma omp parallel
+		{
+			#pragma omp master
+			device->nthreads = omp_get_num_threads();
+		}
 #else
-	device->nthreads = 1;
+		device->nthreads = 1;
 #endif
+	}
 
         return device;
 }

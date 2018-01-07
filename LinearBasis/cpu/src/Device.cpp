@@ -2,7 +2,7 @@
 
 using namespace NAMESPACE;
 
-Device::Device() : available(1)
+Device::Device() : available(1), nthreads(-1)
 {
 }
 
