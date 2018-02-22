@@ -327,6 +327,11 @@ void DataDense::load(const char* filename, int istate)
 	MPI_ERR_CHECK(MPI_Process_get(&process));
 	const Parameters& params = Interpolator::getInstance()->getParameters();
 
+	if (istate >= nstates)
+	{
+		process->cerr("State %d index out of range 0 .. %d\n", istate, nstates - 1);
+		process->abort();
+	}
 	if (loadedStates[istate])
 	{
 		process->cerr("State %d data is already loaded\n", istate);
