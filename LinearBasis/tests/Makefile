@@ -1,5 +1,7 @@
 LOCATION = ../../..
 
+include $(LOCATION)/Makefile.inc
+
 include Makefile.inc
 
 googletest:
