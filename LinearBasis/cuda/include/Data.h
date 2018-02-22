@@ -5,7 +5,6 @@
 #include <assert.h>
 #include <cstddef>
 #include <cstdlib>
-#include <iostream>
 #include <map>
 #include <memory>
 #include <string.h>
@@ -72,16 +71,17 @@ public:
 		size_t size = n * sizeof(T);
 		if (size % (AVX_VECTOR_SIZE * sizeof(T)))
 			size += AVX_VECTOR_SIZE * sizeof(T) - size % (AVX_VECTOR_SIZE * sizeof(T)); 
-		int err = posix_memalign(&ptr, AVX_VECTOR_SIZE * sizeof(T), size);
+
+		// POSIX requires minimum alignment to be sizeof(void*). 
+		int err = posix_memalign(&ptr, std::max(sizeof(void*), AVX_VECTOR_SIZE * sizeof(T)), size);
 		if (err != 0)
 		{
-			using namespace std;
-			cerr << "posix_memalign returned error " << err;
-			if (err == EINVAL) cerr << " (EINVAL)";
-			else if (err == ENOMEM) cerr << " (ENOMEM)";
-			cerr << endl;
 			MPI_Process* process;
 			MPI_ERR_CHECK(MPI_Process_get(&process));
+			process->cerr("posix_memalign returned error %d", err);
+			if (err == EINVAL) process->cerr(" (EINVAL)");
+			else if (err == ENOMEM) process->cerr(" (ENOMEM)");
+			process->cerr("\n");
 			process->abort();
 		}
 		memset(ptr, 0, size);
