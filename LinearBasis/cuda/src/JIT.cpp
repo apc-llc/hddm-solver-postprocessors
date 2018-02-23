@@ -26,10 +26,16 @@ public :
 
 static int id = 1; // TODO
 
+extern unsigned int INTERPOLATE_ARRAY_SH_LEN;
+extern unsigned int INTERPOLATE_ARRAY_MANY_MULTISTATE_SH_LEN;
+
+extern unsigned char INTERPOLATE_ARRAY_SH[];
+extern unsigned char INTERPOLATE_ARRAY_MANY_MULTISTATE_SH[];
+
 template<>
-const string InterpolateArrayKernel::sh = INTERPOLATE_ARRAY_SH;
+const string InterpolateArrayKernel::sh((char*)INTERPOLATE_ARRAY_SH, INTERPOLATE_ARRAY_SH_LEN);
 template<>
-const string InterpolateArrayManyMultistateKernel::sh = INTERPOLATE_ARRAY_MANY_MULTISTATE_SH;
+const string InterpolateArrayManyMultistateKernel::sh((char*)INTERPOLATE_ARRAY_MANY_MULTISTATE_SH, INTERPOLATE_ARRAY_MANY_MULTISTATE_SH_LEN);
 
 struct KSignature
 {
@@ -203,32 +209,8 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 		// Read the compile command template.
 		vector<char> cmd;
 		{
-			FILE* fsh = fopen(kernel.sh.c_str(), "rb");
-			if (!fsh)
-			{
-				process->cerr("Error opening file: %s\n", kernel.sh.c_str());
-				process->cerr("Deferred GPU kernel compilation failed!\n");
-
-				kernel.compilationFailed = true;
-				kernel.dim = dim;
-				kernel.count = count;
-				kernel.DofPerNode = DofPerNode;
-				kernel.fileowner = false;
-				kernel.func = fallbackFunc;
-
-				kernels_tls[signature] = kernel;
-				PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
-				return kernel;
-			}
-
-			vector<char> sh;
-			fseek(fsh, 0, SEEK_END);
-			long length = ftell(fsh);
-			fseek(fsh, 0, SEEK_SET);
-			sh.resize(length + 1);
-			sh[length] = '\0';
-			length = fread(&sh[0], 1, length, fsh);
-			fclose(fsh);
+			string sh = kernel.sh.c_str();
+			size_t length = sh.size();
 
 			// Remove newlines.
 			for (long i = 0; i < length; i++)
@@ -262,7 +244,7 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 			int cc = device->getCC();
 
 			size_t szcmd = snprintf(NULL, 0, format,
-				&sh[0], cc, useConstMemoryForX ? "-DX_IN_CONSTANT_MEMORY" : "",
+				sh.c_str(), cc, useConstMemoryForX ? "-DX_IN_CONSTANT_MEMORY" : "",
 				funcname.c_str(), dim, count, DofPerNode, tmp.filename.c_str(),
 				keepCache ? "-keep" : "");
 
@@ -270,7 +252,7 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 			cmd[szcmd + 1] = '\0';
 
 			snprintf(&cmd[0], szcmd + 1, format,
-				&sh[0], cc, useConstMemoryForX ? "-DX_IN_CONSTANT_MEMORY" : "",
+				sh.c_str(), cc, useConstMemoryForX ? "-DX_IN_CONSTANT_MEMORY" : "",
 				funcname.c_str(), dim, count, DofPerNode, tmp.filename.c_str(),
 				keepCache ? "-keep" : "");
 

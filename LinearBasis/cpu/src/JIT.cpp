@@ -15,10 +15,16 @@ using namespace std;
 
 static int id = 0; // TODO
 
+extern unsigned int INTERPOLATE_ARRAY_SH_LEN;
+extern unsigned int INTERPOLATE_ARRAY_MANY_MULTISTATE_SH_LEN;
+
+extern unsigned char INTERPOLATE_ARRAY_SH[];
+extern unsigned char INTERPOLATE_ARRAY_MANY_MULTISTATE_SH[];
+
 template<>
-const string InterpolateArrayKernel::sh = INTERPOLATE_ARRAY_SH;
+const string InterpolateArrayKernel::sh((char*)INTERPOLATE_ARRAY_SH, INTERPOLATE_ARRAY_SH_LEN);
 template<>
-const string InterpolateArrayManyMultistateKernel::sh = INTERPOLATE_ARRAY_MANY_MULTISTATE_SH;
+const string InterpolateArrayManyMultistateKernel::sh((char*)INTERPOLATE_ARRAY_MANY_MULTISTATE_SH, INTERPOLATE_ARRAY_MANY_MULTISTATE_SH_LEN);
 
 struct KSignature
 {
@@ -192,32 +198,8 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 		// Read the compile command template.
 		vector<char> cmd;
 		{
-			FILE* fsh = fopen(kernel.sh.c_str(), "rb");
-			if (!fsh)
-			{
-				process->cerr("Error opening file: %s\n", kernel.sh.c_str());
-				process->cerr("Deferred CPU kernel compilation failed!\n");
-
-				kernel.compilationFailed = true;
-				kernel.dim = dim;
-				kernel.count = count;
-				kernel.DofPerNode = DofPerNode;
-				kernel.fileowner = false;
-				kernel.func = fallbackFunc;
-
-				kernels_tls[signature] = kernel;
-				PTHREAD_ERR_CHECK(pthread_mutex_unlock(&mutex));
-				return kernel;
-			}
-
-			vector<char> sh;
-			fseek(fsh, 0, SEEK_END);
-			long length = ftell(fsh);
-			fseek(fsh, 0, SEEK_SET);
-			sh.resize(length + 1);
-			sh[length] = '\0';
-			length = fread(&sh[0], 1, length, fsh);
-			fclose(fsh);
+			string sh = kernel.sh.c_str();
+			size_t length = sh.size();
 
 			// Remove newlines.
 			for (long i = 0; i < length; i++)
@@ -229,13 +211,13 @@ K& JIT::jitCompile(Device* device, int dim, int count, int DofPerNode,
 
 			const char* format = "-c \"%s -DFUNCNAME=%s -DDIM=%d -DCOUNT=%d -DDOF_PER_NODE=%d -o %s 2>&1\"";
 			size_t szcmd = snprintf(NULL, 0, format,
-				&sh[0], funcname.c_str(), dim, count, DofPerNode, tmp.filename.c_str());
+				sh.c_str(), funcname.c_str(), dim, count, DofPerNode, tmp.filename.c_str());
 
 			cmd.resize(szcmd + 2);
 			cmd[szcmd + 1] = '\0';
 
 			snprintf(&cmd[0], szcmd + 1, format,
-				&sh[0], funcname.c_str(), dim, count, DofPerNode, tmp.filename.c_str());
+				sh.c_str(), funcname.c_str(), dim, count, DofPerNode, tmp.filename.c_str());
 
 			bool keepCache = false;
 			const char* keepCacheValue = getenv("KEEP_CACHE");

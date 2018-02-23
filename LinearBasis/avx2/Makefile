@@ -21,7 +21,7 @@ all: $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so
 $(INSTALL)/bin/postprocessors/LinearBasis/$(NAME)/libpostprocessor.so: \
 	$(BUILD)/exec-stream.o \
 	$(BUILD)/InterpolateArray.o $(BUILD)/InterpolateArrayManyMultistate.o \
-	$(BUILD)/libInterpolateArray.sh $(BUILD)/libInterpolateArrayManyMultistate.sh \
+	$(BUILD)/libInterpolateArray.sh.o $(BUILD)/libInterpolateArrayManyMultistate.sh.o \
 	$(BUILD)/parameters.o $(BUILD)/Interpolator.o $(BUILD)/Data.o $(BUILD)/JIT.o \
 	$(BUILD)/priority.o $(BUILD)/instrset.o $(BUILD)/supported.o $(BUILD)/reset.o \
 	$(BUILD)/Device.o $(BUILD)/Devices.o $(BUILD)/DeviceProperties.o $(BUILD)/getData.o
@@ -39,8 +39,20 @@ $(BUILD)/InterpolateArrayManyMultistate.o: src/InterpolateArrayManyMultistate.cp
 $(BUILD)/libInterpolateArray.sh: src/InterpolateArray.cpp
 	$(CDIR) && echo cd $(shell pwd) \&\& $(CXX) $(CINC) $(COPT) -shared $^  > $@
 
+$(BUILD)/libInterpolateArray.sh.c: $(BUILD)/libInterpolateArray.sh
+	$(CDIR) && xxd -i $< $@
+
+$(BUILD)/libInterpolateArray.sh.o: $(BUILD)/libInterpolateArray.sh.c
+	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
+
 $(BUILD)/libInterpolateArrayManyMultistate.sh: src/InterpolateArrayManyMultistate.cpp
 	$(CDIR) && echo cd $(shell pwd) \&\& $(CXX) $(CINC) $(COPT) -shared $^  > $@
+
+$(BUILD)/libInterpolateArrayManyMultistate.sh.c: $(BUILD)/libInterpolateArrayManyMultistate.sh
+	$(CDIR) && xxd -i $< $@
+
+$(BUILD)/libInterpolateArrayManyMultistate.sh.o: $(BUILD)/libInterpolateArrayManyMultistate.sh.c
+	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/parameters.o: src/parameters.cpp $(LOCATION)/include/check.h include/parameters.h include/parameters.c
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
@@ -52,7 +64,11 @@ $(BUILD)/Data.o: src/Data.cpp include/Data.h
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
 
 $(BUILD)/JIT.o: src/JIT.cpp include/InterpolateKernel.h
-	$(CDIR) && $(CXX) -DINTERPOLATE_ARRAY_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArray.sh\" -DINTERPOLATE_ARRAY_MANY_MULTISTATE_SH=\"$(shell pwd)/$(BUILD)/libInterpolateArrayManyMultistate.sh\" $(CINC) $(COPT) -c $< -o $@
+	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@ \
+		-DINTERPOLATE_ARRAY_SH=$(subst /,_,$(BUILD))_libInterpolateArray_sh \
+		-DINTERPOLATE_ARRAY_SH_LEN=$(subst /,_,$(BUILD))_libInterpolateArray_sh_len \
+		-DINTERPOLATE_ARRAY_MANY_MULTISTATE_SH=$(subst /,_,$(BUILD))_libInterpolateArrayManyMultistate_sh \
+		-DINTERPOLATE_ARRAY_MANY_MULTISTATE_SH_LEN=$(subst /,_,$(BUILD))_libInterpolateArrayManyMultistate_sh_len
 
 $(BUILD)/priority.o: src/priority.cpp
 	$(CDIR) && $(CXX) $(CINC) $(COPT) -c $< -o $@
