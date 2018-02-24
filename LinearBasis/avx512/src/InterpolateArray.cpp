@@ -1,24 +1,35 @@
 #include <omp.h>
 #include <x86intrin.h>
 
-#include "LinearBasis.h"
 #include "avx512/include/Data.h"
+#include "avx512/include/Device.h"
 
 using namespace NAMESPACE;
 using namespace std;
 
-class Device;
+#include "ScaledSurplus.h"
 
 extern "C" void FUNCNAME(
 	Device* device,
 	const int dim, const int DofPerNode, const double* x,
 	const int nfreqs, const XPS* xps_, const Chains* chains_, const Matrix<double>* surplus_, double* value)
 {
+	size_t szscratch = DOF_PER_NODE;
+	if (DOF_PER_NODE % DOUBLE_VECTOR_SIZE)
+		szscratch = (DOF_PER_NODE / DOUBLE_VECTOR_SIZE + 1) * DOUBLE_VECTOR_SIZE;
+
+	int nthreadsMax = device->getThreadsCount();
+
+	Vector<double> vscratch(szscratch * nthreadsMax);
+	double* scratch = vscratch.getData();
+
 	const XPS& xps = *xps_;
 	const Chains& chains = *chains_;
 	const Matrix<double>& surplus = *surplus_;
 
 	int nno = surplus.dimy();
+
+	int nthreads = min(nthreadsMax, nno);
 
 	// Loop to calculate all unique xp values.
 	const __m512d zero = _mm512_set1_pd(0.0);
@@ -45,29 +56,21 @@ extern "C" void FUNCNAME(
 			_mm512_sub_pd(one, (__m512d)_mm512_abs_epi64((__m512i)_mm512_fmadd_pd(x64, i32, j32)))));
 	}
 
-	size_t szscratch = DOF_PER_NODE;
-	if (DOF_PER_NODE % DOUBLE_VECTOR_SIZE)
-		szscratch = (DOF_PER_NODE / DOUBLE_VECTOR_SIZE + 1) * DOUBLE_VECTOR_SIZE;
-
-	int nthreads = 0;
-
-	#pragma omp parallel
-	{
-		#pragma omp master
-		nthreads = omp_get_num_threads();
-	}
-	Vector<double> vscratch(szscratch * (nthreads - 1));
-	double* scratch = vscratch.getData();
-
 	// Loop to calculate scaled surplus product.
 	double* xpv = (double*)&xpv64[0];
-	#pragma omp parallel
+	ScaledSurplus result(DofPerNode, surplus, value);
+	#pragma omp parallel num_threads(nthreads)
 	{
 		int tid = omp_get_thread_num();
 
-		double* value_private = (tid == 0) ? value : scratch + szscratch * (tid - 1);
+		double* value_private = scratch + szscratch * tid;
 
-		#pragma omp for
+		// Create empty private copies of result. Due to bug in Intel, we do not assign
+		// value_private pointer to it here, and instead do in the reduction loop below.
+		#pragma omp declare reduction(ScaledSurplusReduction: ScaledSurplus: omp_out += omp_in) \
+			initializer(omp_priv = ScaledSurplus::priv(omp_orig))
+
+		#pragma omp for reduction(ScaledSurplusReduction:result)
 		for (int i = 0; i < nno; i++)
 		{
 			double temp = 1.0;
@@ -81,36 +84,14 @@ extern "C" void FUNCNAME(
 				if (!temp) goto next;
 			}
 
-			{
-				const __m512d temp64 = _mm512_set1_pd(temp);
+			result += ScaledSurplus(value_private, i, temp);
+			continue;
 
-				for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE; Dof_choice += DOUBLE_VECTOR_SIZE)
-				{
-					const __m512d surplus64 = _mm512_load_pd(&surplus(i, Dof_choice));
-					__m512d value64 = _mm512_load_pd(&value_private[Dof_choice]);
-					value64 = _mm512_fmadd_pd(temp64, surplus64, value64);
-					_mm512_store_pd(&value_private[Dof_choice], value64);
-				}
-			}
-		
 		next :
 
+			// Only assign private copy a data pointer.
+			result += ScaledSurplus(value_private);
 			continue;
-		}
-
-		for (int shift = 1; shift < nthreads; shift <<= 1)
-		{
-			if (tid % (shift << 1) == 0)
-			{
-				double* value_private2 = scratch + szscratch * (tid - 1 + shift);
-				for (int Dof_choice = 0; Dof_choice < DOF_PER_NODE; Dof_choice += DOUBLE_VECTOR_SIZE)
-				{
-					__m512d v = _mm512_load_pd(&value_private[Dof_choice]);
-					__m512d v2 = _mm512_load_pd(&value_private2[Dof_choice]);
-					_mm512_store_pd((__m512d*)&value_private[Dof_choice], _mm512_add_pd(v, v2));
-				}
-			}
-			#pragma omp barrier
 		}
 	}
 }
