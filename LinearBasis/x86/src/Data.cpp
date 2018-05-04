@@ -20,7 +20,7 @@ static bool isCompressed(const char* filename)
 	if (!infile)
 	{
 		process->cerr("Error opening file: %s\n", filename);
-		exit(1);
+		process->abort();
 	}  
 
 	bool compressed = false;
@@ -632,6 +632,12 @@ void DataSparse::load(const char* filename, int istate)
 
 	// Calculate the maximum number of non-zero values across individual rows.
 	state.nfreqs = index[istate].maxRowPopulation();
+
+	if (!state.nfreqs)
+	{
+		process->cerr("Index array cannot be of all zeros in file: %s\n", filename);
+		process->abort();
+	}
 
 	vector<map<uint32_t, uint32_t> > transMaps(state.nfreqs);
 	vector<AVXIndexes> avxinds(state.nfreqs);

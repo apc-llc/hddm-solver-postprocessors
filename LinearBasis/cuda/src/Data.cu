@@ -601,10 +601,10 @@ void Data::load(const char* filename, int istate)
 	
 	fclose(infile);
 	
-	load(dim, vdim, nno, TotalDof, Level, index, istate);
+	load(filename, dim, vdim, nno, TotalDof, Level, index, istate);
 }
 
-void Data::load(int dim, int vdim, int nno, int TotalDof, int Level, const Matrix<int>::Host& index, int istate)
+void Data::load(const char* filename, int dim, int vdim, int nno, int TotalDof, int Level, const Matrix<int>::Host& index, int istate)
 {
 	MPI_Process* process;
 	MPI_ERR_CHECK(MPI_Process_get(&process));
@@ -637,6 +637,12 @@ void Data::load(int dim, int vdim, int nno, int TotalDof, int Level, const Matri
 
 	// Calculate the maximum number of non-zero values across individual rows.
 	state.nfreqs = index.maxRowPopulation();
+
+	if (!state.nfreqs)
+	{
+		process->cerr("Index array cannot be of all zeros in file: %s\n", filename);
+		process->abort();
+	}
 
 	vector<map<uint32_t, uint32_t> > transMaps(state.nfreqs);
 	vector<AVXIndexes> avxinds(state.nfreqs);

@@ -540,7 +540,7 @@ public :
 
 	virtual void load(const char* filename, int istate);
 
-	void load(int dim, int vdim, int nno, int TotalDof, int Level, const Matrix<int>::Host& index, int istate);
+	void load(const char* filename, int dim, int vdim, int nno, int TotalDof, int Level, const Matrix<int>::Host& index, int istate);
 
 	virtual void clear();
 
