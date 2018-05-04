@@ -276,28 +276,9 @@ public :
 	virtual ~DataDense();
 };
 
-class DataSparse : public DataDense
-{
-	std::vector<int> nfreqs;
-	std::vector<XPS> xps;
-	std::vector<Chains> chains;
-	
-	friend class Interpolator;
-	friend class GoogleTest;
-
-public :
-
-	virtual void load(const char* filename, int istate);
-	
-	DataSparse(int nstates);
-	
-	virtual ~DataSparse();
-};
-
 struct Data
 {
 	typedef DataDense Dense;
-	typedef DataSparse Sparse;
 
 	virtual ~Data() { }
 };
